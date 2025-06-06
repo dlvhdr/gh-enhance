@@ -10,7 +10,7 @@
       "headers": {
         "Content-Type": "application/json"
       },
-      "bodyFile": "run.json"
+      "bodyFile": "pr-34285-checks.json"
     }
   }
 ]

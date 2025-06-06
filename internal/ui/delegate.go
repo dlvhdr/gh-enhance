@@ -18,7 +18,7 @@ func (i item) Description() string { return i.description }
 func (i item) FilterValue() string { return i.title }
 
 var quitKeys = key.NewBinding(
-	key.WithKeys("q", "esc", "ctrl+c"),
+	key.WithKeys("ctrl+c"),
 	key.WithHelp("", "press q to quit"),
 )
 

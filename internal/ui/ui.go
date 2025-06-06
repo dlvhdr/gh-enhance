@@ -1,13 +1,14 @@
 package ui
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 
 	"github.com/charmbracelet/bubbletea-app-template/internal/api"
 )
@@ -15,13 +16,15 @@ import (
 type errMsg error
 
 type model struct {
-	runId    string
-	repo     string
-	run      api.Run
-	list     list.Model
-	spinner  spinner.Model
-	quitting bool
-	err      error
+	prNumber   string
+	repo       string
+	checks     []api.Check
+	runs       []api.Run
+	checksList list.Model
+	runsList   list.Model
+	spinner    spinner.Model
+	quitting   bool
+	err        error
 }
 
 func NewModel() model {
@@ -29,47 +32,71 @@ func NewModel() model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	jobsList := list.New([]list.Item{}, newItemDelegate(), 0, 0)
-	jobsList.Title = "Jobs"
-	jobsList.SetSize(80, 40)
-	return model{list: jobsList, runId: "15372877842", repo: "port-labs/port", spinner: s}
+	checksList := list.New([]list.Item{}, newItemDelegate(), 0, 0)
+	checksList.Title = "Jobs"
+	checksList.SetSize(80, 40)
+
+	runsList := list.New([]list.Item{}, newItemDelegate(), 0, 0)
+	runsList.Title = "Checks"
+	runsList.SetStatusBarItemName("check", "checks")
+	runsList.SetSize(20, 40)
+	return model{
+		checksList: checksList,
+		runsList:   runsList,
+		prNumber:   "34285",
+		repo:       "neovim/neovim",
+		spinner:    s,
+	}
 }
 
 func (m model) Init() tea.Cmd {
-	return m.makeGetJobsCmd(m.runId)
+	return m.makeGetPrChecksCmd(m.prNumber)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	cmds := make([]tea.Cmd, 0)
+	log.Debug("got msg", "type", fmt.Sprintf("%T", msg), "msg", fmt.Sprintf("%+v", msg))
 	switch msg := msg.(type) {
 	case initMsg:
-
-		m.run = msg.run
-		jobs := make([]list.Item, 0)
-		for _, job := range m.run.Jobs {
-			it := item{title: job.Name, description: strings.ToTitle(job.Conclusion)}
-			jobs = append(jobs, it)
+		m.checks = msg.checks
+		m.runs = msg.runs
+		checkItems := make([]list.Item, 0)
+		for _, check := range m.checks {
+			it := item{title: check.Name, description: check.Workflow}
+			checkItems = append(checkItems, it)
 		}
-		cmd = m.list.SetItems(jobs)
+		runItems := make([]list.Item, 0)
+		for _, run := range m.runs {
+			it := item{title: run.Name, description: run.Link}
+			runItems = append(runItems, it)
+		}
+		cmd = m.checksList.SetItems(checkItems)
+		cmds = append(cmds, cmd)
+		cmd = m.runsList.SetItems(runItems)
+		cmds = append(cmds, cmd)
 
 	case tea.KeyMsg:
+		if m.runsList.FilterState() == list.Filtering {
+			break
+		}
+
 		if key.Matches(msg, quitKeys) {
 			m.quitting = true
 			return m, tea.Quit
-
 		}
-		return m, nil
+
 	case errMsg:
 		m.err = msg
 		return m, nil
 
-	default:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
 	}
 
-	return m, cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+	cmds = append(cmds, cmd)
+	m.runsList, cmd = m.runsList.Update(msg)
+	cmds = append(cmds, cmd)
+	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
@@ -77,5 +104,5 @@ func (m model) View() string {
 		return m.err.Error()
 	}
 
-	return m.list.View()
+	return lipgloss.JoinHorizontal(lipgloss.Top, m.runsList.View(), m.checksList.View())
 }

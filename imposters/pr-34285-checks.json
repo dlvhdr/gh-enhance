@@ -1,0 +1,157 @@
+[
+  {
+    "link": "https://github.com/neovim/neovim/runs/43546386958",
+    "name": "CodeQL",
+    "workflow": ""
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960845",
+    "name": "ubuntu asan clang oldtest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960820",
+    "name": "ubuntu asan clang functionaltest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960812",
+    "name": "windows / windows (old)",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960807",
+    "name": "ubuntu release gcc unittest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960832",
+    "name": "macos intel clang functionaltest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960823",
+    "name": "windows / windows (functional)",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960811",
+    "name": "macos intel clang oldtest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960840",
+    "name": "macos arm clang oldtest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://cirrus-ci.com/task/4942453809086464",
+    "name": "FreeBSD",
+    "workflow": ""
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960818",
+    "name": "ubuntu puc-lua gcc functionaltest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960805",
+    "name": "macos intel clang unittest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960797",
+    "name": "macos arm clang functionaltest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370615/job/43545973615",
+    "name": "s390x",
+    "workflow": "optional"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960731",
+    "name": "clang-analyzer",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960796",
+    "name": "ubuntu asan clang unittest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960786",
+    "name": "ubuntu release gcc oldtest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370608/job/43545960507",
+    "name": "Analyze",
+    "workflow": "codeql"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370618/job/43545960562",
+    "name": "lint-commits",
+    "workflow": "lintcommit"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370595/job/43545960488",
+    "name": "check",
+    "workflow": "news.txt"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960794",
+    "name": "macos arm clang unittest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370614/job/43545960502",
+    "name": "docs",
+    "workflow": "docs"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960788",
+    "name": "ubuntu release gcc functionaltest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960747",
+    "name": "lint",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960721",
+    "name": "build using zig build",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370641/job/43545960584",
+    "name": "Test USE_EXISTING_SRC_DIR=ON builds with no network access",
+    "workflow": "build_dummy"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960800",
+    "name": "ubuntu puc-lua gcc oldtest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960738",
+    "name": "with-external-deps",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370626/job/43545960770",
+    "name": "ubuntu tsan clang functionaltest",
+    "workflow": "test"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370641/job/43545960565",
+    "name": "Test oldest supported cmake",
+    "workflow": "build_dummy"
+  },
+  {
+    "link": "https://github.com/neovim/neovim/actions/runs/15468370615/job/43545960753",
+    "name": "windows-asan",
+    "workflow": "optional"
+  }
+]

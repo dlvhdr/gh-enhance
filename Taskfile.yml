@@ -6,7 +6,7 @@ silent: true
 tasks:
   default:
     cmds:
-      - go run ./cmd/prc
+      - DEBUG=true go run ./cmd/prc
     interactive: true
   mock:
     cmds:
