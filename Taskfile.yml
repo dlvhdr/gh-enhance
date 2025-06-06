@@ -1,9 +1,23 @@
 # https://taskfile.dev
 
 version: "3"
+silent: true
 
 tasks:
   default:
     cmds:
-      - killgrave --config ./imposters/config.yml
+      - go run ./cmd/prc
+    interactive: true
+  mock:
+    cmds:
+      - task: start-mock-server
+      - task: default
+      - task: stop-mock-server
+  start-mock-server:
+    cmds:
+      - killgrave --config ./imposters/config.yml &> ./.killgrave.log  &
+    silent: true
+  stop-mock-server:
+    cmds:
+      - pkill killgrave
     silent: true
