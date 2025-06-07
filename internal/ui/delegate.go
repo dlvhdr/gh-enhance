@@ -1,9 +1,9 @@
 package ui
 
 import (
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/v2/key"
+	"github.com/charmbracelet/bubbles/v2/list"
+	tea "github.com/charmbracelet/bubbletea/v2"
 )
 
 type item struct {
@@ -16,11 +16,6 @@ func (i item) Title() string { return i.title }
 func (i item) Description() string { return i.description }
 
 func (i item) FilterValue() string { return i.title }
-
-var quitKeys = key.NewBinding(
-	key.WithKeys("ctrl+c"),
-	key.WithHelp("", "press q to quit"),
-)
 
 func newItemDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()

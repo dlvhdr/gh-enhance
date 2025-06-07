@@ -6,8 +6,7 @@ import (
 	"os"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
 	"github.com/muesli/termenv"
 
@@ -22,7 +21,6 @@ func main() {
 		var fileErr error
 		newConfigFile, fileErr := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if fileErr == nil {
-			lipgloss.SetColorProfile(termenv.TrueColor)
 			log.SetColorProfile(termenv.TrueColor)
 			log.SetOutput(newConfigFile)
 			log.SetTimeFormat(time.Kitchen)

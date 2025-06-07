@@ -3,7 +3,7 @@ package ui
 import (
 	"encoding/json"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
 	"github.com/cli/go-gh/v2"
 
