@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/bubbletea-app-template/internal/api"
 )
 
-type initMsg struct {
+type runsFetchedMsg struct {
 	err    error
 	runs   []api.Run
 	checks []api.Check
@@ -21,14 +21,14 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 		checksOutput, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link")
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
-			return initMsg{err: err}
+			return runsFetchedMsg{err: err}
 		}
 
 		checks := []api.Check{}
 
 		if err := json.Unmarshal(checksOutput.Bytes(), &checks); err != nil {
 			log.Error("error parsing checkouts json", "err", err)
-			return initMsg{err: err}
+			return runsFetchedMsg{err: err}
 		}
 		log.Debug("fetched pr checks", "len(checks)", len(checks))
 		exist := make(map[string]bool)
@@ -41,13 +41,32 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 			}
 			if _, ok := exist[name]; !ok {
 				exist[name] = true
-				runs = append(runs, api.Run{Name: name, Link: check.Link})
+				runs = append(runs, api.Run{Name: name, Link: check.Link, Workflow: check.Workflow})
 			}
 		}
 
-		return initMsg{
+		return runsFetchedMsg{
 			runs:   runs,
 			checks: checks,
+		}
+	}
+}
+
+type jobLogsFetchedMsg struct {
+	err  error
+	logs string
+}
+
+func (m model) makeFetchJobLogsCmd(jobId string) tea.Cmd {
+	return func() tea.Msg {
+		jobOutput, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
+		if err != nil {
+			log.Error("error fetching job logs", "err", err, "stderr", stderr.String())
+			return jobLogsFetchedMsg{err: err}
+		}
+
+		return jobLogsFetchedMsg{
+			logs: jobOutput.String(),
 		}
 	}
 }

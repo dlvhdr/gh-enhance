@@ -7,6 +7,16 @@ var quitKeys = key.NewBinding(
 	key.WithHelp("ctrl+c", "press q to quit"),
 )
 
+var nextRowKey = key.NewBinding(
+	key.WithKeys("j", "down"),
+	key.WithHelp("j/↓", "next row"),
+)
+
+var prevRowKey = key.NewBinding(
+	key.WithKeys("k", "up"),
+	key.WithHelp("k/↑", "previous row"),
+)
+
 var nextPaneKey = key.NewBinding(
 	key.WithKeys("l"),
 	key.WithHelp("l", "next pane"),

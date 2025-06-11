@@ -9,6 +9,7 @@ import (
 type item struct {
 	title       string
 	description string
+	workflow    string
 }
 
 func (i item) Title() string { return i.title }

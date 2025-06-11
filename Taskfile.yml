@@ -6,12 +6,16 @@ silent: true
 tasks:
   default:
     cmds:
-      - DEBUG=true go run ./cmd/prc
+      - go run ./cmd/prc
+    interactive: true
+  debug:
+    cmds:
+      - DEBUG=true FF_MOCK_DATA=true go run ./cmd/prc
     interactive: true
   mock:
     cmds:
       - task: start-mock-server
-      - task: default
+      - task: debug
       - task: stop-mock-server
   start-mock-server:
     cmds:

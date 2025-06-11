@@ -20,9 +20,10 @@ type Step struct {
 }
 
 type Run struct {
-	Name string
-	Link string
-	Jobs []Job
+	Name     string
+	Link     string
+	Jobs     []Job
+	Workflow string
 }
 
 type Check struct {

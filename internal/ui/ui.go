@@ -44,29 +44,22 @@ func NewModel() model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	runsDelegate := newItemDelegate()
-	runsList := list.New([]list.Item{}, runsDelegate, 0, 0)
+	runsList, runsDelegate := newDefaultList()
 	runsList.Title = "Checks"
-	runsList.Styles.TitleBar = focusedPaneTitleStyle
 	runsList.SetStatusBarItemName("check", "checks")
-	runsList.SetSize(firstPaneWidth, 0)
-	runsList.KeyMap.NextPage = key.Binding{}
-	runsList.KeyMap.PrevPage = key.Binding{}
+	runsList.SetWidth(firstPaneWidth)
 
-	checksDelegate := newItemDelegate()
-	checksList := list.New([]list.Item{}, checksDelegate, 0, 0)
-	checksList.Styles.TitleBar = unfocusedPaneTitleStyle
+	checksList, checksDelegate := newDefaultList()
 	checksList.Title = "Jobs"
-	checksList.SetSize(secondPaneWidth, 0)
-	checksList.KeyMap.NextPage = key.Binding{}
-	checksList.KeyMap.PrevPage = key.Binding{}
+	runsList.SetStatusBarItemName("job", "jobs")
+	checksList.SetWidth(secondPaneWidth)
 
 	vp := viewport.New()
 
 	m := model{
 		checksList:     checksList,
 		runsList:       runsList,
-		prNumber:       "34285",
+		prNumber:       "34454",
 		repo:           "neovim/neovim",
 		spinner:        s,
 		runsDelegate:   runsDelegate,
@@ -87,23 +80,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	log.Debug("got msg", "type", fmt.Sprintf("%T", msg))
 	switch msg := msg.(type) {
-	case initMsg:
+
+	case runsFetchedMsg:
 		m.checks = msg.checks
 		m.runs = msg.runs
-		checkItems := make([]list.Item, 0)
-		for _, check := range m.checks {
-			it := item{title: check.Name, description: check.Workflow}
-			checkItems = append(checkItems, it)
-		}
 		runItems := make([]list.Item, 0)
 		for _, run := range m.runs {
-			it := item{title: run.Name, description: run.Link}
+			it := item{title: run.Name, description: run.Link, workflow: run.Workflow}
 			runItems = append(runItems, it)
 		}
-		cmd = m.checksList.SetItems(checkItems)
-		cmds = append(cmds, cmd)
+
 		cmd = m.runsList.SetItems(runItems)
 		cmds = append(cmds, cmd)
+
+		cmds = append(cmds, m.updateChecksListItems())
+		// cmds = append(cmds, m.makeFetchJobLogsCmd(job))
+
+	case jobLogsFetchedMsg:
+		m.logsViewport.SetContent(msg.logs)
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -112,7 +106,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runsList.SetHeight(msg.Height)
 		m.logsViewport.SetHeight(msg.Height - 1)
 		m.logsViewport.Style.Width(m.logsViewport.Width())
-		m.logsViewport.SetContent("Ipsum excepteur voluptate ipsum excepteur.\nAdipisicing reprehenderit proident exercitation nostrud nostrud commodo exercitation aute reprehenderit adipisicing eu minim non elit sit. Lorem veniam consectetur qui Lorem consectetur quis amet magna aliquip magna excepteur eu ea ad. Aliqua proident anim consectetur reprehenderit et elit officia est et.")
 		m.logsViewport.SetWidth(m.width - m.runsList.Width() - m.checksList.Width() - 4)
 		m.logsViewport.SoftWrap = true
 	case tea.KeyMsg:
@@ -120,6 +113,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.runsList.FilterState() == list.Filtering {
 			break
 		}
+
+		// if key.Matches(msg, nextRowKey) {
+		// 	if m.focusedPane == 0 {
+		// 		m.runsList.CursorDown()
+		// 		cmds = append(cmds, m.updateChecksListItems())
+		// 	}
+		// }
 
 		if key.Matches(msg, nextPaneKey) {
 			m.focusedPane = min(1, m.focusedPane+1)
@@ -148,6 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.focusedPane == 0 {
 		m.runsList, cmd = m.runsList.Update(msg)
 		cmds = append(cmds, cmd)
+		m.updateChecksListItems()
 	} else if m.focusedPane == 1 {
 		m.checksList, cmd = m.checksList.Update(msg)
 		cmds = append(cmds, cmd)
@@ -171,11 +172,7 @@ func (m model) View() string {
 				lipgloss.Top,
 				paneStyle.Render(m.runsList.View()),
 				paneStyle.Render(m.checksList.View()),
-				lipgloss.JoinVertical(
-					lipgloss.Left,
-					fmt.Sprintf("model: %dx%d, vp: %dx%d", m.width, m.height, m.logsViewport.Width, m.logsViewport.Height),
-					m.logsViewport.View(),
-				),
+				m.logsViewport.View(),
 			),
 		)
 }
@@ -198,22 +195,45 @@ func (m *model) setFocusedPaneStyles() {
 		unfocusedDelegate = &m.runsDelegate
 	}
 
-	focusedList.Styles.Title = focusedPaneTitleStyle.PaddingLeft(0)
-	focusedList.Styles.TitleBar = focusedPaneTitleStyle.MarginBottom(1)
+	focusedList.Styles.Title = focusedPaneTitleStyle
+	focusedList.Styles.TitleBar = focusedPaneTitleBarStyle
 	focusedDelegate.Styles.SelectedTitle = focusedPaneItemTitleStyle
 	focusedDelegate.Styles.SelectedDesc = focusedPaneItemDescStyle
 	focusedDelegate.Styles.NormalDesc = normalItemDescStyle
 	focusedList.SetDelegate(focusedDelegate)
 
-	unfocusedList.Styles.Title = unfocusedPaneTitleStyle.PaddingLeft(0)
-	unfocusedList.Styles.TitleBar = unfocusedPaneTitleStyle.MarginBottom(1)
+	unfocusedList.Styles.Title = unfocusedPaneTitleStyle
+	unfocusedList.Styles.TitleBar = unfocusedPaneTitleBarStyle
 	unfocusedDelegate.Styles.SelectedTitle = unfocusedPaneItemTitleStyle
 	unfocusedDelegate.Styles.SelectedDesc = unfocusedPaneItemDescStyle
 	unfocusedDelegate.Styles.NormalDesc = normalItemDescStyle
 	unfocusedList.SetDelegate(unfocusedDelegate)
 
-	m.runsList.Styles.Title = m.runsList.Styles.Title.Width(firstPaneWidth)
 	m.runsList.Styles.TitleBar = m.runsList.Styles.TitleBar.Width(firstPaneWidth + 1)
-	m.checksList.Styles.Title = m.checksList.Styles.Title.Width(secondPaneWidth)
 	m.checksList.Styles.TitleBar = m.checksList.Styles.TitleBar.Width(secondPaneWidth + 1)
+}
+
+func newDefaultList() (list.Model, list.DefaultDelegate) {
+	d := newItemDelegate()
+	l := list.New([]list.Item{}, d, 0, 0)
+	l.KeyMap.NextPage = key.Binding{}
+	l.KeyMap.PrevPage = key.Binding{}
+	l.SetShowHelp(false)
+	l.SetShowStatusBar(false)
+
+	return l, d
+}
+
+func (m *model) updateChecksListItems() tea.Cmd {
+	checkItems := make([]list.Item, 0)
+	for _, check := range m.checks {
+		if check.Workflow != (m.runsList.SelectedItem().(item)).workflow {
+			continue
+		}
+
+		it := item{title: check.Name, description: check.Workflow}
+		checkItems = append(checkItems, it)
+	}
+
+	return m.checksList.SetItems(checkItems)
 }
