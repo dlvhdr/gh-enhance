@@ -114,13 +114,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 
-		// if key.Matches(msg, nextRowKey) {
-		// 	if m.focusedPane == 0 {
-		// 		m.runsList.CursorDown()
-		// 		cmds = append(cmds, m.updateChecksListItems())
-		// 	}
-		// }
-
 		if key.Matches(msg, nextPaneKey) {
 			m.focusedPane = min(1, m.focusedPane+1)
 			m.setFocusedPaneStyles()
@@ -146,9 +139,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	if m.focusedPane == 0 {
+		before := m.runsList.Cursor()
 		m.runsList, cmd = m.runsList.Update(msg)
+		after := m.runsList.Cursor()
 		cmds = append(cmds, cmd)
 		m.updateChecksListItems()
+		if before != after {
+			m.checksList.Select(0)
+		}
 	} else if m.focusedPane == 1 {
 		m.checksList, cmd = m.checksList.Update(msg)
 		cmds = append(cmds, cmd)
