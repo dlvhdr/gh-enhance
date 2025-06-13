@@ -28,6 +28,7 @@ type Run struct {
 
 type Check struct {
 	Id       string
+	State    string
 	Name     string
 	Workflow string
 	Logs     string

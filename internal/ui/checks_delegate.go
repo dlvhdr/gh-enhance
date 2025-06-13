@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
@@ -13,9 +15,22 @@ type checkItem struct {
 	id          string
 	logs        string
 	loading     bool
+	state       string
 }
 
-func (i checkItem) Title() string { return i.title }
+func (i checkItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.title) }
+
+func (i checkItem) viewStatus() string {
+	if i.state == "SUCCESS" {
+		return successGlyph.Render()
+	}
+
+	if i.state == "PENDING" {
+		return waitingGlyph.Render()
+	}
+
+	return failureGlyph.Render()
+}
 
 func (i checkItem) Description() string { return i.description }
 

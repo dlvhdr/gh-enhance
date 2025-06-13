@@ -20,4 +20,14 @@ var (
 	focusedPaneItemDescStyle    = defaultItemStyles.SelectedDesc.BorderForeground(lipgloss.Color("4")).Foreground(defaultItemStyles.NormalDesc.GetForeground()).BorderStyle(lipgloss.InnerHalfBlockBorder())
 	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(lipgloss.Color("7")).Foreground(defaultItemStyles.NormalDesc.GetForeground())
 	paneStyle                   = lipgloss.NewStyle().BorderRight(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("8"))
+
+	waitingGlyph = lipgloss.NewStyle().
+			Foreground(lipgloss.Yellow).
+			SetString(WaitingIcon)
+	failureGlyph = lipgloss.NewStyle().
+			Foreground(lipgloss.Red).
+			SetString(FailureIcon)
+	successGlyph = lipgloss.NewStyle().
+			Foreground(lipgloss.Green).
+			SetString(SuccessIcon)
 )

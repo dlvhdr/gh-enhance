@@ -93,6 +93,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				workflow:    check.Workflow,
 				logs:        "",
 				loading:     true,
+				state:       check.State,
 			})
 		}
 		m.runs = msg.runs
@@ -126,9 +127,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.checksList.SetHeight(msg.Height)
 		m.runsList.SetHeight(msg.Height)
 		m.logsViewport.SetHeight(msg.Height - 1)
-		m.logsViewport.Style.Width(m.logsViewport.Width())
 		m.logsViewport.SetWidth(m.width - m.runsList.Width() - m.checksList.Width() - 4)
-		m.logsViewport.SoftWrap = true
+		m.logsViewport.SoftWrap = false
 	case tea.KeyMsg:
 		log.Debug("key pressed", "key", msg.String())
 		if m.runsList.FilterState() == list.Filtering {

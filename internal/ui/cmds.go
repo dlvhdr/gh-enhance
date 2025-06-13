@@ -2,6 +2,8 @@ package ui
 
 import (
 	"encoding/json"
+	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
@@ -18,7 +20,7 @@ type runsFetchedMsg struct {
 
 func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
-		checksOutput, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link")
+		checksOutput, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state")
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
 			return runsFetchedMsg{err: err}
@@ -76,10 +78,52 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 			return jobLogsFetchedMsg{err: err}
 		}
 
+		jobsStr := jobOutput.String()
+		lines := strings.Lines(jobsStr)
+		parsed := make([]string, 0)
+		var name, step string
+		count := 0
+		fieldsFunc := func(r rune) bool {
+			if r == '\t' {
+				return true
+			}
+			return false
+		}
+		for line := range lines {
+			f := strings.FieldsFunc(line, fieldsFunc)
+			if len(f) < 3 {
+				parsed = append(parsed, line)
+				continue
+			}
+
+			if count == 0 {
+				name = f[0]
+				step = f[1]
+			}
+
+			dateAndLog := strings.SplitN(f[2], " ", 2)
+			if len(dateAndLog) == 2 {
+				d, err := time.Parse(time.RFC3339, dateAndLog[0])
+				pd := strings.Repeat(" ", 19)
+				if err == nil {
+					pd = d.Format(time.DateTime)
+				}
+
+				parsed = append(parsed, strings.Join([]string{pd, "", dateAndLog[1]}, " "))
+			} else {
+				parsed = append(parsed, f[2])
+			}
+		}
+		log.Debug("found fields", "count", count, "name", name, "step", step)
+		if name != "" && step != "" {
+			jobsStr = strings.ReplaceAll(jobsStr, name+string('\t'), "")
+			jobsStr = strings.ReplaceAll(jobsStr, step+string('\t'), "")
+		}
+
 		log.Debug("success fetching job logs", "jobId", jobId)
 		return jobLogsFetchedMsg{
 			jobId: jobId,
-			logs:  jobOutput.String(),
+			logs:  strings.Join(parsed, ""),
 		}
 	}
 }
