@@ -40,7 +40,7 @@ const (
 	secondPaneWidth = 40
 )
 
-func NewModel() model {
+func NewModel(repo string, number string) model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -60,8 +60,8 @@ func NewModel() model {
 	m := model{
 		checksList:     checksList,
 		runsList:       runsList,
-		prNumber:       "34454",
-		repo:           "neovim/neovim",
+		prNumber:       number,
+		repo:           repo,
 		spinner:        s,
 		runsDelegate:   runsDelegate,
 		checksDelegate: checksDelegate,

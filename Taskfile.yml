@@ -6,11 +6,11 @@ silent: true
 tasks:
   default:
     cmds:
-      - DEBUG=true go run ./cmd/prc
+      - DEBUG=true go run ./cmd/prc {{.CLI_ARGS}}
     interactive: true
   debug:
     cmds:
-      - DEBUG=true FF_MOCK_DATA=true go run ./cmd/prc
+      - DEBUG=true FF_MOCK_DATA=true go run ./cmd/prc {{.CLI_ARGS}}
     interactive: true
   mock:
     cmds:

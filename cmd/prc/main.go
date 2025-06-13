@@ -9,11 +9,19 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
 	"github.com/muesli/termenv"
+	"github.com/spf13/cobra"
 
 	"github.com/charmbracelet/bubbletea-app-template/internal/ui"
 )
 
-func main() {
+var rootCmd = &cobra.Command{
+	Use:     "gh prc",
+	Short:   "In search of a better name",
+	Version: "0.0.1",
+	Args:    cobra.MaximumNArgs(1),
+}
+
+func init() {
 	var loggerFile *os.File
 	_, debug := os.LookupEnv("DEBUG")
 
@@ -40,9 +48,48 @@ func main() {
 		defer loggerFile.Close()
 	}
 
-	p := tea.NewProgram(ui.NewModel(), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Println(err)
+	var repo string
+
+	rootCmd.PersistentFlags().StringVarP(
+		&repo,
+		"repo",
+		"R",
+		"",
+		`[HOST/]OWNER/REPO   Select another repository using the [HOST/]OWNER/REPO format`,
+	)
+
+	rootCmd.SetVersionTemplate(`gh-prc {{printf "version %s\n" .Version}}`)
+
+	rootCmd.Flags().Bool(
+		"debug",
+		false,
+		"passing this flag will allow writing debug output to debug.log",
+	)
+
+	rootCmd.Flags().BoolP(
+		"help",
+		"h",
+		false,
+		"help for gh-prc",
+	)
+
+	rootCmd.Run = func(_ *cobra.Command, args []string) {
+		if len(args) > 0 {
+			p := tea.NewProgram(ui.NewModel(repo, args[0]), tea.WithAltScreen())
+			if _, err := p.Run(); err != nil {
+				log.Error("failed starting program", "err", err)
+				fmt.Println(err)
+				os.Exit(1)
+			}
+		} else {
+			fmt.Println("Usage: -R owner/repo 15623", "args", args)
+			os.Exit(1)
+		}
+	}
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
