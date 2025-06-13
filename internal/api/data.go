@@ -21,13 +21,15 @@ type Step struct {
 
 type Run struct {
 	Name     string
-	Link     string
 	Jobs     []Job
+	Link     string
 	Workflow string
 }
 
 type Check struct {
+	Id       string
 	Name     string
 	Workflow string
+	Logs     string
 	Link     string
 }

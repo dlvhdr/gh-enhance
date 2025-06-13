@@ -53,20 +53,33 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 }
 
 type jobLogsFetchedMsg struct {
-	err  error
-	logs string
+	err   error
+	jobId string
+	logs  string
 }
 
-func (m model) makeFetchJobLogsCmd(jobId string) tea.Cmd {
+func (m *model) makeFetchJobLogsCmd() tea.Cmd {
+	jobId := m.checksList.SelectedItem().(checkItem).id
+	for _, job := range m.checks {
+		if job.id == jobId && job.loading == false {
+			log.Debug("using cached job logs", "jobId", jobId)
+			m.logsViewport.SetContent(job.logs)
+			return nil
+		}
+	}
+
 	return func() tea.Msg {
+		log.Debug("fetching logs for job", "jobId", jobId)
 		jobOutput, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
 		if err != nil {
-			log.Error("error fetching job logs", "err", err, "stderr", stderr.String())
+			log.Error("error fetching job logs", "jobId", jobId, "err", err, "stderr", stderr.String())
 			return jobLogsFetchedMsg{err: err}
 		}
 
+		log.Debug("success fetching job logs", "jobId", jobId)
 		return jobLogsFetchedMsg{
-			logs: jobOutput.String(),
+			jobId: jobId,
+			logs:  jobOutput.String(),
 		}
 	}
 }

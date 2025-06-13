@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
@@ -21,7 +22,7 @@ type model struct {
 	height         int
 	prNumber       string
 	repo           string
-	checks         []api.Check
+	checks         []checkItem
 	runs           []api.Run
 	checksList     list.Model
 	logsViewport   viewport.Model
@@ -44,12 +45,12 @@ func NewModel() model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	runsList, runsDelegate := newDefaultList()
+	runsList, runsDelegate := newRunsDefaultList()
 	runsList.Title = "Checks"
 	runsList.SetStatusBarItemName("check", "checks")
 	runsList.SetWidth(firstPaneWidth)
 
-	checksList, checksDelegate := newDefaultList()
+	checksList, checksDelegate := newChecksDefaultList()
 	checksList.Title = "Jobs"
 	runsList.SetStatusBarItemName("job", "jobs")
 	checksList.SetWidth(secondPaneWidth)
@@ -82,11 +83,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case runsFetchedMsg:
-		m.checks = msg.checks
+		for _, check := range msg.checks {
+			parts := strings.Split(check.Link, "/")
+			id := parts[len(parts)-1]
+			m.checks = append(m.checks, checkItem{
+				id:          id,
+				title:       check.Name,
+				description: id,
+				workflow:    check.Workflow,
+				logs:        "",
+				loading:     true,
+			})
+		}
 		m.runs = msg.runs
 		runItems := make([]list.Item, 0)
 		for _, run := range m.runs {
-			it := item{title: run.Name, description: run.Link, workflow: run.Workflow}
+			it := runItem{title: run.Name, description: run.Link, workflow: run.Workflow}
 			runItems = append(runItems, it)
 		}
 
@@ -94,10 +106,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 
 		cmds = append(cmds, m.updateChecksListItems())
-		// cmds = append(cmds, m.makeFetchJobLogsCmd(job))
+		cmds = append(cmds, m.makeFetchJobLogsCmd())
 
 	case jobLogsFetchedMsg:
-		m.logsViewport.SetContent(msg.logs)
+		for i := range m.checks {
+			if m.checks[i].id == msg.jobId {
+				log.Debug("caching job logs", "jobId", msg.jobId)
+				m.checks[i].logs = msg.logs
+				m.checks[i].loading = false
+				cmd := m.updateChecksListItems()
+				cmds = append(cmds, cmd)
+				break
+			}
+		}
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -142,14 +163,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		before := m.runsList.Cursor()
 		m.runsList, cmd = m.runsList.Update(msg)
 		after := m.runsList.Cursor()
-		cmds = append(cmds, cmd)
-		m.updateChecksListItems()
 		if before != after {
+			cmd := m.updateChecksListItems()
+			cmds = append(cmds, cmd)
 			m.checksList.Select(0)
+			cmds = append(cmds, m.makeFetchJobLogsCmd())
 		}
 	} else if m.focusedPane == 1 {
+		before := m.checksList.Cursor()
 		m.checksList, cmd = m.checksList.Update(msg)
 		cmds = append(cmds, cmd)
+		after := m.checksList.Cursor()
+		if before != after {
+			cmds = append(cmds, m.makeFetchJobLogsCmd())
+		}
+	}
+
+	currCheck := m.checksList.SelectedItem()
+	if currCheck != nil {
+		m.logsViewport.SetContent(currCheck.(checkItem).logs)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -158,6 +190,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	if m.err != nil {
 		return m.err.Error()
+	}
+
+	logsPane := ""
+	check := m.checksList.SelectedItem()
+	if check == nil || check.(checkItem).loading {
+		logsPane = "loading..."
+	} else {
+		logsPane = m.logsViewport.View()
 	}
 
 	return lipgloss.NewStyle().
@@ -170,7 +210,7 @@ func (m model) View() string {
 				lipgloss.Top,
 				paneStyle.Render(m.runsList.View()),
 				paneStyle.Render(m.checksList.View()),
-				m.logsViewport.View(),
+				logsPane,
 			),
 		)
 }
@@ -211,8 +251,19 @@ func (m *model) setFocusedPaneStyles() {
 	m.checksList.Styles.TitleBar = m.checksList.Styles.TitleBar.Width(secondPaneWidth + 1)
 }
 
-func newDefaultList() (list.Model, list.DefaultDelegate) {
-	d := newItemDelegate()
+func newRunsDefaultList() (list.Model, list.DefaultDelegate) {
+	d := newRunItemDelegate()
+	l := list.New([]list.Item{}, d, 0, 0)
+	l.KeyMap.NextPage = key.Binding{}
+	l.KeyMap.PrevPage = key.Binding{}
+	l.SetShowHelp(false)
+	l.SetShowStatusBar(false)
+
+	return l, d
+}
+
+func newChecksDefaultList() (list.Model, list.DefaultDelegate) {
+	d := newCheckItemDelegate()
 	l := list.New([]list.Item{}, d, 0, 0)
 	l.KeyMap.NextPage = key.Binding{}
 	l.KeyMap.PrevPage = key.Binding{}
@@ -223,15 +274,14 @@ func newDefaultList() (list.Model, list.DefaultDelegate) {
 }
 
 func (m *model) updateChecksListItems() tea.Cmd {
-	checkItems := make([]list.Item, 0)
+	displayed := make([]list.Item, 0)
 	for _, check := range m.checks {
-		if check.Workflow != (m.runsList.SelectedItem().(item)).workflow {
+		if check.workflow != (m.runsList.SelectedItem().(runItem)).workflow {
 			continue
 		}
 
-		it := item{title: check.Name, description: check.Workflow}
-		checkItems = append(checkItems, it)
+		displayed = append(displayed, check)
 	}
 
-	return m.checksList.SetItems(checkItems)
+	return m.checksList.SetItems(displayed)
 }

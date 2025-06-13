@@ -6,23 +6,23 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 )
 
-type item struct {
+type runItem struct {
 	title       string
 	description string
 	workflow    string
 }
 
-func (i item) Title() string { return i.title }
+func (i runItem) Title() string { return i.title }
 
-func (i item) Description() string { return i.description }
+func (i runItem) Description() string { return i.description }
 
-func (i item) FilterValue() string { return i.title }
+func (i runItem) FilterValue() string { return i.title }
 
-func newItemDelegate() list.DefaultDelegate {
+func newRunItemDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		if _, ok := m.SelectedItem().(item); ok {
+		if _, ok := m.SelectedItem().(runItem); ok {
 		} else {
 			return nil
 		}
