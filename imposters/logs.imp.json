@@ -1,0 +1,16 @@
+[
+  {
+    "request": {
+      "method": "GET",
+      "endpoint": "/repos/{_repo:[\\w-_\\.]}/actions/runs/{_run:[\\d]+}/logs"
+    },
+    "response": {
+      "status": 200,
+      "delay": "200ms",
+      "headers": {
+        "Content-Type": "application/text"
+      },
+      "bodyFile": "pr-34285-run-15468370618-jobs-logs.log"
+    }
+  }
+]

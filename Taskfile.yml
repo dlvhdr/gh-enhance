@@ -10,13 +10,13 @@ tasks:
     interactive: true
   debug:
     cmds:
-      - DEBUG=true FF_MOCK_DATA=true go run ./cmd/enhance {{.CLI_ARGS}}
+      - DEBUG=true go run ./cmd/enhance {{.CLI_ARGS}}
     interactive: true
   mock:
     cmds:
       - task: start-mock-server
-      - task: debug
-      - task: stop-mock-server
+      - defer: { task: stop-mock-server }
+      - cmd: DEBUG=true FF_MOCK_DATA=true go run ./cmd/enhance -R neovim/neovim 34454
   start-mock-server:
     cmds:
       - killgrave --config ./imposters/config.yml &> ./.killgrave.log  &

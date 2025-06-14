@@ -10,6 +10,7 @@ type runItem struct {
 	title       string
 	description string
 	workflow    string
+	jobs        []jobItem
 }
 
 func (i runItem) Title() string { return i.title }

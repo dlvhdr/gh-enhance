@@ -26,3 +26,13 @@ var prevPaneKey = key.NewBinding(
 	key.WithKeys("h"),
 	key.WithHelp("h", "previous pane"),
 )
+
+var gotoTopKey = key.NewBinding(
+	key.WithKeys("g"),
+	key.WithHelp("g", "go to top"),
+)
+
+var gotoBottomKey = key.NewBinding(
+	key.WithKeys("shift+g"),
+	key.WithHelp("G", "go to bottom"),
+)

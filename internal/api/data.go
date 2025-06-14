@@ -1,15 +1,5 @@
 package api
 
-type Job struct {
-	CompletedAt string
-	Conclusion  string
-	Name        string
-	DatabaseId  int
-	StartedAt   string
-	Status      string
-	Steps       []Step
-}
-
 type Step struct {
 	CompletedAt string
 	Conclusion  string
@@ -19,14 +9,14 @@ type Step struct {
 	Status      string
 }
 
-type Run struct {
+type CheckRun struct {
 	Name     string
-	Jobs     []Job
 	Link     string
 	Workflow string
+	Jobs     []Job
 }
 
-type Check struct {
+type Job struct {
 	Id       string
 	State    string
 	Name     string

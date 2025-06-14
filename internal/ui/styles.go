@@ -11,7 +11,6 @@ var (
 	unfocusedPaneTitleStyle    = defaultListStyles.Title.UnsetBackground().Faint(true).PaddingLeft(0).PaddingRight(0).Margin(0)
 	focusedPaneTitleBarStyle   = defaultListStyles.Title.UnsetBackground().Bold(true).PaddingLeft(1).PaddingRight(0).MarginBottom(1)
 	unfocusedPaneTitleBarStyle = defaultListStyles.Title.UnsetBackground().Faint(true).PaddingLeft(1).PaddingRight(0).MarginBottom(1)
-	debugStyle                 = lipgloss.NewStyle().Background(lipgloss.Color("1"))
 
 	defaultItemStyles           = list.NewDefaultItemStyles(true)
 	normalItemDescStyle         = defaultItemStyles.DimmedDesc
@@ -20,6 +19,8 @@ var (
 	focusedPaneItemDescStyle    = defaultItemStyles.SelectedDesc.BorderForeground(lipgloss.Color("4")).Foreground(defaultItemStyles.NormalDesc.GetForeground()).BorderStyle(lipgloss.InnerHalfBlockBorder())
 	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(lipgloss.Color("7")).Foreground(defaultItemStyles.NormalDesc.GetForeground())
 	paneStyle                   = lipgloss.NewStyle().BorderRight(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("8"))
+
+	lineNumbersStyle = lipgloss.NewStyle().Faint(true)
 
 	waitingGlyph = lipgloss.NewStyle().
 			Foreground(lipgloss.Yellow).
@@ -30,4 +31,6 @@ var (
 	successGlyph = lipgloss.NewStyle().
 			Foreground(lipgloss.Green).
 			SetString(SuccessIcon)
+
+	debugStyle = lipgloss.NewStyle().Background(lipgloss.Color("1"))
 )

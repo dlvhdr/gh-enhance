@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log"
 	"github.com/cli/go-gh/v2"
 
@@ -13,43 +14,50 @@ import (
 )
 
 type runsFetchedMsg struct {
-	err    error
-	runs   []api.Run
-	checks []api.Check
+	err  error
+	runs []api.CheckRun
 }
 
 func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
-		checksOutput, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state")
+		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state")
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
 			return runsFetchedMsg{err: err}
 		}
 
-		checks := []api.Check{}
+		jobs := []api.Job{}
 
-		if err := json.Unmarshal(checksOutput.Bytes(), &checks); err != nil {
+		if err := json.Unmarshal(checkRunsRes.Bytes(), &jobs); err != nil {
 			log.Error("error parsing checkouts json", "err", err)
 			return runsFetchedMsg{err: err}
 		}
-		log.Debug("fetched pr checks", "len(checks)", len(checks))
-		exist := make(map[string]bool)
+		log.Debug("fetched pr checks", "len(checks)", len(jobs))
+		runsMap := make(map[string]api.CheckRun)
 
-		runs := make([]api.Run, 0)
-		for _, check := range checks {
-			name := check.Workflow
+		for _, job := range jobs {
+			name := job.Workflow
 			if name == "" {
-				name = check.Name
+				name = job.Name
 			}
-			if _, ok := exist[name]; !ok {
-				exist[name] = true
-				runs = append(runs, api.Run{Name: name, Link: check.Link, Workflow: check.Workflow})
+
+			run, ok := runsMap[name]
+			if ok {
+				run.Jobs = append(run.Jobs, job)
+			} else {
+				run = api.CheckRun{Name: name, Link: job.Link, Workflow: job.Workflow}
+				run.Jobs = []api.Job{job}
 			}
+			runsMap[name] = run
+		}
+
+		runs := make([]api.CheckRun, 0)
+		for _, run := range runsMap {
+			runs = append(runs, run)
 		}
 
 		return runsFetchedMsg{
-			runs:   runs,
-			checks: checks,
+			runs: runs,
 		}
 	}
 }
@@ -60,9 +68,13 @@ type jobLogsFetchedMsg struct {
 	logs  string
 }
 
-func (m *model) makeFetchJobLogsCmd() tea.Cmd {
-	jobId := m.checksList.SelectedItem().(checkItem).id
-	for _, job := range m.checks {
+func (m *model) makeFetchJobStepsAndLogsCmd() tea.Cmd {
+	if m.jobsList.SelectedItem() == nil {
+		return nil
+	}
+	run := m.runsList.SelectedItem().(runItem)
+	jobId := m.jobsList.SelectedItem().(jobItem).id
+	for _, job := range run.jobs {
 		if job.id == jobId && job.loading == false {
 			log.Debug("using cached job logs", "jobId", jobId)
 			m.logsViewport.SetContent(job.logs)
@@ -72,13 +84,13 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 
 	return func() tea.Msg {
 		log.Debug("fetching logs for job", "jobId", jobId)
-		jobOutput, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
+		jobsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
 		if err != nil {
 			log.Error("error fetching job logs", "jobId", jobId, "err", err, "stderr", stderr.String())
 			return jobLogsFetchedMsg{err: err}
 		}
 
-		jobsStr := jobOutput.String()
+		jobsStr := jobsRes.String()
 		lines := strings.Lines(jobsStr)
 		parsed := make([]string, 0)
 		var name, step string
@@ -104,12 +116,16 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 			dateAndLog := strings.SplitN(f[2], " ", 2)
 			if len(dateAndLog) == 2 {
 				d, err := time.Parse(time.RFC3339, dateAndLog[0])
-				pd := strings.Repeat(" ", 19)
+				pd := strings.Repeat(" ", 8)
 				if err == nil {
-					pd = d.Format(time.DateTime)
+					pd = d.Format(time.TimeOnly)
 				}
 
-				parsed = append(parsed, strings.Join([]string{pd, "", dateAndLog[1]}, " "))
+				parsed = append(parsed, strings.Join([]string{
+					pd,
+					lipgloss.NewStyle().Foreground(lipgloss.Color("234")).Render(""),
+					dateAndLog[1],
+				}, " "))
 			} else {
 				parsed = append(parsed, f[2])
 			}
