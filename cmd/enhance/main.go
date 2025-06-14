@@ -15,7 +15,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:     "gh prc",
+	Use:     "gh enhance",
 	Short:   "In search of a better name",
 	Version: "0.0.1",
 	Args:    cobra.MaximumNArgs(1),
@@ -58,7 +58,7 @@ func init() {
 		`[HOST/]OWNER/REPO   Select another repository using the [HOST/]OWNER/REPO format`,
 	)
 
-	rootCmd.SetVersionTemplate(`gh-prc {{printf "version %s\n" .Version}}`)
+	rootCmd.SetVersionTemplate(`gh-enhance {{printf "version %s\n" .Version}}`)
 
 	rootCmd.Flags().Bool(
 		"debug",
@@ -70,7 +70,7 @@ func init() {
 		"help",
 		"h",
 		false,
-		"help for gh-prc",
+		"help for gh-enhance",
 	)
 
 	rootCmd.Run = func(_ *cobra.Command, args []string) {
