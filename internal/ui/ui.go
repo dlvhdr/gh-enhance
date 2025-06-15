@@ -60,10 +60,10 @@ func NewModel(repo string, number string) model {
 	runsList.SetStatusBarItemName("run", "runs")
 	runsList.SetWidth(focusedPaneWidth)
 
-	checksList, checksDelegate := newJobsDefaultList()
-	checksList.Title = "Jobs"
-	checksList.SetStatusBarItemName("job", "jobs")
-	checksList.SetWidth(unfocusedPaneWidth)
+	jobsList, jobsDelegate := newJobsDefaultList()
+	jobsList.Title = "Jobs"
+	jobsList.SetStatusBarItemName("job", "jobs")
+	jobsList.SetWidth(unfocusedPaneWidth)
 
 	stepsList, stepsDelegate := newStepsDefaultList()
 	stepsList.Title = "Steps"
@@ -87,14 +87,14 @@ func NewModel(repo string, number string) model {
 	vp.KeyMap.Left = key.Binding{}
 
 	m := model{
-		jobsList:      checksList,
+		jobsList:      jobsList,
 		runsList:      runsList,
 		stepsList:     stepsList,
 		prNumber:      number,
 		repo:          repo,
 		spinner:       s,
 		runsDelegate:  runsDelegate,
-		jobsDelegate:  checksDelegate,
+		jobsDelegate:  jobsDelegate,
 		stepsDelegate: stepsDelegate,
 		logsViewport:  vp,
 	}
@@ -216,6 +216,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		after := m.runsList.Cursor()
 		if before != after {
 			m.jobsList.Select(0)
+			m.stepsList.Select(0)
 			cmds = append(cmds, m.makeFetchJobLogsCmd())
 			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.data[after].Id))
 			cmds = append(cmds, m.updateLists()...)
@@ -227,6 +228,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		after := m.jobsList.Cursor()
 		if before != after {
+			m.stepsList.Select(0)
 			cmds = append(cmds, m.makeFetchJobLogsCmd())
 			cmds = append(cmds, m.updateLists()...)
 		}
@@ -309,10 +311,15 @@ func (m *model) setFocusedPaneStyles() {
 		setListFocusedStyles(&m.jobsList, &m.jobsDelegate)
 		setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
-	case PaneLogs:
+	case PaneSteps:
 		setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		setListFocusedStyles(&m.stepsList, &m.stepsDelegate)
+		break
+	case PaneLogs:
+		setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
+		setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
+		setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	}
 
 	m.logsViewport.SetWidth(m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - 4)
