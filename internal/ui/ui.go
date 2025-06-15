@@ -11,6 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log"
+
+	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
 type errMsg error
@@ -25,25 +27,27 @@ const (
 )
 
 type model struct {
-	width          int
-	height         int
-	prNumber       string
-	repo           string
-	runsList       list.Model
-	jobsList       list.Model
-	stepsList      list.Model
-	logsViewport   viewport.Model
-	spinner        spinner.Model
-	quitting       bool
-	focusedPane    focusedPane
-	err            error
-	runsDelegate   list.DefaultDelegate
-	checksDelegate list.DefaultDelegate
+	width         int
+	height        int
+	prNumber      string
+	repo          string
+	data          []api.CheckRun
+	runsList      list.Model
+	jobsList      list.Model
+	stepsList     list.Model
+	logsViewport  viewport.Model
+	spinner       spinner.Model
+	quitting      bool
+	focusedPane   focusedPane
+	err           error
+	runsDelegate  list.DefaultDelegate
+	jobsDelegate  list.DefaultDelegate
+	stepsDelegate list.DefaultDelegate
 }
 
 const (
-	firstPaneWidth  = 20
-	secondPaneWidth = 40
+	unfocusedPaneWidth = 20
+	focusedPaneWidth   = 40
 )
 
 func NewModel(repo string, number string) model {
@@ -54,17 +58,17 @@ func NewModel(repo string, number string) model {
 	runsList, runsDelegate := newRunsDefaultList()
 	runsList.Title = "Runs"
 	runsList.SetStatusBarItemName("run", "runs")
-	runsList.SetWidth(firstPaneWidth)
+	runsList.SetWidth(focusedPaneWidth)
 
-	checksList, checksDelegate := newChecksDefaultList()
+	checksList, checksDelegate := newJobsDefaultList()
 	checksList.Title = "Jobs"
 	checksList.SetStatusBarItemName("job", "jobs")
-	checksList.SetWidth(secondPaneWidth)
+	checksList.SetWidth(unfocusedPaneWidth)
 
-	stepsList, checksDelegate := newChecksDefaultList()
+	stepsList, stepsDelegate := newStepsDefaultList()
 	stepsList.Title = "Steps"
 	stepsList.SetStatusBarItemName("step", "steps")
-	stepsList.SetWidth(secondPaneWidth)
+	stepsList.SetWidth(unfocusedPaneWidth)
 
 	vp := viewport.New()
 	vp.LeftGutterFunc = func(info viewport.GutterContext) string {
@@ -83,14 +87,16 @@ func NewModel(repo string, number string) model {
 	vp.KeyMap.Left = key.Binding{}
 
 	m := model{
-		jobsList:       checksList,
-		runsList:       runsList,
-		prNumber:       number,
-		repo:           repo,
-		spinner:        s,
-		runsDelegate:   runsDelegate,
-		checksDelegate: checksDelegate,
-		logsViewport:   vp,
+		jobsList:      checksList,
+		runsList:      runsList,
+		stepsList:     stepsList,
+		prNumber:      number,
+		repo:          repo,
+		spinner:       s,
+		runsDelegate:  runsDelegate,
+		jobsDelegate:  checksDelegate,
+		stepsDelegate: stepsDelegate,
+		logsViewport:  vp,
 	}
 	m.setFocusedPaneStyles()
 	return m
@@ -108,57 +114,74 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case runsFetchedMsg:
-		runItems := make([]list.Item, 0)
-		for _, run := range msg.runs {
-			jobItems := make([]jobItem, 0)
-			for _, job := range run.Jobs {
-				parts := strings.Split(job.Link, "/")
-				id := parts[len(parts)-1]
-				jobItem := jobItem{
-					title:       job.Name,
-					description: id,
-					workflow:    job.Workflow,
-					id:          id,
-					logs:        "",
-					loading:     true,
-					state:       job.State,
+		m.data = msg.runs
+
+		if len(m.data) > 0 {
+			run := m.data[0]
+			parts := strings.Split(run.Link, "/")
+			runId := parts[len(parts)-3]
+
+			// Initialize ids and loading state for each job
+			for runIdx, run := range m.data {
+				for jobIdx, job := range run.Jobs {
+					parts := strings.Split(job.Link, "/")
+
+					m.data[runIdx].Id = parts[len(parts)-3]
+					m.data[runIdx].Jobs[jobIdx].Id = parts[len(parts)-1]
+					m.data[runIdx].Jobs[jobIdx].Loading = true
 				}
-				jobItems = append(jobItems, jobItem)
 			}
 
-			it := runItem{title: run.Name, description: run.Link, workflow: run.Workflow, jobs: jobItems}
-			runItems = append(runItems, it)
+			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(runId))
 		}
 
-		cmd = m.runsList.SetItems(runItems)
-		cmds = append(cmds, cmd)
-
-		cmds = append(cmds, m.updateJobsListItems())
-		cmds = append(cmds, m.makeFetchJobStepsAndLogsCmd())
+		cmds = append(cmds, m.updateLists()...)
 
 	case jobLogsFetchedMsg:
-		run := m.runsList.SelectedItem().(runItem)
-		for i := range run.jobs {
-			if run.jobs[i].id == msg.jobId {
+		runIdx := m.runsList.Cursor()
+		run := m.data[runIdx]
+		for i := range run.Jobs {
+			if run.Jobs[i].Id == msg.jobId {
 				log.Debug("caching job logs", "jobId", msg.jobId)
-				run.jobs[i].logs = msg.logs
-				run.jobs[i].loading = false
-				cmd := m.updateJobsListItems()
-				cmds = append(cmds, cmd)
+				m.data[runIdx].Jobs[i].Logs = msg.logs
+				m.data[runIdx].Jobs[i].Loading = false
+				cmds = append(cmds, m.updateLists()...)
 				break
 			}
 		}
 
+	case runJobsStepsFetchedMsg:
+		jobsMap := make(map[string]api.JobWithSteps)
+		for _, job := range msg.jobsWithSteps.Jobs {
+			jobsMap[fmt.Sprintf("%d", job.DatabaseId)] = job
+		}
+
+		for runIdx, run := range m.data {
+			for jobIdx, job := range run.Jobs {
+				jobWithSteps, ok := jobsMap[job.Id]
+				if !ok {
+					continue
+				}
+
+				m.data[runIdx].Jobs[jobIdx].Steps = jobWithSteps.Steps
+			}
+		}
+
+		cmds = append(cmds, m.updateLists()...)
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.jobsList.SetHeight(msg.Height)
 		m.runsList.SetHeight(msg.Height)
+		m.jobsList.SetHeight(msg.Height)
+		m.stepsList.SetHeight(msg.Height)
 		m.logsViewport.SetHeight(msg.Height - 1)
-		m.logsViewport.SetWidth(m.width - m.runsList.Width() - m.jobsList.Width() - 4)
+		m.logsViewport.SetWidth(m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - 4)
 	case tea.KeyMsg:
 		log.Debug("key pressed", "key", msg.String())
-		if m.runsList.FilterState() == list.Filtering {
+		if m.runsList.FilterState() == list.Filtering ||
+			m.jobsList.FilterState() == list.Filtering ||
+			m.stepsList.FilterState() == list.Filtering {
 			break
 		}
 
@@ -192,10 +215,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runsList, cmd = m.runsList.Update(msg)
 		after := m.runsList.Cursor()
 		if before != after {
-			cmd := m.updateJobsListItems()
-			cmds = append(cmds, cmd)
 			m.jobsList.Select(0)
-			cmds = append(cmds, m.makeFetchJobStepsAndLogsCmd())
+			cmds = append(cmds, m.makeFetchJobLogsCmd())
+			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.data[after].Id))
+			cmds = append(cmds, m.updateLists()...)
 		}
 		break
 	case PaneJobs:
@@ -204,16 +227,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		after := m.jobsList.Cursor()
 		if before != after {
-			cmds = append(cmds, m.makeFetchJobStepsAndLogsCmd())
+			cmds = append(cmds, m.makeFetchJobLogsCmd())
+			cmds = append(cmds, m.updateLists()...)
 		}
 	case PaneSteps:
-		before := m.jobsList.Cursor()
-		m.jobsList, cmd = m.jobsList.Update(msg)
+		m.stepsList, cmd = m.stepsList.Update(msg)
 		cmds = append(cmds, cmd)
-		after := m.jobsList.Cursor()
-		if before != after {
-			cmds = append(cmds, m.makeFetchJobStepsAndLogsCmd())
-		}
+
 	case PaneLogs:
 		if msg, ok := msg.(tea.KeyMsg); ok {
 			if key.Matches(msg, gotoBottomKey) {
@@ -251,6 +271,7 @@ func (m model) View() string {
 				lipgloss.Top,
 				paneStyle.Render(m.runsList.View()),
 				paneStyle.Render(m.jobsList.View()),
+				paneStyle.Render(m.stepsList.View()),
 				m.viewLogs(),
 			),
 		)
@@ -280,37 +301,41 @@ func (m *model) setFocusedPaneStyles() {
 	switch m.focusedPane {
 	case PaneRuns:
 		setListFocusedStyles(&m.runsList, &m.runsDelegate)
-		setListUnfocusedStyles(&m.jobsList, &m.checksDelegate)
+		setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
+		setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
 	case PaneJobs:
-		setListFocusedStyles(&m.jobsList, &m.checksDelegate)
 		setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
+		setListFocusedStyles(&m.jobsList, &m.jobsDelegate)
+		setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
 	case PaneLogs:
-		setListUnfocusedStyles(&m.jobsList, &m.checksDelegate)
 		setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
+		setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
+		setListFocusedStyles(&m.stepsList, &m.stepsDelegate)
 	}
 
-	m.runsList.Styles.TitleBar = m.runsList.Styles.TitleBar.Width(firstPaneWidth + 1)
-	m.jobsList.Styles.TitleBar = m.jobsList.Styles.TitleBar.Width(secondPaneWidth + 1)
+	m.logsViewport.SetWidth(m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - 4)
 }
 
 func setListFocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
 	l.Styles.Title = focusedPaneTitleStyle
-	l.Styles.TitleBar = focusedPaneTitleBarStyle
+	l.Styles.TitleBar = focusedPaneTitleBarStyle.Width(focusedPaneWidth)
 	delegate.Styles.SelectedTitle = focusedPaneItemTitleStyle
 	delegate.Styles.SelectedDesc = focusedPaneItemDescStyle
 	delegate.Styles.NormalDesc = normalItemDescStyle
 	l.SetDelegate(delegate)
+	l.SetWidth(focusedPaneWidth)
 }
 
 func setListUnfocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
 	l.Styles.Title = unfocusedPaneTitleStyle
-	l.Styles.TitleBar = unfocusedPaneTitleBarStyle
+	l.Styles.TitleBar = unfocusedPaneTitleBarStyle.Width(unfocusedPaneWidth)
 	delegate.Styles.SelectedTitle = unfocusedPaneItemTitleStyle
 	delegate.Styles.SelectedDesc = unfocusedPaneItemDescStyle
 	delegate.Styles.NormalDesc = normalItemDescStyle
 	l.SetDelegate(delegate)
+	l.SetWidth(unfocusedPaneWidth)
 }
 
 func newRunsDefaultList() (list.Model, list.DefaultDelegate) {
@@ -324,7 +349,7 @@ func newRunsDefaultList() (list.Model, list.DefaultDelegate) {
 	return l, d
 }
 
-func newChecksDefaultList() (list.Model, list.DefaultDelegate) {
+func newJobsDefaultList() (list.Model, list.DefaultDelegate) {
 	d := newCheckItemDelegate()
 	l := list.New([]list.Item{}, d, 0, 0)
 	l.KeyMap.NextPage = key.Binding{}
@@ -335,11 +360,64 @@ func newChecksDefaultList() (list.Model, list.DefaultDelegate) {
 	return l, d
 }
 
-func (m *model) updateJobsListItems() tea.Cmd {
-	run := m.runsList.SelectedItem().(runItem)
-	items := make([]list.Item, 0)
-	for _, item := range run.jobs {
-		items = append(items, item)
+func newStepsDefaultList() (list.Model, list.DefaultDelegate) {
+	d := newStepItemDelegate()
+	l := list.New([]list.Item{}, d, 0, 0)
+	l.KeyMap.NextPage = key.Binding{}
+	l.KeyMap.PrevPage = key.Binding{}
+	l.SetShowHelp(false)
+	l.SetShowStatusBar(false)
+
+	return l, d
+}
+
+func (m *model) updateLists() []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
+	runItems := make([]list.Item, 0)
+	for _, run := range m.data {
+		it := runItem{title: run.Name, description: run.Link, workflow: run.Workflow}
+		runItems = append(runItems, it)
+		cmds = append(cmds, m.runsList.SetItems(runItems))
 	}
-	return m.jobsList.SetItems(items)
+
+	if m.runsList.Cursor() >= len(m.data) {
+		return cmds
+	}
+
+	run := m.data[m.runsList.Cursor()]
+	jobItems := make([]list.Item, 0)
+	for _, job := range run.Jobs {
+		parts := strings.Split(job.Link, "/")
+		id := parts[len(parts)-1]
+		jobItem := jobItem{
+			title:       job.Name,
+			description: id,
+			workflow:    job.Workflow,
+			id:          id,
+			logs:        job.Logs,
+			loading:     job.Loading,
+			state:       job.State,
+		}
+		jobItems = append(jobItems, jobItem)
+	}
+	cmds = append(cmds, m.jobsList.SetItems(jobItems))
+
+	if m.jobsList.Cursor() >= len(run.Jobs) {
+		return cmds
+	}
+
+	job := run.Jobs[m.jobsList.Cursor()]
+
+	stepItems := make([]list.Item, 0)
+	for _, step := range job.Steps {
+		stepItem := stepItem{
+			title:       step.Name,
+			description: step.StartedAt,
+			state:       step.Status,
+		}
+		stepItems = append(stepItems, stepItem)
+	}
+	cmds = append(cmds, m.stepsList.SetItems(stepItems))
+
+	return cmds
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 
-	"github.com/charmbracelet/bubbletea-app-template/internal/ui"
+	"github.com/dlvhdr/gh-enhance/internal/ui"
 )
 
 var rootCmd = &cobra.Command{

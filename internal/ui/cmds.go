@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/cli/go-gh/v2"
 
-	"github.com/charmbracelet/bubbletea-app-template/internal/api"
+	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
 type runsFetchedMsg struct {
@@ -20,6 +20,7 @@ type runsFetchedMsg struct {
 
 func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
+		log.Debug("fetching check runs", "repo", m.repo, "prNumber", prNumber)
 		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state")
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
@@ -32,7 +33,7 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 			log.Error("error parsing checkouts json", "err", err)
 			return runsFetchedMsg{err: err}
 		}
-		log.Debug("fetched pr checks", "len(checks)", len(jobs))
+		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(jobs))
 		runsMap := make(map[string]api.CheckRun)
 
 		for _, job := range jobs {
@@ -45,6 +46,7 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 			if ok {
 				run.Jobs = append(run.Jobs, job)
 			} else {
+
 				run = api.CheckRun{Name: name, Link: job.Link, Workflow: job.Workflow}
 				run.Jobs = []api.Job{job}
 			}
@@ -68,7 +70,7 @@ type jobLogsFetchedMsg struct {
 	logs  string
 }
 
-func (m *model) makeFetchJobStepsAndLogsCmd() tea.Cmd {
+func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	if m.jobsList.SelectedItem() == nil {
 		return nil
 	}
@@ -84,12 +86,42 @@ func (m *model) makeFetchJobStepsAndLogsCmd() tea.Cmd {
 
 	return func() tea.Msg {
 		log.Debug("fetching logs for job", "jobId", jobId)
+		// results := make(chan string, 2)
+		// errors := make(chan error, 2)
+		// wg := sync.WaitGroup{}
+		//
+		// wg.Add(1)
+		// go func() (stdout, stderr bytes.Buffer, err error) {
+		// 	defer wg.Done()
+		// 	jobsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
+		// 	if err != nil {
+		// 		log.Error("error fetching job logs", "jobId", jobId, "err", err, "stderr", stderr.String())
+		// 	}
+		// 	errors <- err
+		// 	results <- jobsRes.String()
+		// 	return jobsRes, stderr, err
+		// }()
+
+		// wg.Add(1)
+		// go func() (stdout, stderr bytes.Buffer, err error) {
+		// 	defer wg.Done()
+		// 	stepsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
+		// 	if err != nil {
+		// 		log.Error("error fetching job steps", "jobId", jobId, "err", err, "stderr", stderr.String())
+		// 	}
+		// 	errors <- err
+		// 	results <- stepsRes.String()
+		// 	return
+		// }()
+		//
+		// wg.Wait()
+		// close(results)
+		//
+
 		jobsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
 		if err != nil {
 			log.Error("error fetching job logs", "jobId", jobId, "err", err, "stderr", stderr.String())
-			return jobLogsFetchedMsg{err: err}
 		}
-
 		jobsStr := jobsRes.String()
 		lines := strings.Lines(jobsStr)
 		parsed := make([]string, 0)
@@ -140,6 +172,33 @@ func (m *model) makeFetchJobStepsAndLogsCmd() tea.Cmd {
 		return jobLogsFetchedMsg{
 			jobId: jobId,
 			logs:  strings.Join(parsed, ""),
+		}
+	}
+}
+
+type runJobsStepsFetchedMsg struct {
+	err           error
+	jobsWithSteps api.CheckRunJobsWithSteps
+}
+
+func (m *model) makeFetchRunJobsWithStepsCmd(runId string) tea.Cmd {
+	return func() tea.Msg {
+		log.Debug("fetching all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId)
+		jobsWithStepsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, runId, "--json", "jobs")
+		if err != nil {
+			log.Error("error fetching all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId, "err", err, "stderr", stderr.String())
+		}
+		log.Debug("successfully fetched all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId)
+
+		jobsWithSteps := api.CheckRunJobsWithSteps{}
+
+		if err := json.Unmarshal(jobsWithStepsRes.Bytes(), &jobsWithSteps); err != nil {
+			log.Error("error parsing run jobs json", "err", err)
+			return runJobsStepsFetchedMsg{err: err}
+		}
+
+		return runJobsStepsFetchedMsg{
+			jobsWithSteps: jobsWithSteps,
 		}
 	}
 }

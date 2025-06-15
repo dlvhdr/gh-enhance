@@ -1,4 +1,4 @@
-module github.com/charmbracelet/bubbletea-app-template
+module github.com/dlvhdr/gh-enhance
 
 go 1.24.3
 

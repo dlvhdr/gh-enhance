@@ -6,7 +6,7 @@ import (
 
 	gh "github.com/cli/go-gh/v2/pkg/api"
 
-	"github.com/charmbracelet/bubbletea-app-template/internal/config"
+	"github.com/dlvhdr/gh-enhance/internal/config"
 )
 
 func NewClient() (*gh.GraphQLClient, error) {

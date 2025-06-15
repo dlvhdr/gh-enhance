@@ -8,20 +8,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 )
 
-type jobItem struct {
+type stepItem struct {
 	title       string
 	description string
-	workflow    string
-	id          string
-	logs        string
-	loading     bool
 	state       string
-	steps       []stepItem
 }
 
-func (i jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.title) }
+func (i stepItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.title) }
 
-func (i jobItem) viewStatus() string {
+func (i stepItem) viewStatus() string {
 	if i.state == "SUCCESS" {
 		return successGlyph.Render()
 	}
@@ -33,15 +28,15 @@ func (i jobItem) viewStatus() string {
 	return failureGlyph.Render()
 }
 
-func (i jobItem) Description() string { return i.description }
+func (i stepItem) Description() string { return i.description }
 
-func (i jobItem) FilterValue() string { return i.title }
+func (i stepItem) FilterValue() string { return i.title }
 
-func newCheckItemDelegate() list.DefaultDelegate {
+func newStepItemDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		if _, ok := m.SelectedItem().(jobItem); ok {
+		if _, ok := m.SelectedItem().(stepItem); ok {
 		} else {
 			return nil
 		}
