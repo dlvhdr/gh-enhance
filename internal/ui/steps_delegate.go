@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
@@ -12,20 +13,23 @@ type stepItem struct {
 	title       string
 	description string
 	state       string
+	conclusion  string
+	startedAt   time.Time
+	completedAt time.Time
 }
 
-func (i stepItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.title) }
+func (i stepItem) Title() string { return fmt.Sprintf("%s %s", i.viewConclusion(), i.title) }
 
-func (i stepItem) viewStatus() string {
-	if i.state == "SUCCESS" {
+func (i stepItem) viewConclusion() string {
+	if i.conclusion == "success" {
 		return successGlyph.Render()
 	}
 
-	if i.state == "PENDING" {
-		return waitingGlyph.Render()
+	if i.conclusion == "failure" {
+		return failureGlyph.Render()
 	}
 
-	return failureGlyph.Render()
+	return waitingGlyph.Render()
 }
 
 func (i stepItem) Description() string { return i.description }

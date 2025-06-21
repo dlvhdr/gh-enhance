@@ -1,20 +1,22 @@
 package api
 
+import "time"
+
 type Step struct {
-	CompletedAt string
+	CompletedAt time.Time
 	Conclusion  string
 	Name        string
 	Number      int
-	StartedAt   string
+	StartedAt   time.Time
 	Status      string
 }
 
 type JobWithSteps struct {
-	CompletedAt string
+	CompletedAt time.Time
 	Conclusion  string
 	DatabaseId  int
 	Name        string
-	StartedAt   string
+	StartedAt   time.Time
 	Status      string
 	Steps       []Step
 }
@@ -31,12 +33,19 @@ type CheckRun struct {
 	Jobs     []Job
 }
 
+type StepLogs string
+
+type StepLogsWithTime struct {
+	Log  string
+	Time time.Time
+}
+
 type Job struct {
 	Id       string
 	State    string
 	Name     string
 	Workflow string
-	Logs     string
+	Logs     []StepLogsWithTime
 	Loading  bool
 	Link     string
 	Steps    []Step

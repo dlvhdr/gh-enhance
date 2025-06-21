@@ -1,0 +1,10 @@
+18:01:59  Current runner version: '2.325.0'
+----
+18:01:59  ##[group]Run actions/checkout@v4
+18:01:59  Some log
+18:01:59  ##[endgroup]
+----
+18:01:59  Post job cleanup.
+18:01:59  [command]/usr/bin/git version
+----
+18:01:59  Cleaning up orphan processes

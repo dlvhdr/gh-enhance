@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/log"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
+	"github.com/dlvhdr/gh-enhance/internal/ui/art"
 )
 
 type errMsg error
@@ -167,6 +168,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		cmds = append(cmds, m.makeFetchJobLogsCmd())
 		cmds = append(cmds, m.updateLists()...)
 
 	case tea.WindowSizeMsg:
@@ -176,7 +178,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.jobsList.SetHeight(msg.Height)
 		m.stepsList.SetHeight(msg.Height)
 		m.logsViewport.SetHeight(msg.Height - 1)
-		m.logsViewport.SetWidth(m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - 4)
+		m.logsViewport.SetWidth(m.logsWidth())
 	case tea.KeyMsg:
 		log.Debug("key pressed", "key", msg.String())
 		if m.runsList.FilterState() == list.Filtering ||
@@ -233,8 +235,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.updateLists()...)
 		}
 	case PaneSteps:
+		before := m.stepsList.Cursor()
 		m.stepsList, cmd = m.stepsList.Update(msg)
 		cmds = append(cmds, cmd)
+		after := m.stepsList.Cursor()
+		if before != after {
+			job := m.jobsList.SelectedItem()
+			step := m.stepsList.SelectedItem()
+
+			if step != nil {
+				log.Debug("looking for step start", "step", step.(stepItem).title)
+				for i, log := range job.(jobItem).logs {
+					if log.Time.After(step.(stepItem).startedAt) {
+						m.logsViewport.SetYOffset(i - 1)
+						break
+					}
+				}
+			}
+
+		}
 
 	case PaneLogs:
 		if msg, ok := msg.(tea.KeyMsg); ok {
@@ -250,9 +269,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
-	currCheck := m.jobsList.SelectedItem()
-	if currCheck != nil {
-		m.logsViewport.SetContent(currCheck.(jobItem).logs)
+	currJob := m.jobsList.SelectedItem()
+	currStep := m.stepsList.SelectedItem()
+	if currJob != nil && currStep != nil && len(currJob.(jobItem).logs) > m.stepsList.Cursor() {
+		logs := strings.Builder{}
+		for _, log := range currJob.(jobItem).logs {
+			// logs.Write([]byte(log.Time.String()))
+			logs.Write([]byte(log.Log))
+		}
+		logs.Write([]byte(strings.Repeat("~\n", m.logsViewport.Height())))
+		m.logsViewport.SetContent(logs.String())
 	}
 
 	return m, tea.Batch(cmds...)
@@ -289,9 +315,30 @@ func (m *model) viewLogs() string {
 		title = unfocusedPaneTitleBarStyle.Render(unfocusedPaneTitleStyle.Render(title))
 	}
 
-	check := m.jobsList.SelectedItem()
-	if check == nil || check.(jobItem).loading {
-		content = "loading..."
+	job := m.jobsList.SelectedItem()
+	step := m.stepsList.SelectedItem()
+	if job == nil || job.(jobItem).loading || step == nil || len(job.(jobItem).logs) == 0 {
+		content = fmt.Sprintf("loading...")
+		content += "\n"
+		if job != nil {
+			content += fmt.Sprintf("job: %s", job.(jobItem).title)
+		} else {
+			content += "job=none"
+		}
+
+		content += "\n"
+		if step != nil {
+			content += fmt.Sprintf("step: %s", step.(stepItem).title)
+		} else {
+			content += "step=none"
+		}
+
+		if job != nil && len(job.(jobItem).logs) <= m.stepsList.Cursor() {
+			content += "\n"
+			content += fmt.Sprintf("not enough log groups, len(logs)=%d m.stepsList.len()=%d", len(job.(jobItem).logs), len(m.stepsList.Items()))
+		}
+	} else if len(job.(jobItem).logs) == 0 {
+		content = m.noLogsView()
 	} else {
 		content = m.logsViewport.View()
 	}
@@ -322,7 +369,7 @@ func (m *model) setFocusedPaneStyles() {
 		setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	}
 
-	m.logsViewport.SetWidth(m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - 4)
+	m.logsViewport.SetWidth(m.logsWidth())
 }
 
 func setListFocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
@@ -419,12 +466,41 @@ func (m *model) updateLists() []tea.Cmd {
 	for _, step := range job.Steps {
 		stepItem := stepItem{
 			title:       step.Name,
-			description: step.StartedAt,
+			description: step.StartedAt.String(),
 			state:       step.Status,
+			conclusion:  step.Conclusion,
+			startedAt:   step.StartedAt,
+			completedAt: step.CompletedAt,
 		}
 		stepItems = append(stepItems, stepItem)
 	}
 	cmds = append(cmds, m.stepsList.SetItems(stepItems))
 
 	return cmds
+}
+
+func (m *model) logsWidth() int {
+	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - 4
+}
+
+func (m *model) noLogsView() string {
+	emptySetArt := ""
+	for _, char := range art.EmptySet {
+		if char == '╱' {
+			emptySetArt += lipgloss.NewStyle().Foreground(lipgloss.Red).Render("╱")
+		} else {
+			emptySetArt += watermarkIllustrationStyle.Render(string(char))
+		}
+	}
+
+	return lipgloss.Place(
+		m.logsWidth(),
+		m.height,
+		lipgloss.Center,
+		0.75,
+		lipgloss.JoinVertical(
+			lipgloss.Center,
+			emptySetArt,
+			noLogsStyle.Render("This job doesn't have any logs"),
+		))
 }

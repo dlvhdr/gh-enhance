@@ -1,0 +1,130 @@
+18:01:59  Current runner version: '2.325.0'
+18:01:59  ##[group]Operating System
+18:01:59  Ubuntu
+18:01:59  24.04.2
+18:01:59  LTS
+18:01:59  ##[endgroup]
+18:01:59  ##[group]Runner Image
+18:01:59  Image: ubuntu-24.04
+18:01:59  Version: 20250609.1.0
+18:01:59  Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250609.1/images/ubuntu/Ubuntu2404-Readme.md
+18:01:59  Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250609.1
+18:01:59  ##[endgroup]
+18:01:59  ##[group]Runner Image Provisioner
+18:01:59  2.0.437.1
+18:01:59  ##[endgroup]
+18:01:59  ##[group]GITHUB_TOKEN Permissions
+18:01:59  Metadata: read
+18:01:59  PullRequests: write
+18:01:59  ##[endgroup]
+18:01:59  Secret source: Actions
+18:01:59  Prepare workflow directory
+18:01:59  Prepare all required actions
+18:01:59  Getting action download info
+18:01:59  ##[group]Download immutable action package 'actions/checkout@v4'
+18:01:59  Version: 4.2.2
+18:01:59  Digest: sha256:ccb2698953eaebd21c7bf6268a94f9c26518a7e38e27e0b83c1fe1ad049819b1
+18:01:59  Source commit SHA: 11bd71901bbe5b1630ceea73d27597364c9af683
+18:01:59  ##[endgroup]
+18:01:59  ##[group]Download immutable action package 'actions/github-script@v7'
+18:01:59  Version: 7.0.1
+18:01:59  Digest: sha256:bce02966afe3a75123f766b765abe432fac5464b74976015dc06b811ac9054c7
+18:01:59  Source commit SHA: 60a0d83039c74a4aee543508d2ffcb1c3799cdea
+18:01:59  ##[endgroup]
+18:01:59  Complete job name: remove-reviewers
+----
+18:01:59  ##[group]Run actions/checkout@v4
+18:01:59  with:
+18:01:59    repository: neovim/neovim
+18:01:59    token: ***
+18:01:59    ssh-strict: true
+18:01:59    ssh-user: git
+18:01:59    persist-credentials: true
+18:01:59    clean: true
+18:01:59    sparse-checkout-cone-mode: true
+18:01:59    fetch-depth: 1
+18:01:59    fetch-tags: false
+18:01:59    show-progress: true
+18:01:59    lfs: false
+18:01:59    submodules: false
+18:01:59    set-safe-directory: true
+18:01:59  ##[endgroup]
+18:01:59  Syncing repository: neovim/neovim
+18:01:59  ##[group]Getting Git version info
+18:01:59  Working directory is '/home/runner/work/neovim/neovim'
+18:01:59  [command]/usr/bin/git version
+18:01:59  git version 2.49.0
+18:01:59  ##[endgroup]
+18:01:59  Temporarily overriding HOME='/home/runner/work/_temp/7c910cf8-892f-4b0f-a9cb-fb4709c8689e' before making global git config changes
+18:01:59  Adding repository directory to the temporary git global config as a safe directory
+18:01:59  [command]/usr/bin/git config --global --add safe.directory /home/runner/work/neovim/neovim
+18:01:59  Deleting the contents of '/home/runner/work/neovim/neovim'
+18:01:59  ##[group]Initializing the repository
+18:01:59  [command]/usr/bin/git init /home/runner/work/neovim/neovim
+18:01:59  hint: Using 'master' as the name for the initial branch. This default branch name
+18:01:59  hint: is subject to change. To configure the initial branch name to use in all
+18:01:59  hint: of your new repositories, which will suppress this warning, call:
+18:01:59  hint:
+18:01:59  hint: 	git config --global init.defaultBranch <name>
+18:01:59  hint:
+18:01:59  hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+18:01:59  hint: 'development'. The just-created branch can be renamed via this command:
+18:01:59  hint:
+18:01:59  hint: 	git branch -m <name>
+18:01:59  Initialized empty Git repository in /home/runner/work/neovim/neovim/.git/
+18:01:59  [command]/usr/bin/git remote add origin https://github.com/neovim/neovim
+18:01:59  ##[endgroup]
+18:01:59  ##[group]Disabling automatic garbage collection
+18:01:59  [command]/usr/bin/git config --local gc.auto 0
+18:01:59  ##[endgroup]
+18:01:59  ##[group]Setting up auth
+18:01:59  [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+18:01:59  [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+18:01:59  [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+18:01:59  [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+18:01:59  [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+18:01:59  ##[endgroup]
+18:01:59  ##[group]Fetching the repository
+18:01:59  [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +82d0883c2d96cafba17590cb48674d06e7834816:refs/remotes/origin/master
+18:01:59  From https://github.com/neovim/neovim
+18:01:59   * [new ref]         82d0883c2d96cafba17590cb48674d06e7834816 -> origin/master
+18:01:59  ##[endgroup]
+18:01:59  ##[group]Determining the checkout info
+18:01:59  ##[endgroup]
+18:01:59  [command]/usr/bin/git sparse-checkout disable
+18:01:59  [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+18:01:59  ##[group]Checking out the ref
+18:01:59  [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+18:01:59  Reset branch 'master'
+18:01:59  branch 'master' set up to track 'origin/master'.
+18:01:59  ##[endgroup]
+18:01:59  [command]/usr/bin/git log -1 --format=%H
+18:01:59  82d0883c2d96cafba17590cb48674d06e7834816
+----
+18:01:59  ##[group]Run actions/github-script@v7
+18:01:59  with:
+18:01:59    script: const script = require('./.github/scripts/reviewers_remove.js')
+18:01:59  await script({github, context})
+18:01:59  
+18:01:59    github-token: ***
+18:01:59    debug: false
+18:01:59    user-agent: actions/github-script
+18:01:59    result-encoding: json
+18:01:59    retries: 0
+18:01:59    retry-exempt-status-codes: 400,401,403,404,422
+18:01:59  ##[endgroup]
+----
+18:01:59  Post job cleanup.
+18:01:59  [command]/usr/bin/git version
+18:01:59  git version 2.49.0
+18:01:59  Temporarily overriding HOME='/home/runner/work/_temp/f70936c5-13ee-42ad-8316-058e14bea09d' before making global git config changes
+18:01:59  Adding repository directory to the temporary git global config as a safe directory
+18:01:59  [command]/usr/bin/git config --global --add safe.directory /home/runner/work/neovim/neovim
+18:01:59  [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+18:01:59  [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+18:01:59  [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+18:01:59  http.https://github.com/.extraheader
+18:01:59  [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+18:01:59  [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+----
+18:01:59  Cleaning up orphan processes

@@ -6,6 +6,8 @@ import (
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
+
+	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
 type jobItem struct {
@@ -13,7 +15,7 @@ type jobItem struct {
 	description string
 	workflow    string
 	id          string
-	logs        string
+	logs        []api.StepLogsWithTime
 	loading     bool
 	state       string
 	steps       []stepItem

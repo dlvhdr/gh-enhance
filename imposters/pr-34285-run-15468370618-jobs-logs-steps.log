@@ -1,0 +1,50 @@
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.2018380Z ##[group]Operating System
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.2020903Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.2021590Z ##[group]Runner Image
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.2025928Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.2026460Z ##[group]Runner Image Provisioner
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.2027473Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.2028541Z ##[group]GITHUB_TOKEN Permissions
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.2032310Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.6678070Z ##[group]Download immutable action package 'actions/checkout@v4'
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.6682207Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.9121493Z ##[group]Run actions/checkout@v4
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:04.9128811Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.1735069Z ##[group]Getting Git version info
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.1837787Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.1897417Z ##[group]Initializing the repository
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.2035474Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.2036894Z ##[group]Disabling automatic garbage collection
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.2069800Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.2071458Z ##[group]Setting up auth
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.2736165Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:31:05.2739135Z ##[group]Fetching the repository
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:09.6790809Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:09.6791373Z ##[group]Determining the checkout info
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:09.6795114Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:09.6869277Z ##[group]Checking out the ref
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.0990830Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.1374435Z ##[group]Run ./.github/actions/setup
+  lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.1374838Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.1456439Z ##[group]Run echo "$BIN_DIR" >> $GITHUB_PATH
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.1525859Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.1671615Z ##[group]Run ulimit -c unlimited
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.1723539Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.1919072Z ##[group]Run ./.github/scripts/install_deps.sh 
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:10.1973755Z ##[endgroup]
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.2210052Z ##[group]Download immutable action package 'actions/cache@v4'
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.2212044Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.3817201Z ##[group]Run ./.github/actions/cache
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.3817446Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.3841551Z ##[group]Run echo "CACHE_KEY=lintcommit" >> $GITHUB_ENV
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.3894242Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.3998285Z ##[group]Run echo "CACHE_KEY=lint-commits" >> $GITHUB_ENV
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.4049072Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.4151071Z ##[group]Run echo "version=$ImageVersion" >> $GITHUB_OUTPUT
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.4203585Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.6391428Z ##[group]Run actions/cache@v4
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:29.6395004Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:32:30.0902686Z ##[group]Run cmake -S cmake.deps --preset ci
+    lint-commits	UNKNOWN STEP	2025-06-05T13:32:30.0954750Z ##[endgroup]
+lint-commits	UNKNOWN STEP	2025-06-05T13:33:25.2370202Z ##[group]Run cmake --build build --target lintcommit
+    lint-commits	UNKNOWN STEP	2025-06-05T13:33:25.2421327Z ##[endgroup]

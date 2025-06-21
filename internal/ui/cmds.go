@@ -2,15 +2,21 @@ package ui
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log"
 	"github.com/cli/go-gh/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
+	"github.com/dlvhdr/gh-enhance/internal/parser"
+)
+
+const (
+	stepStartMarker  = "##[group]Run "
+	groupStartMarker = "##[group]"
+	groupEndMarker   = "##[endgroup]"
 )
 
 type runsFetchedMsg struct {
@@ -67,113 +73,43 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 type jobLogsFetchedMsg struct {
 	err   error
 	jobId string
-	logs  string
+	logs  []api.StepLogsWithTime
 }
 
 func (m *model) makeFetchJobLogsCmd() tea.Cmd {
-	if m.jobsList.SelectedItem() == nil {
+	if len(m.data) == 0 {
 		return nil
 	}
-	run := m.runsList.SelectedItem().(runItem)
-	jobId := m.jobsList.SelectedItem().(jobItem).id
-	for _, job := range run.jobs {
-		if job.id == jobId && job.loading == false {
-			log.Debug("using cached job logs", "jobId", jobId)
-			m.logsViewport.SetContent(job.logs)
-			return nil
+
+	run := m.data[m.runsList.Cursor()]
+	if len(run.Jobs) == 0 {
+		return nil
+	}
+
+	job := run.Jobs[m.jobsList.Cursor()]
+	if job.Loading == false {
+		logs := strings.Builder{}
+		for _, log := range job.Logs {
+			logs.Write([]byte(log.Log))
 		}
+		m.logsViewport.SetContent(logs.String())
+		return nil
 	}
 
 	return func() tea.Msg {
-		log.Debug("fetching logs for job", "jobId", jobId)
-		// results := make(chan string, 2)
-		// errors := make(chan error, 2)
-		// wg := sync.WaitGroup{}
-		//
-		// wg.Add(1)
-		// go func() (stdout, stderr bytes.Buffer, err error) {
-		// 	defer wg.Done()
-		// 	jobsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
-		// 	if err != nil {
-		// 		log.Error("error fetching job logs", "jobId", jobId, "err", err, "stderr", stderr.String())
-		// 	}
-		// 	errors <- err
-		// 	results <- jobsRes.String()
-		// 	return jobsRes, stderr, err
-		// }()
-
-		// wg.Add(1)
-		// go func() (stdout, stderr bytes.Buffer, err error) {
-		// 	defer wg.Done()
-		// 	stepsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
-		// 	if err != nil {
-		// 		log.Error("error fetching job steps", "jobId", jobId, "err", err, "stderr", stderr.String())
-		// 	}
-		// 	errors <- err
-		// 	results <- stepsRes.String()
-		// 	return
-		// }()
-		//
-		// wg.Wait()
-		// close(results)
-		//
-
-		jobsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", jobId)
+		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.Id)
 		if err != nil {
-			log.Error("error fetching job logs", "jobId", jobId, "err", err, "stderr", stderr.String())
+			log.Error("error fetching job logs", "jobId", job.Id, "err", err, "stderr", stderr.String())
 		}
-		jobsStr := jobsRes.String()
-		lines := strings.Lines(jobsStr)
-		parsed := make([]string, 0)
-		var name, step string
-		count := 0
-		fieldsFunc := func(r rune) bool {
-			if r == '\t' {
-				return true
-			}
-			return false
-		}
-		for line := range lines {
-			f := strings.FieldsFunc(line, fieldsFunc)
-			if len(f) < 3 {
-				parsed = append(parsed, line)
-				continue
-			}
+		jobLogs := jobLogsRes.String()
+		log.Debug("success fetching job logs", "jobId", job.Id, "bytes", len(jobLogsRes.Bytes()))
 
-			if count == 0 {
-				name = f[0]
-				step = f[1]
-			}
-
-			dateAndLog := strings.SplitN(f[2], " ", 2)
-			if len(dateAndLog) == 2 {
-				d, err := time.Parse(time.RFC3339, dateAndLog[0])
-				pd := strings.Repeat(" ", 8)
-				if err == nil {
-					pd = d.Format(time.TimeOnly)
-				}
-
-				parsed = append(parsed, strings.Join([]string{
-					pd,
-					lipgloss.NewStyle().Foreground(lipgloss.Color("234")).Render(""),
-					dateAndLog[1],
-				}, " "))
-			} else {
-				parsed = append(parsed, f[2])
-			}
-		}
-		log.Debug("found fields", "count", count, "name", name, "step", step)
-		if name != "" && step != "" {
-			jobsStr = strings.ReplaceAll(jobsStr, name+string('\t'), "")
-			jobsStr = strings.ReplaceAll(jobsStr, step+string('\t'), "")
-		}
-
-		log.Debug("success fetching job logs", "jobId", jobId)
 		return jobLogsFetchedMsg{
-			jobId: jobId,
-			logs:  strings.Join(parsed, ""),
+			jobId: job.Id,
+			logs:  parser.MarkStepsLogsByTime(job.Id, job.Steps, jobLogs),
 		}
 	}
+
 }
 
 type runJobsStepsFetchedMsg struct {
@@ -195,6 +131,12 @@ func (m *model) makeFetchRunJobsWithStepsCmd(runId string) tea.Cmd {
 		if err := json.Unmarshal(jobsWithStepsRes.Bytes(), &jobsWithSteps); err != nil {
 			log.Error("error parsing run jobs json", "err", err)
 			return runJobsStepsFetchedMsg{err: err}
+		}
+
+		for jobIdx := range jobsWithSteps.Jobs {
+			sort.Slice(jobsWithSteps.Jobs[jobIdx].Steps, func(i, j int) bool {
+				return jobsWithSteps.Jobs[jobIdx].Steps[i].Number < jobsWithSteps.Jobs[jobIdx].Steps[j].Number
+			})
 		}
 
 		return runJobsStepsFetchedMsg{

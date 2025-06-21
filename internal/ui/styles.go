@@ -6,6 +6,11 @@ import (
 )
 
 var (
+	focusedColor   = lipgloss.Color("4")
+	unfocusedColor = lipgloss.Color("7")
+	faintColor     = lipgloss.Color("8")
+	fainterColor   = lipgloss.Color("236")
+
 	defaultListStyles          = list.DefaultStyles(true)
 	focusedPaneTitleStyle      = defaultListStyles.Title.UnsetBackground().Bold(true).PaddingLeft(0).PaddingRight(0).Margin(0)
 	unfocusedPaneTitleStyle    = defaultListStyles.Title.UnsetBackground().Faint(true).PaddingLeft(0).PaddingRight(0).Margin(0)
@@ -14,11 +19,11 @@ var (
 
 	defaultItemStyles           = list.NewDefaultItemStyles(true)
 	normalItemDescStyle         = defaultItemStyles.DimmedDesc
-	focusedPaneItemTitleStyle   = defaultItemStyles.SelectedTitle.Bold(true).Foreground(lipgloss.Color("4")).BorderForeground(lipgloss.Color("4")).BorderStyle(lipgloss.InnerHalfBlockBorder())
-	unfocusedPaneItemTitleStyle = defaultItemStyles.SelectedTitle.Bold(true).Foreground(lipgloss.Color("4")).BorderForeground(lipgloss.Color("7"))
-	focusedPaneItemDescStyle    = defaultItemStyles.SelectedDesc.BorderForeground(lipgloss.Color("4")).Foreground(defaultItemStyles.NormalDesc.GetForeground()).BorderStyle(lipgloss.InnerHalfBlockBorder())
-	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(lipgloss.Color("7")).Foreground(defaultItemStyles.NormalDesc.GetForeground())
-	paneStyle                   = lipgloss.NewStyle().BorderRight(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("8"))
+	focusedPaneItemTitleStyle   = defaultItemStyles.SelectedTitle.Bold(true).Foreground(focusedColor).BorderForeground(focusedColor).BorderStyle(lipgloss.InnerHalfBlockBorder())
+	unfocusedPaneItemTitleStyle = defaultItemStyles.SelectedTitle.Bold(true).Foreground(focusedColor).BorderForeground(unfocusedColor)
+	focusedPaneItemDescStyle    = defaultItemStyles.SelectedDesc.BorderForeground(focusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground()).BorderStyle(lipgloss.InnerHalfBlockBorder())
+	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(unfocusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground())
+	paneStyle                   = lipgloss.NewStyle().BorderRight(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(faintColor)
 
 	lineNumbersStyle = lipgloss.NewStyle().Faint(true)
 
@@ -31,6 +36,9 @@ var (
 	successGlyph = lipgloss.NewStyle().
 			Foreground(lipgloss.Green).
 			SetString(SuccessIcon)
+
+	noLogsStyle                = lipgloss.NewStyle().Foreground(faintColor).Bold(true)
+	watermarkIllustrationStyle = lipgloss.NewStyle().Foreground(lipgloss.White)
 
 	debugStyle = lipgloss.NewStyle().Background(lipgloss.Color("1"))
 )

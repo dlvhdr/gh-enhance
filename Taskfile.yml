@@ -16,12 +16,17 @@ tasks:
     cmds:
       - task: start-mock-server
       - defer: { task: stop-mock-server }
+      - echo "----------------------------------------" > ./debug.log
       - cmd: DEBUG=true FF_MOCK_DATA=true go run ./cmd/enhance -R neovim/neovim 34454
   start-mock-server:
     cmds:
       - killgrave --config ./imposters/config.yml &> ./.killgrave.log  &
-    silent: true
+  logs:
+    cmds:
+      - rm -f ./debug.log
+      - touch ./debug.log
+      - tail -f ./debug.log
+    interactive: true
   stop-mock-server:
     cmds:
       - pkill killgrave
-    silent: true
