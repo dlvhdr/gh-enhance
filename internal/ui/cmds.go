@@ -10,7 +10,7 @@ import (
 	"github.com/cli/go-gh/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
-	"github.com/dlvhdr/gh-enhance/internal/parser"
+	"github.com/dlvhdr/gh-enhance/internal/logs_parser"
 )
 
 const (
@@ -106,7 +106,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 
 		return jobLogsFetchedMsg{
 			jobId: job.Id,
-			logs:  parser.MarkStepsLogsByTime(job.Id, job.Steps, jobLogs),
+			logs:  logs_parser.MarkStepsLogsByTime(job.Id, job.Steps, jobLogs),
 		}
 	}
 

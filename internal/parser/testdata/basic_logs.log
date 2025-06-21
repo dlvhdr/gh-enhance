@@ -1,7 +1,0 @@
-lint-commits	UNKNOWN STEP	2025-06-12T18:01:59.2459155Z Current runner version: '2.325.0'
-lint-commits	UNKNOWN STEP	2025-06-12T18:01:59.2459155Z ##[group]Run actions/checkout@v4
-lint-commits	UNKNOWN STEP	2025-06-12T18:01:59.2459155Z Some log
-lint-commits	UNKNOWN STEP	2025-06-12T18:01:59.2459155Z ##[endgroup]
-lint-commits	UNKNOWN STEP	2025-06-12T18:01:59.2459155Z Post job cleanup.
-lint-commits	UNKNOWN STEP	2025-06-12T18:01:59.2459155Z [command]/usr/bin/git version
-lint-commits	UNKNOWN STEP	2025-06-12T18:01:59.2459155Z Cleaning up orphan processes
