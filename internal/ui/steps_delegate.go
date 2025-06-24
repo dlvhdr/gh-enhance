@@ -14,8 +14,8 @@ import (
 type stepItem struct {
 	title       string
 	description string
-	state       string
-	conclusion  string
+	state       api.Status
+	conclusion  api.Conclusion
 	startedAt   time.Time
 	completedAt time.Time
 }
@@ -30,23 +30,27 @@ func (i *stepItem) Description() string { return i.description }
 func (i *stepItem) FilterValue() string { return i.title }
 
 func (i *stepItem) viewConclusion() string {
-	if i.conclusion == "success" {
+	if i.conclusion == api.ConclusionSuccess {
 		return successGlyph.Render()
 	}
 
-	if i.conclusion == "failure" {
+	if api.IsFailureConclusion(i.conclusion) {
 		return failureGlyph.Render()
 	}
 
-	if i.state == "in_progress" {
+	if i.state == api.StatusInProgress {
 		return waitingGlyph.Render()
 	}
 
-	if i.state == "pending" {
+	if i.state == api.StatusPending {
 		return pendingGlyph.Render()
 	}
 
-	return i.state
+	if i.state == api.StatusCompleted {
+		return successGlyph.Render()
+	}
+
+	return string(i.state)
 }
 
 func newStepItemDelegate() list.DefaultDelegate {

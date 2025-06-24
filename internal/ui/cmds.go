@@ -27,33 +27,33 @@ type runsFetchedMsg struct {
 func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
 		log.Debug("fetching check runs", "repo", m.repo, "prNumber", prNumber)
-		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state,event,startedAt,completedAt")
+		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state,event,startedAt,completedAt,bucket")
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
 			return runsFetchedMsg{err: err}
 		}
 
-		jobs := []api.Job{}
+		statusChecks := []api.StatusCheck{}
 
-		if err := json.Unmarshal(checkRunsRes.Bytes(), &jobs); err != nil {
+		if err := json.Unmarshal(checkRunsRes.Bytes(), &statusChecks); err != nil {
 			log.Error("error parsing checkouts json", "err", err)
 			return runsFetchedMsg{err: err}
 		}
-		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(jobs))
+		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(statusChecks))
 		runsMap := make(map[string]api.CheckRun)
 
-		for _, job := range jobs {
-			name := job.Workflow
+		for _, statusCheck := range statusChecks {
+			name := statusCheck.Workflow
 			if name == "" {
-				name = job.Name
+				name = statusCheck.Name
 			}
 
 			run, ok := runsMap[name]
 			if ok {
-				run.Jobs = append(run.Jobs, job)
+				run.Jobs = append(run.Jobs, statusCheck)
 			} else {
-				run = api.CheckRun{Name: job.Name, Link: job.Link, Workflow: job.Workflow, Event: job.Event}
-				run.Jobs = []api.Job{job}
+				run = api.CheckRun{Name: statusCheck.Name, Link: statusCheck.Link, Workflow: statusCheck.Workflow, Event: statusCheck.Event, Bucket: statusCheck.Bucket}
+				run.Jobs = []api.StatusCheck{statusCheck}
 			}
 			runsMap[name] = run
 		}

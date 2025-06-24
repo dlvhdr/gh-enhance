@@ -19,7 +19,7 @@ type jobItem struct {
 	workflow    string
 	logs        []api.StepLogsWithTime
 	loading     bool
-	state       string
+	state       api.StatusCheckConclusion
 	steps       []*stepItem
 	startedAt   time.Time
 	completedAt time.Time
@@ -30,7 +30,7 @@ func (i *jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *jobItem) Description() string {
-	if i.state == "SKIPPED" {
+	if i.state == api.StatusCheckConclusionSkipped {
 		return "Skipped"
 	}
 
@@ -45,23 +45,19 @@ func (i *jobItem) Description() string {
 func (i *jobItem) FilterValue() string { return i.title }
 
 func (i *jobItem) viewStatus() string {
-	if i.state == "SUCCESS" {
+	if i.state == api.StatusCheckConclusionSuccess {
 		return successGlyph.Render()
 	}
 
-	if i.state == "PENDING" {
-		return waitingGlyph.Render()
-	}
-
-	if i.state == "SKIPPED" {
+	if i.state == api.StatusCheckConclusionSkipped {
 		return skippedGlyph.Render()
 	}
 
-	if i.state == "CANCELLED" {
+	if i.state == api.StatusCheckConclusionCancelled {
 		return canceledGlyph.Render()
 	}
 
-	if i.state == "FAILURE" {
+	if api.IsFailureStatusCheckState(i.state) {
 		return failureGlyph.Render()
 	}
 
@@ -93,7 +89,7 @@ func newCheckItemDelegate() list.DefaultDelegate {
 	return d
 }
 
-func NewJobItem(job api.Job) jobItem {
+func NewJobItem(job api.StatusCheck) jobItem {
 	parts := strings.Split(job.Link, "/")
 	id := parts[len(parts)-1]
 	return jobItem{
