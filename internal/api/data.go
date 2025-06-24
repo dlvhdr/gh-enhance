@@ -30,6 +30,7 @@ type CheckRun struct {
 	Name     string
 	Link     string
 	Workflow string
+	Event    string
 	Jobs     []Job
 }
 
@@ -41,12 +42,15 @@ type StepLogsWithTime struct {
 }
 
 type Job struct {
-	Id       string
-	State    string
-	Name     string
-	Workflow string
-	Logs     []StepLogsWithTime
-	Loading  bool
-	Link     string
-	Steps    []Step
+	Id          string
+	State       string
+	Name        string
+	Workflow    string
+	Event       string
+	Logs        []StepLogsWithTime
+	Loading     bool
+	Link        string
+	Steps       []Step
+	StartedAt   time.Time
+	CompletedAt time.Time
 }

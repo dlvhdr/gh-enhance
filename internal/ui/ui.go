@@ -32,12 +32,11 @@ type model struct {
 	height        int
 	prNumber      string
 	repo          string
-	data          []api.CheckRun
 	runsList      list.Model
 	jobsList      list.Model
 	stepsList     list.Model
 	logsViewport  viewport.Model
-	spinner       spinner.Model
+	spinners      []spinner.Model
 	quitting      bool
 	focusedPane   focusedPane
 	err           error
@@ -93,7 +92,7 @@ func NewModel(repo string, number string) model {
 		stepsList:     stepsList,
 		prNumber:      number,
 		repo:          repo,
-		spinner:       s,
+		spinners:      []spinner.Model{},
 		runsDelegate:  runsDelegate,
 		jobsDelegate:  jobsDelegate,
 		stepsDelegate: stepsDelegate,
@@ -115,37 +114,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case runsFetchedMsg:
-		m.data = msg.runs
+		runItems := make([]list.Item, 0)
+		for _, run := range msg.runs {
+			ri := NewRunItem(run)
+			runItems = append(runItems, &ri)
+		}
 
-		if len(m.data) > 0 {
-			run := m.data[0]
-			parts := strings.Split(run.Link, "/")
-			runId := parts[len(parts)-3]
-
-			// Initialize ids and loading state for each job
-			for runIdx, run := range m.data {
-				for jobIdx, job := range run.Jobs {
-					parts := strings.Split(job.Link, "/")
-
-					m.data[runIdx].Id = parts[len(parts)-3]
-					m.data[runIdx].Jobs[jobIdx].Id = parts[len(parts)-1]
-					m.data[runIdx].Jobs[jobIdx].Loading = true
-				}
-			}
-
-			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(runId))
+		cmds = append(cmds, m.runsList.SetItems(runItems))
+		if len(runItems) > 0 {
+			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(runItems[0].(*runItem).id))
 		}
 
 		cmds = append(cmds, m.updateLists()...)
 
 	case jobLogsFetchedMsg:
-		runIdx := m.runsList.Cursor()
-		run := m.data[runIdx]
-		for i := range run.Jobs {
-			if run.Jobs[i].Id == msg.jobId {
+		run := m.runsList.SelectedItem().(*runItem)
+		for i := range run.jobs {
+			if run.jobs[i].id == msg.jobId {
 				log.Debug("caching job logs", "jobId", msg.jobId)
-				m.data[runIdx].Jobs[i].Logs = msg.logs
-				m.data[runIdx].Jobs[i].Loading = false
+				run.jobs[i].logs = msg.logs
+				run.jobs[i].loading = false
 				cmds = append(cmds, m.updateLists()...)
 				break
 			}
@@ -157,14 +145,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			jobsMap[fmt.Sprintf("%d", job.DatabaseId)] = job
 		}
 
-		for runIdx, run := range m.data {
-			for jobIdx, job := range run.Jobs {
-				jobWithSteps, ok := jobsMap[job.Id]
+		runs := m.runsList.Items()
+		for _, run := range runs {
+			run := run.(*runItem)
+			for jobIdx, job := range run.jobs {
+				jobWithSteps, ok := jobsMap[job.id]
 				if !ok {
 					continue
 				}
 
-				m.data[runIdx].Jobs[jobIdx].Steps = jobWithSteps.Steps
+				for _, step := range jobWithSteps.Steps {
+					si := NewStepItem(step)
+					run.jobs[jobIdx].steps = append(run.jobs[jobIdx].steps, &si)
+				}
+
 			}
 		}
 
@@ -208,9 +202,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	}
 
-	m.spinner, cmd = m.spinner.Update(msg)
-	cmds = append(cmds, cmd)
-
 	switch m.focusedPane {
 	case PaneRuns:
 		before := m.runsList.Cursor()
@@ -220,7 +211,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.jobsList.Select(0)
 			m.stepsList.Select(0)
 			cmds = append(cmds, m.makeFetchJobLogsCmd())
-			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.data[after].Id))
+			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.runsList.Items()[after].(*runItem).id))
 			cmds = append(cmds, m.updateLists()...)
 		}
 		break
@@ -244,9 +235,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			step := m.stepsList.SelectedItem()
 
 			if step != nil {
-				log.Debug("looking for step start", "step", step.(stepItem).title)
-				for i, log := range job.(jobItem).logs {
-					if log.Time.After(step.(stepItem).startedAt) {
+				for i, log := range job.(*jobItem).logs {
+					if log.Time.After(step.(*stepItem).startedAt) {
 						m.logsViewport.SetYOffset(i - 1)
 						break
 					}
@@ -271,9 +261,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	currJob := m.jobsList.SelectedItem()
 	currStep := m.stepsList.SelectedItem()
-	if currJob != nil && currStep != nil && len(currJob.(jobItem).logs) > m.stepsList.Cursor() {
+	if currJob != nil && currStep != nil && len(currJob.(*jobItem).logs) > m.stepsList.Cursor() {
 		logs := strings.Builder{}
-		for _, log := range currJob.(jobItem).logs {
+		for _, log := range currJob.(*jobItem).logs {
 			// logs.Write([]byte(log.Time.String()))
 			logs.Write([]byte(log.Log))
 		}
@@ -317,27 +307,16 @@ func (m *model) viewLogs() string {
 
 	job := m.jobsList.SelectedItem()
 	step := m.stepsList.SelectedItem()
-	if job == nil || job.(jobItem).loading || step == nil || len(job.(jobItem).logs) == 0 {
-		content = fmt.Sprintf("loading...")
-		content += "\n"
-		if job != nil {
-			content += fmt.Sprintf("job: %s", job.(jobItem).title)
-		} else {
-			content += "job=none"
-		}
-
-		content += "\n"
-		if step != nil {
-			content += fmt.Sprintf("step: %s", step.(stepItem).title)
-		} else {
-			content += "step=none"
-		}
-
-		if job != nil && len(job.(jobItem).logs) <= m.stepsList.Cursor() {
-			content += "\n"
-			content += fmt.Sprintf("not enough log groups, len(logs)=%d m.stepsList.len()=%d", len(job.(jobItem).logs), len(m.stepsList.Items()))
-		}
-	} else if len(job.(jobItem).logs) == 0 {
+	if job == nil || job.(*jobItem).loading || step == nil || len(job.(*jobItem).logs) == 0 {
+		content = lipgloss.Place(
+			m.logsWidth(),
+			m.height,
+			lipgloss.Center,
+			0.75,
+			"Loading...",
+			// m.spinner.View(),
+		)
+	} else if len(job.(*jobItem).logs) == 0 {
 		content = m.noLogsView()
 	} else {
 		content = m.logsViewport.View()
@@ -427,54 +406,28 @@ func newStepsDefaultList() (list.Model, list.DefaultDelegate) {
 
 func (m *model) updateLists() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
-	runItems := make([]list.Item, 0)
-	for _, run := range m.data {
-		it := runItem{title: run.Name, description: run.Link, workflow: run.Workflow}
-		runItems = append(runItems, it)
-		cmds = append(cmds, m.runsList.SetItems(runItems))
-	}
 
-	if m.runsList.Cursor() >= len(m.data) {
+	if len(m.runsList.Items()) == 0 {
 		return cmds
 	}
 
-	run := m.data[m.runsList.Cursor()]
-	jobItems := make([]list.Item, 0)
-	for _, job := range run.Jobs {
-		parts := strings.Split(job.Link, "/")
-		id := parts[len(parts)-1]
-		jobItem := jobItem{
-			title:       job.Name,
-			description: id,
-			workflow:    job.Workflow,
-			id:          id,
-			logs:        job.Logs,
-			loading:     job.Loading,
-			state:       job.State,
-		}
-		jobItems = append(jobItems, jobItem)
+	run := m.runsList.SelectedItem().(*runItem)
+	jobs := make([]list.Item, 0)
+	for _, job := range run.jobs {
+		jobs = append(jobs, job)
 	}
-	cmds = append(cmds, m.jobsList.SetItems(jobItems))
+	cmds = append(cmds, m.jobsList.SetItems(jobs))
 
-	if m.jobsList.Cursor() >= len(run.Jobs) {
+	if m.jobsList.Cursor() >= len(run.jobs) {
 		return cmds
 	}
 
-	job := run.Jobs[m.jobsList.Cursor()]
-
-	stepItems := make([]list.Item, 0)
-	for _, step := range job.Steps {
-		stepItem := stepItem{
-			title:       step.Name,
-			description: step.StartedAt.String(),
-			state:       step.Status,
-			conclusion:  step.Conclusion,
-			startedAt:   step.StartedAt,
-			completedAt: step.CompletedAt,
-		}
-		stepItems = append(stepItems, stepItem)
+	job := m.jobsList.SelectedItem().(*jobItem)
+	steps := make([]list.Item, 0)
+	for _, step := range job.steps {
+		steps = append(steps, step)
 	}
-	cmds = append(cmds, m.stepsList.SetItems(stepItems))
+	cmds = append(cmds, m.stepsList.SetItems(steps))
 
 	return cmds
 }

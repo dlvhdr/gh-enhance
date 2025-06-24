@@ -1,10 +1,12 @@
 package ui
 
 const (
-	SkippedIcon = ""
-	WaitingIcon = ""
-	FailureIcon = "󰅙"
-	SuccessIcon = ""
+	CanceledIcon = ""
+	SkippedIcon  = ""
+	WaitingIcon  = ""
+	PendingIcon  = ""
+	FailureIcon  = "󰅙"
+	SuccessIcon  = ""
 
 	AsciiSkippedIcon = `
     ,---_   

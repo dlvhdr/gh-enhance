@@ -16,7 +16,7 @@ tasks:
     cmds:
       - task: start-mock-server
       - defer: { task: stop-mock-server }
-      - echo "----------------------------------------" > ./debug.log
+      - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
       - cmd: DEBUG=true FF_MOCK_DATA=true go run ./cmd/enhance -R neovim/neovim 34454
   start-mock-server:
     cmds:

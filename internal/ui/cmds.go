@@ -27,7 +27,7 @@ type runsFetchedMsg struct {
 func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
 		log.Debug("fetching check runs", "repo", m.repo, "prNumber", prNumber)
-		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state")
+		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state,event,startedAt,completedAt")
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
 			return runsFetchedMsg{err: err}
@@ -52,8 +52,7 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 			if ok {
 				run.Jobs = append(run.Jobs, job)
 			} else {
-
-				run = api.CheckRun{Name: name, Link: job.Link, Workflow: job.Workflow}
+				run = api.CheckRun{Name: job.Name, Link: job.Link, Workflow: job.Workflow, Event: job.Event}
 				run.Jobs = []api.Job{job}
 			}
 			runsMap[name] = run
@@ -63,6 +62,20 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 		for _, run := range runsMap {
 			runs = append(runs, run)
 		}
+
+		sort.Slice(runs, func(i, j int) bool {
+			nameA := runs[i].Workflow
+			if nameA == "" {
+				nameA = runs[i].Name
+			}
+
+			nameB := runs[j].Workflow
+			if nameB == "" {
+				nameB = runs[j].Name
+			}
+
+			return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
+		})
 
 		return runsFetchedMsg{
 			runs: runs,
@@ -77,19 +90,19 @@ type jobLogsFetchedMsg struct {
 }
 
 func (m *model) makeFetchJobLogsCmd() tea.Cmd {
-	if len(m.data) == 0 {
+	if len(m.runsList.Items()) == 0 {
 		return nil
 	}
 
-	run := m.data[m.runsList.Cursor()]
-	if len(run.Jobs) == 0 {
+	run := m.runsList.SelectedItem().(*runItem)
+	if len(run.jobs) == 0 {
 		return nil
 	}
 
-	job := run.Jobs[m.jobsList.Cursor()]
-	if job.Loading == false {
+	job := run.jobs[m.jobsList.Cursor()]
+	if job.loading == false {
 		logs := strings.Builder{}
-		for _, log := range job.Logs {
+		for _, log := range job.logs {
 			logs.Write([]byte(log.Log))
 		}
 		m.logsViewport.SetContent(logs.String())
@@ -97,16 +110,16 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.Id)
+		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.id)
 		if err != nil {
-			log.Error("error fetching job logs", "jobId", job.Id, "err", err, "stderr", stderr.String())
+			log.Error("error fetching job logs", "jobId", job.id, "err", err, "stderr", stderr.String())
 		}
 		jobLogs := jobLogsRes.String()
-		log.Debug("success fetching job logs", "jobId", job.Id, "bytes", len(jobLogsRes.Bytes()))
+		log.Debug("success fetching job logs", "jobId", job.id, "bytes", len(jobLogsRes.Bytes()))
 
 		return jobLogsFetchedMsg{
-			jobId: job.Id,
-			logs:  logs_parser.MarkStepsLogsByTime(job.Id, job.Steps, jobLogs),
+			jobId: job.id,
+			logs:  logs_parser.MarkStepsLogsByTime(job.id, jobLogs),
 		}
 	}
 

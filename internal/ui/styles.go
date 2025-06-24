@@ -27,9 +27,18 @@ var (
 
 	lineNumbersStyle = lipgloss.NewStyle().Faint(true)
 
+	canceledGlyph = lipgloss.NewStyle().
+			Foreground(faintColor).
+			SetString(CanceledIcon)
+	skippedGlyph = lipgloss.NewStyle().
+			Foreground(faintColor).
+			SetString(SkippedIcon)
 	waitingGlyph = lipgloss.NewStyle().
 			Foreground(lipgloss.Yellow).
 			SetString(WaitingIcon)
+	pendingGlyph = lipgloss.NewStyle().
+			Foreground(lipgloss.Yellow).
+			SetString(PendingIcon)
 	failureGlyph = lipgloss.NewStyle().
 			Foreground(lipgloss.Red).
 			SetString(FailureIcon)

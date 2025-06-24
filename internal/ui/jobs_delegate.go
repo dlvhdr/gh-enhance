@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
@@ -11,19 +13,38 @@ import (
 )
 
 type jobItem struct {
+	id          string
 	title       string
 	description string
 	workflow    string
-	id          string
 	logs        []api.StepLogsWithTime
 	loading     bool
 	state       string
-	steps       []stepItem
+	steps       []*stepItem
+	startedAt   time.Time
+	completedAt time.Time
 }
 
-func (i jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.title) }
+// Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
+func (i *jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.title) }
 
-func (i jobItem) viewStatus() string {
+// Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
+func (i *jobItem) Description() string {
+	if i.state == "SKIPPED" {
+		return "Skipped"
+	}
+
+	if i.completedAt.IsZero() || i.startedAt.IsZero() {
+		return "Running..."
+	}
+
+	return i.completedAt.Sub(i.startedAt).String()
+}
+
+// FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
+func (i *jobItem) FilterValue() string { return i.title }
+
+func (i *jobItem) viewStatus() string {
 	if i.state == "SUCCESS" {
 		return successGlyph.Render()
 	}
@@ -32,18 +53,26 @@ func (i jobItem) viewStatus() string {
 		return waitingGlyph.Render()
 	}
 
-	return failureGlyph.Render()
+	if i.state == "SKIPPED" {
+		return skippedGlyph.Render()
+	}
+
+	if i.state == "CANCELLED" {
+		return canceledGlyph.Render()
+	}
+
+	if i.state == "FAILURE" {
+		return failureGlyph.Render()
+	}
+
+	return waitingGlyph.Render()
 }
-
-func (i jobItem) Description() string { return i.description }
-
-func (i jobItem) FilterValue() string { return i.title }
 
 func newCheckItemDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		if _, ok := m.SelectedItem().(jobItem); ok {
+		if _, ok := m.SelectedItem().(*jobItem); ok {
 		} else {
 			return nil
 		}
@@ -62,4 +91,21 @@ func newCheckItemDelegate() list.DefaultDelegate {
 	}
 
 	return d
+}
+
+func NewJobItem(job api.Job) jobItem {
+	parts := strings.Split(job.Link, "/")
+	id := parts[len(parts)-1]
+	return jobItem{
+		id:          id,
+		title:       job.Name,
+		description: id,
+		workflow:    job.Workflow,
+		logs:        make([]api.StepLogsWithTime, 0),
+		state:       job.State,
+		loading:     true,
+		steps:       make([]*stepItem, 0),
+		startedAt:   job.StartedAt,
+		completedAt: job.CompletedAt,
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss/v2"
+	"github.com/charmbracelet/log"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 )
@@ -27,7 +28,7 @@ type LogsGroup struct {
 	Logs  []string
 }
 
-func MarkStepsLogsByTime(jobId string, steps []api.Step, jobLogs string) []api.StepLogsWithTime {
+func MarkStepsLogsByTime(jobId string, jobLogs string) []api.StepLogsWithTime {
 	lines := strings.Lines(jobLogs)
 	stepsLogs := make([]api.StepLogsWithTime, 0)
 
@@ -43,11 +44,16 @@ func MarkStepsLogsByTime(jobId string, steps []api.Step, jobLogs string) []api.S
 		if count == 0 {
 			name = fields[0]
 			step = fields[1]
+			log.Debug("found job name and step", "name", name, "step", step)
 		}
 
 		if name != "" && step != "" {
 			line = strings.Replace(line, name+string('\t'), "", 1)
-			line = strings.Replace(line, step+string('\t'), "", 1)
+			if step == "UNKNOWN STEP" {
+				line = strings.Replace(line, step+string('\t'), "", 1)
+			} else {
+				line = line + " " + step
+			}
 		}
 
 		dateAndLog := strings.SplitN(fields[2], " ", 2)
