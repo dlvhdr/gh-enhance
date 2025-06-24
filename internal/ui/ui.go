@@ -308,12 +308,16 @@ func (m *model) viewLogs() string {
 	job := m.jobsList.SelectedItem()
 	step := m.stepsList.SelectedItem()
 	if job == nil || job.(*jobItem).loading || step == nil || len(job.(*jobItem).logs) == 0 {
+		text := "Loading..."
+		if job != nil && job.(*jobItem).loading == false && step != nil && len(job.(*jobItem).logs) == 0 {
+			text = "Failed fetching logs"
+		}
 		content = lipgloss.Place(
 			m.logsWidth(),
 			m.height,
 			lipgloss.Center,
 			0.75,
-			"Loading...",
+			text,
 			// m.spinner.View(),
 		)
 	} else if len(job.(*jobItem).logs) == 0 {
@@ -357,6 +361,7 @@ func setListFocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
 	delegate.Styles.SelectedTitle = focusedPaneItemTitleStyle
 	delegate.Styles.SelectedDesc = focusedPaneItemDescStyle
 	delegate.Styles.NormalDesc = normalItemDescStyle
+	delegate.Styles.DimmedDesc = normalItemDescStyle
 	l.SetDelegate(delegate)
 	l.SetWidth(focusedPaneWidth)
 }
@@ -367,6 +372,7 @@ func setListUnfocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
 	delegate.Styles.SelectedTitle = unfocusedPaneItemTitleStyle
 	delegate.Styles.SelectedDesc = unfocusedPaneItemDescStyle
 	delegate.Styles.NormalDesc = normalItemDescStyle
+	delegate.Styles.DimmedDesc = normalItemDescStyle
 	l.SetDelegate(delegate)
 	l.SetWidth(unfocusedPaneWidth)
 }

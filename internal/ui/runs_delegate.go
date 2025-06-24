@@ -58,8 +58,7 @@ func (i *runItem) viewWarnings() string {
 	case "cancel":
 		return canceledGlyph.Render()
 	default:
-		return i.bucket
-		// return pendingGlyph.Render()
+		return pendingGlyph.Render()
 	}
 }
 

@@ -18,11 +18,11 @@ var (
 	unfocusedPaneTitleBarStyle = defaultListStyles.Title.UnsetBackground().Faint(true).PaddingLeft(1).PaddingRight(0).MarginBottom(1)
 
 	defaultItemStyles           = list.NewDefaultItemStyles(true)
-	normalItemDescStyle         = defaultItemStyles.DimmedDesc
+	normalItemDescStyle         = defaultItemStyles.DimmedDesc.PaddingLeft(4)
 	focusedPaneItemTitleStyle   = defaultItemStyles.SelectedTitle.Bold(true).Foreground(focusedColor).BorderForeground(focusedColor).BorderStyle(lipgloss.InnerHalfBlockBorder())
 	unfocusedPaneItemTitleStyle = defaultItemStyles.SelectedTitle.Bold(true).Foreground(focusedColor).BorderForeground(unfocusedColor)
-	focusedPaneItemDescStyle    = defaultItemStyles.SelectedDesc.BorderForeground(focusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground()).BorderStyle(lipgloss.InnerHalfBlockBorder())
-	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(unfocusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground())
+	focusedPaneItemDescStyle    = defaultItemStyles.SelectedDesc.BorderForeground(focusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground()).BorderStyle(lipgloss.InnerHalfBlockBorder()).PaddingLeft(3)
+	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(unfocusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground()).PaddingLeft(3)
 	paneStyle                   = lipgloss.NewStyle().BorderRight(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(faintColor)
 
 	lineNumbersStyle = lipgloss.NewStyle().Faint(true)
