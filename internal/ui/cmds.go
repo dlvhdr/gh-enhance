@@ -74,6 +74,18 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 				nameB = runs[j].Name
 			}
 
+			if runs[i].Bucket == runs[j].Bucket {
+				return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
+			}
+
+			if runs[i].Bucket == "fail" {
+				return true
+			}
+
+			if runs[j].Bucket == "fail" {
+				return false
+			}
+
 			return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
 		})
 
