@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
@@ -13,52 +12,46 @@ import (
 )
 
 type jobItem struct {
-	id           string
-	title        string
-	workflow     string
+	job          *api.StatusCheck
 	logs         []api.StepLogsWithTime
 	loadingLogs  bool
 	loadingSteps bool
-	state        api.StatusCheckConclusion
 	steps        []*stepItem
-	startedAt    time.Time
-	completedAt  time.Time
-	link         string
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
-func (i *jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.title) }
+func (i *jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.job.Name) }
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *jobItem) Description() string {
-	if i.state == api.StatusCheckConclusionSkipped {
+	if i.job.State == api.StatusCheckConclusionSkipped {
 		return "Skipped"
 	}
 
-	if i.completedAt.IsZero() || i.startedAt.IsZero() {
+	if i.job.CompletedAt.IsZero() || i.job.StartedAt.IsZero() {
 		return "Running..."
 	}
 
-	return i.completedAt.Sub(i.startedAt).String()
+	return i.job.CompletedAt.Sub(i.job.StartedAt).String()
 }
 
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
-func (i *jobItem) FilterValue() string { return i.title }
+func (i *jobItem) FilterValue() string { return i.job.Name }
 
 func (i *jobItem) viewStatus() string {
-	if i.state == api.StatusCheckConclusionSuccess {
+	if i.job.State == api.StatusCheckConclusionSuccess {
 		return successGlyph.Render()
 	}
 
-	if i.state == api.StatusCheckConclusionSkipped {
+	if i.job.State == api.StatusCheckConclusionSkipped {
 		return skippedGlyph.Render()
 	}
 
-	if i.state == api.StatusCheckConclusionCancelled {
+	if i.job.State == api.StatusCheckConclusionCancelled {
 		return canceledGlyph.Render()
 	}
 
-	if api.IsFailureStatusCheckState(i.state) {
+	if api.IsFailureStatusCheckState(i.job.State) {
 		return failureGlyph.Render()
 	}
 
@@ -79,7 +72,7 @@ func newCheckItemDelegate() list.DefaultDelegate {
 			log.Debug("key pressed on run", "key", msg.Text)
 			switch msg.Text {
 			case "o":
-				return makeOpenUrlCmd(job.link)
+				return makeOpenUrlCmd(job.job.Link)
 			}
 		}
 
@@ -102,16 +95,10 @@ func newCheckItemDelegate() list.DefaultDelegate {
 
 func NewJobItem(job api.StatusCheck) jobItem {
 	return jobItem{
-		id:           job.Id,
-		title:        job.Name,
-		workflow:     job.Workflow,
+		job:          &job,
 		logs:         make([]api.StepLogsWithTime, 0),
-		state:        job.State,
 		loadingLogs:  true,
 		loadingSteps: true,
 		steps:        make([]*stepItem, 0),
-		startedAt:    job.StartedAt,
-		completedAt:  job.CompletedAt,
-		link:         job.Link,
 	}
 }

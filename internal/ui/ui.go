@@ -111,7 +111,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		cmds = append(cmds, m.runsList.SetItems(runItems))
 		if len(runItems) > 0 {
-			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(runItems[0].(*runItem).id))
+			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(runItems[0].(*runItem).run.Id))
 		}
 
 		cmds = append(cmds, m.updateLists()...)
@@ -119,7 +119,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case jobLogsFetchedMsg:
 		run := m.runsList.SelectedItem().(*runItem)
 		for i := range run.jobs {
-			if run.jobs[i].id == msg.jobId {
+			if run.jobs[i].job.Id == msg.jobId {
 				log.Debug("caching job logs", "jobId", msg.jobId)
 				run.jobs[i].logs = msg.logs
 				run.jobs[i].loadingLogs = false
@@ -137,12 +137,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		runs := m.runsList.Items()
 		for _, run := range runs {
 			run := run.(*runItem)
-			if run.id == msg.runId {
+			if run.run.Id == msg.runId {
 				run.loading = false
 			}
 			for jobIdx, job := range run.jobs {
 				run.jobs[jobIdx].loadingSteps = false
-				jobWithSteps, ok := jobsMap[job.id]
+				jobWithSteps, ok := jobsMap[job.job.Id]
 				if !ok {
 					continue
 				}
@@ -207,7 +207,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.makeFetchJobLogsCmd())
 			newRun := m.runsList.Items()[after].(*runItem)
 			if newRun.loading {
-				cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.runsList.Items()[after].(*runItem).id))
+				cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.runsList.Items()[after].(*runItem).run.Id))
 			}
 			cmds = append(cmds, m.updateLists()...)
 		}
@@ -233,7 +233,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if step != nil {
 				for i, log := range job.(*jobItem).logs {
-					if log.Time.After(step.(*stepItem).startedAt) {
+					if log.Time.After(step.(*stepItem).step.StartedAt) {
 						m.logsViewport.SetYOffset(i - 1)
 						break
 					}

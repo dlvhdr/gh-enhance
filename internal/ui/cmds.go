@@ -135,19 +135,19 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		return nil
 	}
 
-	return func() tea.Msg {
-		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.id)
-		if err != nil {
-			log.Error("error fetching job logs", "jobId", job.id, "err", err, "stderr", stderr.String())
-		}
-		jobLogs := jobLogsRes.String()
-		log.Debug("success fetching job logs", "jobId", job.id, "bytes", len(jobLogsRes.Bytes()))
+		return func() tea.Msg {
+			jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.job.Id)
+			if err != nil {
+				log.Error("error fetching job logs", "jobId", job.job.Id, "err", err, "stderr", stderr.String())
+			}
+			jobLogs := jobLogsRes.String()
+			log.Debug("success fetching job logs", "jobId", job.job.Id, "bytes", len(jobLogsRes.Bytes()))
 
-		return jobLogsFetchedMsg{
-			jobId: job.id,
-			logs:  parseJobLogs(jobLogs),
+			return jobLogsFetchedMsg{
+				jobId: job.job.Id,
+				logs:  parseJobLogs(jobLogs),
+			}
 		}
-	}
 
 }
 

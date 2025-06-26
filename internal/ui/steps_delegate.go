@@ -2,7 +2,7 @@ package ui
 
 import (
 	"fmt"
-	"time"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
@@ -12,45 +12,48 @@ import (
 )
 
 type stepItem struct {
-	title       string
-	description string
-	state       api.Status
-	conclusion  api.Conclusion
-	startedAt   time.Time
-	completedAt time.Time
+	step *api.Step
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
-func (i *stepItem) Title() string { return fmt.Sprintf("%s %s", i.viewConclusion(), i.title) }
+func (i *stepItem) Title() string { return fmt.Sprintf("%s %s", i.viewConclusion(), i.step.Name) }
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
-func (i *stepItem) Description() string { return i.description }
+func (i *stepItem) Description() string {
+	if i.step.CompletedAt.IsZero() || i.step.StartedAt.IsZero() {
+		if i.step.Status == api.StatusInProgress {
+			return "Running..."
+		}
+		return strings.ToTitle(string(i.step.Status))
+	}
+	return i.step.CompletedAt.Sub(i.step.StartedAt).String()
+}
 
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
-func (i *stepItem) FilterValue() string { return i.title }
+func (i *stepItem) FilterValue() string { return i.step.Name }
 
 func (i *stepItem) viewConclusion() string {
-	if i.conclusion == api.ConclusionSuccess {
+	if i.step.Conclusion == api.ConclusionSuccess {
 		return successGlyph.Render()
 	}
 
-	if api.IsFailureConclusion(i.conclusion) {
+	if api.IsFailureConclusion(i.step.Conclusion) {
 		return failureGlyph.Render()
 	}
 
-	if i.state == api.StatusInProgress {
+	if i.step.Status == api.StatusInProgress {
 		return waitingGlyph.Render()
 	}
 
-	if i.state == api.StatusPending {
+	if i.step.Status == api.StatusPending {
 		return pendingGlyph.Render()
 	}
 
-	if i.state == api.StatusCompleted {
+	if i.step.Status == api.StatusCompleted {
 		return successGlyph.Render()
 	}
 
-	return string(i.state)
+	return string(i.step.Status)
 }
 
 func newStepItemDelegate() list.DefaultDelegate {
@@ -80,11 +83,6 @@ func newStepItemDelegate() list.DefaultDelegate {
 
 func NewStepItem(step api.Step) stepItem {
 	return stepItem{
-		title:       step.Name,
-		description: step.StartedAt.String(),
-		state:       step.Status,
-		conclusion:  step.Conclusion,
-		startedAt:   step.StartedAt,
-		completedAt: step.CompletedAt,
+		step: &step,
 	}
 }

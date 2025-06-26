@@ -2,3 +2,4 @@ coverage.txt
 dist/
 .killgrave.log
 debug.log
+.crush

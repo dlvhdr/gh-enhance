@@ -12,24 +12,18 @@ import (
 )
 
 type runItem struct {
-	run      *api.CheckRun
-	id       string
-	title    string
-	workflow string
-	event    string
-	link     string
-	bucket   string
-	jobs     []*jobItem
-	loading  bool
+	run     *api.CheckRun
+	jobs    []*jobItem
+	loading bool
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
 func (i *runItem) Title() string {
 	status := i.viewWarnings()
 
-	name := i.workflow
+	name := i.run.Workflow
 	if name == "" && len(i.jobs) > 0 {
-		name = i.jobs[0].title
+		name = i.jobs[0].job.Name
 	}
 
 	return fmt.Sprintf("%s %s", status, name)
@@ -37,18 +31,18 @@ func (i *runItem) Title() string {
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *runItem) Description() string {
-	if i.event == "" {
-		return i.link
+	if i.run.Event == "" {
+		return i.run.Link
 	}
 
-	return fmt.Sprintf("on: %s", i.event)
+	return fmt.Sprintf("on: %s", i.run.Event)
 }
 
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
-func (i *runItem) FilterValue() string { return i.title }
+func (i *runItem) FilterValue() string { return i.run.Name }
 
 func (i *runItem) viewWarnings() string {
-	switch i.bucket {
+	switch i.run.Bucket {
 	case "pass":
 		return successGlyph.Render()
 	case "fail":
@@ -76,7 +70,7 @@ func newRunItemDelegate() list.DefaultDelegate {
 			log.Debug("key pressed on run", "key", msg.Text)
 			switch msg.Text {
 			case "o":
-				return makeOpenUrlCmd(run.link)
+				return makeOpenUrlCmd(run.run.Link)
 			}
 		}
 
@@ -105,12 +99,8 @@ func NewRunItem(run api.CheckRun) runItem {
 	}
 
 	return runItem{
-		id:       run.Id,
-		workflow: run.Workflow,
-		jobs:     jobs,
-		event:    run.Event,
-		link:     run.Link,
-		bucket:   run.Bucket,
-		loading:  true,
+		run:     &run,
+		jobs:    jobs,
+		loading: true,
 	}
 }

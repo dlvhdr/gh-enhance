@@ -84,8 +84,8 @@ type Step struct {
 	Conclusion  Conclusion
 	Name        string
 	Number      int
-	StartedAt   time.Time `json:"started_at"`
-	CompletedAt time.Time `json:"completed_at"`
+	StartedAt   time.Time `json:"startedAt"`
+	CompletedAt time.Time `json:"completedAt"`
 	Status      Status
 }
 
