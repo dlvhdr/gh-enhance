@@ -25,7 +25,7 @@ var (
 	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(unfocusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground()).PaddingLeft(3)
 	paneStyle                   = lipgloss.NewStyle().BorderRight(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(faintColor)
 
-	lineNumbersStyle = lipgloss.NewStyle().Faint(true)
+	lineNumbersStyle = lipgloss.NewStyle().Foreground(fainterColor)
 
 	canceledGlyph = lipgloss.NewStyle().
 			Foreground(faintColor).
@@ -50,4 +50,12 @@ var (
 	watermarkIllustrationStyle = lipgloss.NewStyle().Foreground(lipgloss.White)
 
 	debugStyle = lipgloss.NewStyle().Background(lipgloss.Color("1"))
+
+	errorBgStyle          = lipgloss.NewStyle().Background(lipgloss.Color("#1C0D0F"))
+	errorStyle            = errorBgStyle.Foreground(lipgloss.Red).Bold(false)
+	errorTitleStyle       = errorBgStyle.Foreground(lipgloss.Red).Bold(true)
+	separatorStyle        = lipgloss.NewStyle().Foreground(fainterColor)
+	commandStyle          = lipgloss.NewStyle().Foreground(lipgloss.Blue).Inline(true)
+	stepStartMarkerStyle  = lipgloss.NewStyle().Bold(true).Inline(true)
+	groupStartMarkerStyle = lipgloss.NewStyle().Inline(true)
 )

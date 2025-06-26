@@ -71,17 +71,6 @@ func NewModel(repo string, number string) model {
 	stepsList.SetWidth(unfocusedPaneWidth)
 
 	vp := viewport.New()
-	vp.LeftGutterFunc = func(info viewport.GutterContext) string {
-		if info.Soft {
-			return "     │ "
-		}
-		if info.Index >= info.TotalLines {
-			return "   ~ │ "
-		}
-
-		spacing := fmt.Sprintf("%d", info.TotalLines)
-		return lineNumbersStyle.Width(len(spacing) + 1).AlignHorizontal(lipgloss.Right).Render(fmt.Sprintf("%d ", info.Index+1))
-	}
 	vp.SoftWrap = false
 	vp.KeyMap.Right = key.Binding{}
 	vp.KeyMap.Left = key.Binding{}
@@ -133,7 +122,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if run.jobs[i].id == msg.jobId {
 				log.Debug("caching job logs", "jobId", msg.jobId)
 				run.jobs[i].logs = msg.logs
-				run.jobs[i].loading = false
+				run.jobs[i].loadingLogs = false
 				cmds = append(cmds, m.updateLists()...)
 				break
 			}
@@ -148,7 +137,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		runs := m.runsList.Items()
 		for _, run := range runs {
 			run := run.(*runItem)
+			if run.id == msg.runId {
+				run.loading = false
+			}
 			for jobIdx, job := range run.jobs {
+				run.jobs[jobIdx].loadingSteps = false
 				jobWithSteps, ok := jobsMap[job.id]
 				if !ok {
 					continue
@@ -206,12 +199,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PaneRuns:
 		before := m.runsList.Cursor()
 		m.runsList, cmd = m.runsList.Update(msg)
+		cmds = append(cmds, cmd)
 		after := m.runsList.Cursor()
 		if before != after {
 			m.jobsList.Select(0)
 			m.stepsList.Select(0)
 			cmds = append(cmds, m.makeFetchJobLogsCmd())
-			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.runsList.Items()[after].(*runItem).id))
+			newRun := m.runsList.Items()[after].(*runItem)
+			if newRun.loading {
+				cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.runsList.Items()[after].(*runItem).id))
+			}
 			cmds = append(cmds, m.updateLists()...)
 		}
 		break
@@ -263,14 +260,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	currStep := m.stepsList.SelectedItem()
 	if currJob != nil && currStep != nil && len(currJob.(*jobItem).logs) > m.stepsList.Cursor() {
 		logs := strings.Builder{}
-		for _, log := range currJob.(*jobItem).logs {
-			// logs.Write([]byte(log.Time.String()))
-			logs.Write([]byte(log.Log))
+		totalLines := fmt.Sprintf("%d", len(currJob.(*jobItem).logs))
+		for i, log := range currJob.(*jobItem).logs {
+			if strings.Contains(log.Log, errorMarker) {
+				log.Log = strings.Replace(log.Log, errorMarker, "", 1)
+				log.Log = errorBgStyle.Width(m.logsViewport.Width()).Render(lipgloss.JoinHorizontal(lipgloss.Top, errorTitleStyle.Render("Error: "), errorStyle.Render(log.Log)))
+			}
+			ln := fmt.Sprintf("%d", i+1)
+			ln = ln + strings.Repeat(" ", len(totalLines)-len(ln)) + "  "
+			logs.WriteString(lineNumbersStyle.Render(ln))
+			logs.WriteString(log.Log)
+			logs.WriteString("\n")
 		}
-		logs.Write([]byte(strings.Repeat("~\n", m.logsViewport.Height())))
 		m.logsViewport.SetContent(logs.String())
 	}
 
+	m.setFocusedPaneStyles()
 	return m, tea.Batch(cmds...)
 }
 
@@ -306,22 +311,28 @@ func (m *model) viewLogs() string {
 	}
 
 	job := m.jobsList.SelectedItem()
-	step := m.stepsList.SelectedItem()
-	if job == nil || job.(*jobItem).loading || step == nil || len(job.(*jobItem).logs) == 0 {
-		text := "Loading..."
-		if job != nil && job.(*jobItem).loading == false && step != nil && len(job.(*jobItem).logs) == 0 {
-			text = "Failed fetching logs"
-		}
+	if job == nil || job.(*jobItem).loadingLogs || job.(*jobItem).loadingSteps {
 		content = lipgloss.Place(
 			m.logsWidth(),
 			m.height,
 			lipgloss.Center,
 			0.75,
-			text,
+			"Loading...",
 			// m.spinner.View(),
 		)
-	} else if len(job.(*jobItem).logs) == 0 {
-		content = m.noLogsView()
+	} else if len(job.(*jobItem).logs) == 0 || len(job.(*jobItem).steps) == 0 {
+		if !job.(*jobItem).loadingSteps && len(job.(*jobItem).steps) == 0 {
+			content = lipgloss.Place(
+				m.logsWidth(),
+				m.height,
+				lipgloss.Center,
+				0.75,
+				"No steps...",
+				// m.spinner.View(),
+			)
+		} else {
+			content = m.noLogsView()
+		}
 	} else {
 		content = m.logsViewport.View()
 	}
@@ -439,7 +450,9 @@ func (m *model) updateLists() []tea.Cmd {
 }
 
 func (m *model) logsWidth() int {
-	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - 4
+	borders := 4
+	gutter := len(fmt.Sprintf("%d", m.logsViewport.TotalLineCount())) + 2
+	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - gutter - borders
 }
 
 func (m *model) noLogsView() string {

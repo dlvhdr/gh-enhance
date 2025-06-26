@@ -15,4 +15,7 @@ const (
    \ ╱   /  
 		:---:   
 		`
+
+	Separator    = "│"
+	ExpandSymbol = "▶"
 )

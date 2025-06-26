@@ -2,27 +2,28 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/log"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
 type jobItem struct {
-	id          string
-	title       string
-	description string
-	workflow    string
-	logs        []api.StepLogsWithTime
-	loading     bool
-	state       api.StatusCheckConclusion
-	steps       []*stepItem
-	startedAt   time.Time
-	completedAt time.Time
+	id           string
+	title        string
+	workflow     string
+	logs         []api.StepLogsWithTime
+	loadingLogs  bool
+	loadingSteps bool
+	state        api.StatusCheckConclusion
+	steps        []*stepItem
+	startedAt    time.Time
+	completedAt  time.Time
+	link         string
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -68,15 +69,25 @@ func newCheckItemDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		if _, ok := m.SelectedItem().(*jobItem); ok {
-		} else {
+		job, ok := m.SelectedItem().(*jobItem)
+		if !ok {
 			return nil
+		}
+
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			log.Debug("key pressed on run", "key", msg.Text)
+			switch msg.Text {
+			case "o":
+				return makeOpenUrlCmd(job.link)
+			}
 		}
 
 		return nil
 	}
 
-	help := []key.Binding{}
+	keys := newDelegateKeyMap()
+	help := []key.Binding{keys.openInBrowser}
 
 	d.ShortHelpFunc = func() []key.Binding {
 		return help
@@ -90,18 +101,17 @@ func newCheckItemDelegate() list.DefaultDelegate {
 }
 
 func NewJobItem(job api.StatusCheck) jobItem {
-	parts := strings.Split(job.Link, "/")
-	id := parts[len(parts)-1]
 	return jobItem{
-		id:          id,
-		title:       job.Name,
-		description: id,
-		workflow:    job.Workflow,
-		logs:        make([]api.StepLogsWithTime, 0),
-		state:       job.State,
-		loading:     true,
-		steps:       make([]*stepItem, 0),
-		startedAt:   job.StartedAt,
-		completedAt: job.CompletedAt,
+		id:           job.Id,
+		title:        job.Name,
+		workflow:     job.Workflow,
+		logs:         make([]api.StepLogsWithTime, 0),
+		state:        job.State,
+		loadingLogs:  true,
+		loadingSteps: true,
+		steps:        make([]*stepItem, 0),
+		startedAt:    job.StartedAt,
+		completedAt:  job.CompletedAt,
+		link:         job.Link,
 	}
 }

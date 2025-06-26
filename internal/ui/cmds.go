@@ -2,22 +2,24 @@ package ui
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"regexp"
 	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
+	"github.com/cli/go-gh/pkg/browser"
 	"github.com/cli/go-gh/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
-	"github.com/dlvhdr/gh-enhance/internal/logs_parser"
 )
 
-const (
-	stepStartMarker  = "##[group]Run "
-	groupStartMarker = "##[group]"
-	groupEndMarker   = "##[endgroup]"
-)
+// https://github.com/neovim/neovim/actions/runs/15852696561/job/44690047836
+var jobUrlRegex = regexp.MustCompile(`https:\/\/github\.com\/(.*)\/(.*)\/actions\/runs\/(\d+)\/job\/(\d+)`)
+
+var jobSubexps = jobUrlRegex.NumSubexp()
 
 type runsFetchedMsg struct {
 	err  error
@@ -52,7 +54,19 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 			if ok {
 				run.Jobs = append(run.Jobs, statusCheck)
 			} else {
-				run = api.CheckRun{Name: statusCheck.Name, Link: statusCheck.Link, Workflow: statusCheck.Workflow, Event: statusCheck.Event, Bucket: statusCheck.Bucket}
+				matches := jobUrlRegex.FindAllSubmatch([]byte(statusCheck.Link), jobSubexps)
+				runLink := statusCheck.Link
+				runId := ""
+				jobId := ""
+
+				if matches != nil {
+					runId = string(matches[0][3])
+					jobId = string(matches[0][4])
+					runLink = fmt.Sprintf("https://github.com/%s/%s/actions/runs/%s", string(matches[0][1]), string(matches[0][2]), runId)
+				}
+
+				run = api.CheckRun{Id: runId, Name: statusCheck.Name, Link: runLink, Workflow: statusCheck.Workflow, Event: statusCheck.Event, Bucket: statusCheck.Bucket}
+				statusCheck.Id = jobId
 				run.Jobs = []api.StatusCheck{statusCheck}
 			}
 			runsMap[name] = run
@@ -112,7 +126,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	}
 
 	job := run.jobs[m.jobsList.Cursor()]
-	if job.loading == false {
+	if job.loadingLogs == false {
 		logs := strings.Builder{}
 		for _, log := range job.logs {
 			logs.Write([]byte(log.Log))
@@ -131,15 +145,16 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 
 		return jobLogsFetchedMsg{
 			jobId: job.id,
-			logs:  logs_parser.MarkStepsLogsByTime(job.id, jobLogs),
+			logs:  parseJobLogs(jobLogs),
 		}
 	}
 
 }
 
 type runJobsStepsFetchedMsg struct {
-	err           error
+	runId         string
 	jobsWithSteps api.CheckRunJobsWithSteps
+	err           error
 }
 
 func (m *model) makeFetchRunJobsWithStepsCmd(runId string) tea.Cmd {
@@ -154,8 +169,7 @@ func (m *model) makeFetchRunJobsWithStepsCmd(runId string) tea.Cmd {
 		jobsWithSteps := api.CheckRunJobsWithSteps{}
 
 		if err := json.Unmarshal(jobsWithStepsRes.Bytes(), &jobsWithSteps); err != nil {
-			log.Error("error parsing run jobs json", "err", err)
-			return runJobsStepsFetchedMsg{err: err}
+			log.Error("error parsing run jobs with steps json", "err", err, "stderr", stderr.String(), "response", jobsWithStepsRes.String())
 		}
 
 		for jobIdx := range jobsWithSteps.Jobs {
@@ -165,7 +179,17 @@ func (m *model) makeFetchRunJobsWithStepsCmd(runId string) tea.Cmd {
 		}
 
 		return runJobsStepsFetchedMsg{
+			runId:         runId,
 			jobsWithSteps: jobsWithSteps,
 		}
+	}
+}
+
+func makeOpenUrlCmd(url string) tea.Cmd {
+	return func() tea.Msg {
+		log.Debug("opening run url", "url", url)
+		b := browser.New("", os.Stdout, os.Stdin)
+		b.Browse(url)
+		return nil
 	}
 }

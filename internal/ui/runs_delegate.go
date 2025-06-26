@@ -2,11 +2,11 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/log"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 )
@@ -66,15 +66,25 @@ func newRunItemDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		if _, ok := m.SelectedItem().(*runItem); ok {
-		} else {
+		run, ok := m.SelectedItem().(*runItem)
+		if !ok {
 			return nil
+		}
+
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			log.Debug("key pressed on run", "key", msg.Text)
+			switch msg.Text {
+			case "o":
+				return makeOpenUrlCmd(run.link)
+			}
 		}
 
 		return nil
 	}
 
-	help := []key.Binding{}
+	keys := newDelegateKeyMap()
+	help := []key.Binding{keys.openInBrowser}
 
 	d.ShortHelpFunc = func() []key.Binding {
 		return help
@@ -88,8 +98,6 @@ func newRunItemDelegate() list.DefaultDelegate {
 }
 
 func NewRunItem(run api.CheckRun) runItem {
-	parts := strings.Split(run.Link, "/")
-
 	jobs := make([]*jobItem, 0)
 	for _, job := range run.Jobs {
 		ji := NewJobItem(job)
@@ -97,11 +105,12 @@ func NewRunItem(run api.CheckRun) runItem {
 	}
 
 	return runItem{
-		id:       parts[len(parts)-3],
+		id:       run.Id,
 		workflow: run.Workflow,
 		jobs:     jobs,
 		event:    run.Event,
 		link:     run.Link,
 		bucket:   run.Bucket,
+		loading:  true,
 	}
 }
