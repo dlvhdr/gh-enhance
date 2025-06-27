@@ -84,8 +84,8 @@ type Step struct {
 	Conclusion  Conclusion
 	Name        string
 	Number      int
-	StartedAt   time.Time `json:"startedAt"`
-	CompletedAt time.Time `json:"completedAt"`
+	StartedAt   time.Time
+	CompletedAt time.Time
 	Status      Status
 }
 
@@ -97,6 +97,7 @@ type JobWithSteps struct {
 	StartedAt   time.Time
 	Status      string
 	Steps       []Step
+	Url         string
 }
 
 type CheckRunJobsWithSteps struct {

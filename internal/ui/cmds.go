@@ -135,19 +135,19 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		return nil
 	}
 
-		return func() tea.Msg {
-			jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.job.Id)
-			if err != nil {
-				log.Error("error fetching job logs", "jobId", job.job.Id, "err", err, "stderr", stderr.String())
-			}
-			jobLogs := jobLogsRes.String()
-			log.Debug("success fetching job logs", "jobId", job.job.Id, "bytes", len(jobLogsRes.Bytes()))
-
-			return jobLogsFetchedMsg{
-				jobId: job.job.Id,
-				logs:  parseJobLogs(jobLogs),
-			}
+	return func() tea.Msg {
+		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.job.Id)
+		if err != nil {
+			log.Error("error fetching job logs", "jobId", job.job.Id, "err", err, "stderr", stderr.String())
 		}
+		jobLogs := jobLogsRes.String()
+		log.Debug("success fetching job logs", "jobId", job.job.Id, "bytes", len(jobLogsRes.Bytes()))
+
+		return jobLogsFetchedMsg{
+			jobId: job.job.Id,
+			logs:  parseJobLogs(jobLogs),
+		}
+	}
 
 }
 
@@ -164,13 +164,14 @@ func (m *model) makeFetchRunJobsWithStepsCmd(runId string) tea.Cmd {
 		if err != nil {
 			log.Error("error fetching all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId, "err", err, "stderr", stderr.String())
 		}
-		log.Debug("successfully fetched all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId)
 
 		jobsWithSteps := api.CheckRunJobsWithSteps{}
 
 		if err := json.Unmarshal(jobsWithStepsRes.Bytes(), &jobsWithSteps); err != nil {
 			log.Error("error parsing run jobs with steps json", "err", err, "stderr", stderr.String(), "response", jobsWithStepsRes.String())
 		}
+
+		log.Debug("successfully fetched all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId)
 
 		for jobIdx := range jobsWithSteps.Jobs {
 			sort.Slice(jobsWithSteps.Jobs[jobIdx].Steps, func(i, j int) bool {

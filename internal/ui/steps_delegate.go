@@ -7,12 +7,14 @@ import (
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/log"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
 type stepItem struct {
-	step *api.Step
+	step   *api.Step
+	jobUrl string
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -60,9 +62,18 @@ func newStepItemDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
 	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		if _, ok := m.SelectedItem().(*stepItem); ok {
-		} else {
+		step, ok := m.SelectedItem().(*stepItem)
+		if !ok {
 			return nil
+		}
+
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			log.Debug("key pressed on run", "key", msg.Text)
+			switch msg.Text {
+			case "o":
+				return makeOpenUrlCmd(step.Link())
+			}
 		}
 
 		return nil
@@ -81,8 +92,13 @@ func newStepItemDelegate() list.DefaultDelegate {
 	return d
 }
 
-func NewStepItem(step api.Step) stepItem {
+func (si *stepItem) Link() string {
+	return fmt.Sprintf("%s#step:%d:1", si.jobUrl, si.step.Number)
+}
+
+func NewStepItem(step api.Step, url string) stepItem {
 	return stepItem{
-		step: &step,
+		jobUrl: url,
+		step:   &step,
 	}
 }

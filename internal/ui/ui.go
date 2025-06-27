@@ -148,7 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				for _, step := range jobWithSteps.Steps {
-					si := NewStepItem(step)
+					si := NewStepItem(step, jobWithSteps.Url)
 					run.jobs[jobIdx].steps = append(run.jobs[jobIdx].steps, &si)
 				}
 
@@ -450,9 +450,8 @@ func (m *model) updateLists() []tea.Cmd {
 }
 
 func (m *model) logsWidth() int {
-	borders := 4
-	gutter := len(fmt.Sprintf("%d", m.logsViewport.TotalLineCount())) + 2
-	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - gutter - borders
+	borders := 5
+	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - borders
 }
 
 func (m *model) noLogsView() string {
