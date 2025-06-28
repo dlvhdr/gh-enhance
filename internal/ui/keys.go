@@ -2,37 +2,49 @@ package ui
 
 import "github.com/charmbracelet/bubbles/v2/key"
 
-var quitKeys = key.NewBinding(
-	key.WithKeys("ctrl+c"),
-	key.WithHelp("ctrl+c", "press q to quit"),
-)
+var (
+	quitKeys = key.NewBinding(
+		key.WithKeys("ctrl+c"),
+		key.WithHelp("ctrl+c", "press q to quit"),
+	)
 
-var nextRowKey = key.NewBinding(
-	key.WithKeys("j", "down"),
-	key.WithHelp("j/↓", "next row"),
-)
+	nextRowKey = key.NewBinding(
+		key.WithKeys("j", "down"),
+		key.WithHelp("j/↓", "next row"),
+	)
 
-var prevRowKey = key.NewBinding(
-	key.WithKeys("k", "up"),
-	key.WithHelp("k/↑", "previous row"),
-)
+	prevRowKey = key.NewBinding(
+		key.WithKeys("k", "up"),
+		key.WithHelp("k/↑", "previous row"),
+	)
 
-var nextPaneKey = key.NewBinding(
-	key.WithKeys("l"),
-	key.WithHelp("l", "next pane"),
-)
+	nextPaneKey = key.NewBinding(
+		key.WithKeys("l"),
+		key.WithHelp("l", "next pane"),
+	)
 
-var prevPaneKey = key.NewBinding(
-	key.WithKeys("h"),
-	key.WithHelp("h", "previous pane"),
-)
+	prevPaneKey = key.NewBinding(
+		key.WithKeys("h"),
+		key.WithHelp("h", "previous pane"),
+	)
 
-var gotoTopKey = key.NewBinding(
-	key.WithKeys("g"),
-	key.WithHelp("g", "go to top"),
-)
+	gotoTopKey = key.NewBinding(
+		key.WithKeys("g"),
+		key.WithHelp("g", "go to top"),
+	)
 
-var gotoBottomKey = key.NewBinding(
-	key.WithKeys("shift+g"),
-	key.WithHelp("G", "go to bottom"),
+	gotoBottomKey = key.NewBinding(
+		key.WithKeys("shift+g"),
+		key.WithHelp("G", "go to bottom"),
+	)
+
+	rightKey = key.NewBinding(
+		key.WithKeys("right"),
+		key.WithHelp("→", "move right"),
+	)
+
+	leftKey = key.NewBinding(
+		key.WithKeys("left"),
+		key.WithHelp("←", "move left"),
+	)
 )

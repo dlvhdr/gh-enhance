@@ -79,7 +79,8 @@ func newStepItemDelegate() list.DefaultDelegate {
 		return nil
 	}
 
-	help := []key.Binding{}
+	keys := newDelegateKeyMap()
+	help := []key.Binding{keys.openInBrowser}
 
 	d.ShortHelpFunc = func() []key.Binding {
 		return help

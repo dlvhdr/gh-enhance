@@ -16,14 +16,15 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
-// https://github.com/neovim/neovim/actions/runs/15852696561/job/44690047836
-var jobUrlRegex = regexp.MustCompile(`^https:\/\/github\.com\/(.*)\/(.*)\/actions\/runs\/(\d+)\/job\/(\d+)$`)
+var (
+	// e.g. https://github.com/neovim/neovim/actions/runs/15852696561/job/44690047836
+	jobUrlRegex = regexp.MustCompile(`^https:\/\/github\.com\/(.*)\/(.*)\/actions\/runs\/(\d+)\/job\/(\d+)$`)
+	jobSubexps  = jobUrlRegex.NumSubexp()
 
-var jobSubexps = jobUrlRegex.NumSubexp()
-
-var checkRunRegex = regexp.MustCompile(`^https:\/\/github\.com\/(.*)\/(.*)\/runs\/(\d+)$`)
-
-var checkRunSubexp = checkRunRegex.NumSubexp()
+	// e.g. https://github.com/neovim/neovim/runs/15852696561
+	checkRunRegex  = regexp.MustCompile(`^https:\/\/github\.com\/(.*)\/(.*)\/runs\/(\d+)$`)
+	checkRunSubexp = checkRunRegex.NumSubexp()
+)
 
 type runsFetchedMsg struct {
 	err  error
@@ -33,13 +34,14 @@ type runsFetchedMsg struct {
 func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
 		log.Debug("fetching check runs", "repo", m.repo, "prNumber", prNumber)
-		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo, "--json", "name,workflow,link,state,event,startedAt,completedAt,bucket")
+		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo,
+			"--json", "name,workflow,link,state,event,startedAt,completedAt,bucket")
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
 			return runsFetchedMsg{err: err}
 		}
 
-		statusChecks := []api.StatusCheck{}
+		statusChecks := []api.Job{}
 
 		if err := json.Unmarshal(checkRunsRes.Bytes(), &statusChecks); err != nil {
 			log.Error("error parsing checkouts json", "err", err)
@@ -57,23 +59,26 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 
 			matches := jobUrlRegex.FindAllSubmatch([]byte(statusCheck.Link), jobSubexps)
 			runId, jobId := "", ""
+			kind := api.JobKindJob
 			runLink := statusCheck.Link
 
+			// TODO: clean
 			if matches != nil {
 				runId = string(matches[0][3])
 				jobId = string(matches[0][4])
-				runLink = fmt.Sprintf("https://github.com/%s/%s/actions/runs/%s", string(matches[0][1]), string(matches[0][2]), runId)
+				runLink = fmt.Sprintf("https://github.com/%s/%s/actions/runs/%s",
+					string(matches[0][1]), string(matches[0][2]), runId)
 			} else if matches := checkRunRegex.FindAllSubmatch([]byte(statusCheck.Link), checkRunSubexp); matches != nil {
 				runId = string(matches[0][3])
 				jobId = runId
-				runLink = fmt.Sprintf("https://github.com/%s/%s/runs/%s", string(matches[0][1]), string(matches[0][2]), runId)
-				for _, match := range matches[0] {
-					log.Debug("🔵", "match", string(match))
-				}
+				runLink = fmt.Sprintf("https://github.com/%s/%s/runs/%s",
+					string(matches[0][1]), string(matches[0][2]), runId)
+				kind = api.JobKindCheckRun
 			} else {
-				log.Debug("🔴 no matches", "link", statusCheck.Link)
+				log.Error("no matches when parsing status check link", "link", statusCheck.Link)
 			}
 			statusCheck.Id = jobId
+			statusCheck.Kind = kind
 
 			run, ok := runsMap[name]
 			if ok {
@@ -87,7 +92,7 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 					Event:    statusCheck.Event,
 					Bucket:   statusCheck.Bucket,
 				}
-				run.Jobs = []api.StatusCheck{statusCheck}
+				run.Jobs = []api.Job{statusCheck}
 			}
 			runsMap[name] = run
 		}
@@ -135,96 +140,98 @@ type jobLogsFetchedMsg struct {
 }
 
 type checkRunOutputFetchedMsg struct {
-	jobId   string
-	summary string
-	title   string
+	jobId       string
+	summary     string
+	text        string
+	description string
+	title       string
 }
 
 func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	if len(m.runsList.Items()) == 0 {
+		log.Debug("🚨 y like dis")
 		return nil
 	}
 
-	run := m.runsList.SelectedItem().(*runItem)
-	if len(run.jobs) == 0 {
+	ri := m.runsList.SelectedItem().(*runItem)
+	if len(ri.jobsItems) == 0 {
+		log.Debug("🚨 not fetching job logs")
 		return nil
 	}
 
-	job := run.jobs[m.jobsList.Cursor()]
-	if job.loadingLogs == false {
-		logs := strings.Builder{}
-		if job.kind == "check-run" {
-			m.logsViewport.SetContent(job.summary)
-		} else {
-			for _, log := range job.logs {
-				logs.Write([]byte(log.Log))
-			}
-			m.logsViewport.SetContent(logs.String())
-		}
-		m.logsViewport.GotoTop()
-		return nil
-	}
-
+	job := ri.jobsItems[m.jobsList.Cursor()]
+	job.initiatedLogsFetch = true
 	return func() tea.Msg {
-		if checkRunRegex.Match([]byte(job.job.Link)) {
-			log.Debug("fetching check run output", "link", job.job.Link)
+		log.Debug("🚨 fetching job logs", "link", job.job.Link)
+		if job.job.Kind == api.JobKindCheckRun {
+			log.Debug("🚨 fetching check run output", "link", job.job.Link)
 			output, err := api.FetchCheckRunOutput(m.repo, job.job.Id)
 			if err != nil {
-				log.Error("error fetching check run output", "checkRunId", job.job, "err", err)
+				log.Error("error fetching check run output", "link", job.job.Link, "err", err)
 				return nil
 			}
-			summary, err := parseRunOutputMarkdown(output.Output.Summary, m.logsWidth())
+			text := output.Output.Summary
+			text += "\n\n"
+			text += output.Output.Text
+			summary, err := parseRunOutputMarkdown(
+				text,
+				m.logsWidth(),
+			)
 			if err != nil {
+				log.Error("failed rendering as markdown", "link", job.job.Link, "err", err)
 				summary = output.Output.Summary
 			}
 			return checkRunOutputFetchedMsg{
-				jobId:   job.job.Id,
-				title:   output.Output.Title,
-				summary: summary,
+				jobId:       job.job.Id,
+				title:       output.Output.Title,
+				description: output.Output.Description,
+				summary:     summary,
 			}
 		}
 
 		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.job.Id)
 		if err != nil {
-			log.Error("error fetching job logs", "jobId", job.job.Id, "err", err, "stderr", stderr.String(), "job", job.job)
+			log.Error("error fetching job logs", "link", job.job.Link, "err", err, "stderr", stderr.String())
 			return nil
 		}
 		jobLogs := jobLogsRes.String()
-		log.Debug("success fetching job logs", "jobId", job.job.Id, "bytes", len(jobLogsRes.Bytes()))
+		log.Debug("success fetching job logs", "link", job.job.Link, "bytes", len(jobLogsRes.Bytes()))
 
 		return jobLogsFetchedMsg{
 			jobId: job.job.Id,
 			logs:  parseJobLogs(jobLogs),
 		}
 	}
-
 }
 
 type runJobsStepsFetchedMsg struct {
 	runId         string
-	jobsWithSteps api.CheckRunJobsWithSteps
+	jobsWithSteps api.CheckRunJobsSteps
 	err           error
 }
 
-func (m *model) makeFetchRunJobsWithStepsCmd(runId string) tea.Cmd {
+func (m *model) makeFetchRunJobsStepsCmd(runId string) tea.Cmd {
 	return func() tea.Msg {
 		log.Debug("fetching all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId)
 		jobsWithStepsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, runId, "--json", "jobs")
 		if err != nil {
-			log.Error("error fetching all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId, "err", err, "stderr", stderr.String())
+			log.Error("error fetching all jobs steps for run", "repo", m.repo,
+				"prNumber", m.prNumber, "runId", runId, "err", err, "stderr", stderr.String())
 		}
 
-		jobsWithSteps := api.CheckRunJobsWithSteps{}
+		jobsWithSteps := api.CheckRunJobsSteps{}
 
 		if err := json.Unmarshal(jobsWithStepsRes.Bytes(), &jobsWithSteps); err != nil {
-			log.Error("error parsing run jobs with steps json", "err", err, "stderr", stderr.String(), "response", jobsWithStepsRes.String())
+			log.Error("error parsing run jobs with steps json", "err", err, "stderr",
+				stderr.String(), "response", jobsWithStepsRes.String())
 		}
 
 		log.Debug("successfully fetched all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId)
 
-		for jobIdx := range jobsWithSteps.Jobs {
-			sort.Slice(jobsWithSteps.Jobs[jobIdx].Steps, func(i, j int) bool {
-				return jobsWithSteps.Jobs[jobIdx].Steps[i].Number < jobsWithSteps.Jobs[jobIdx].Steps[j].Number
+		for jobIdx := range jobsWithSteps.JobsSteps {
+			sort.Slice(jobsWithSteps.JobsSteps[jobIdx].Steps, func(i, j int) bool {
+				return jobsWithSteps.JobsSteps[jobIdx].Steps[i].Number <
+					jobsWithSteps.JobsSteps[jobIdx].Steps[j].Number
 			})
 		}
 

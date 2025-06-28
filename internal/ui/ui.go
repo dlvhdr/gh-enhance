@@ -6,7 +6,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
-	"github.com/charmbracelet/bubbles/v2/spinner"
 	"github.com/charmbracelet/bubbles/v2/viewport"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
@@ -38,7 +37,6 @@ type model struct {
 	stepsList     list.Model
 	logsViewport  viewport.Model
 	scrollbar     tea.Model
-	spinners      []spinner.Model
 	quitting      bool
 	focusedPane   focusedPane
 	err           error
@@ -53,10 +51,6 @@ const (
 )
 
 func NewModel(repo string, number string) model {
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-
 	runsList, runsDelegate := newRunsDefaultList()
 	runsList.Title = "Runs"
 	runsList.SetStatusBarItemName("run", "runs")
@@ -74,14 +68,8 @@ func NewModel(repo string, number string) model {
 
 	vp := viewport.New()
 	vp.SoftWrap = false
-	vp.KeyMap.Right = key.NewBinding(
-		key.WithKeys("right"),
-		key.WithHelp("→", "move right"),
-	)
-	vp.KeyMap.Left = key.NewBinding(
-		key.WithKeys("left"),
-		key.WithHelp("←", "move left"),
-	)
+	vp.KeyMap.Right = rightKey
+	vp.KeyMap.Left = leftKey
 
 	sb := scrollbar.NewVertical()
 	sb.Style = sb.Style.Inherit(scrollbarStyle)
@@ -94,7 +82,6 @@ func NewModel(repo string, number string) model {
 		stepsList:     stepsList,
 		prNumber:      number,
 		repo:          repo,
-		spinners:      []spinner.Model{},
 		runsDelegate:  runsDelegate,
 		jobsDelegate:  jobsDelegate,
 		stepsDelegate: stepsDelegate,
@@ -124,65 +111,55 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		cmds = append(cmds, m.runsList.SetItems(runItems))
-		if len(runItems) > 0 {
-			cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(runItems[0].(*runItem).run.Id))
-		}
-
 		cmds = append(cmds, m.updateLists()...)
 
-	case jobLogsFetchedMsg:
-		run := m.runsList.SelectedItem().(*runItem)
-		for i := range run.jobs {
-			if run.jobs[i].job.Id == msg.jobId {
-				run.jobs[i].logs = msg.logs
-				run.jobs[i].loadingLogs = false
-				cmds = append(cmds, m.updateLists()...)
-				break
-			}
-		}
-
-	case checkRunOutputFetchedMsg:
-		run := m.runsList.SelectedItem().(*runItem)
-		for i := range run.jobs {
-			if run.jobs[i].job.Id == msg.jobId {
-				run.jobs[i].summary = msg.summary
-				run.jobs[i].title = msg.summary
-				run.jobs[i].kind = "check-run"
-				run.jobs[i].loadingLogs = false
-				cmds = append(cmds, m.updateLists()...)
-				break
+		if len(runItems) > 0 {
+			ri := runItems[0].(*runItem)
+			cmds = append(cmds, m.makeFetchRunJobsStepsCmd(ri.run.Id))
+			if len(ri.run.Jobs) > 0 {
+				m.jobsList.Select(0)
+				cmds = append(cmds, m.onJobChanged()...)
 			}
 		}
 
 	case runJobsStepsFetchedMsg:
-		jobsMap := make(map[string]api.JobWithSteps)
-		for _, job := range msg.jobsWithSteps.Jobs {
-			jobsMap[fmt.Sprintf("%d", job.DatabaseId)] = job
-		}
-
-		runs := m.runsList.Items()
-		for _, run := range runs {
-			run := run.(*runItem)
-			if run.run.Id == msg.runId {
-				run.loading = false
-			}
-			for jobIdx, job := range run.jobs {
-				run.jobs[jobIdx].loadingSteps = false
-				jobWithSteps, ok := jobsMap[job.job.Id]
-				if !ok {
-					continue
-				}
-
-				for _, step := range jobWithSteps.Steps {
-					si := NewStepItem(step, jobWithSteps.Url)
-					run.jobs[jobIdx].steps = append(run.jobs[jobIdx].steps, &si)
-				}
-
-			}
-		}
-
-		cmds = append(cmds, m.makeFetchJobLogsCmd())
+		m.enrichRunWithJobsSteps(msg)
 		cmds = append(cmds, m.updateLists()...)
+
+	case jobLogsFetchedMsg:
+		run := m.runsList.SelectedItem().(*runItem)
+		for i := range run.jobsItems {
+			if run.jobsItems[i].job.Id != msg.jobId {
+				continue
+			}
+
+			run.jobsItems[i].logs = msg.logs
+			run.jobsItems[i].loadingLogs = false
+			currJob := m.jobsList.SelectedItem()
+			if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
+				m.renderJobLogs()
+			}
+
+			cmds = append(cmds, m.updateLists()...)
+			break
+		}
+
+	case checkRunOutputFetchedMsg:
+		run := m.runsList.SelectedItem().(*runItem)
+		for i := range run.jobsItems {
+			if run.jobsItems[i].job.Id == msg.jobId {
+				run.jobsItems[i].summary = msg.summary
+				run.jobsItems[i].title = msg.summary
+				run.jobsItems[i].loadingLogs = false
+				currJob := m.jobsList.SelectedItem()
+				if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
+					m.renderJobLogs()
+				}
+
+				cmds = append(cmds, m.updateLists()...)
+				break
+			}
+		}
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -229,16 +206,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		after := m.runsList.Cursor()
 		if before != after {
-			m.jobsList.Select(0)
-			m.stepsList.Select(0)
-			cmds = append(cmds, m.makeFetchJobLogsCmd())
-			newRun := m.runsList.Items()[after].(*runItem)
-			if newRun.loading {
-				cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(
-					m.runsList.Items()[after].(*runItem).run.Id))
-			}
 			cmds = append(cmds, m.updateLists()...)
-			m.logsViewport.GotoTop()
+			cmds = append(cmds, m.onRunChanged()...)
 		}
 		break
 	case PaneJobs:
@@ -247,10 +216,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		after := m.jobsList.Cursor()
 		if before != after {
-			m.stepsList.Select(0)
-			cmds = append(cmds, m.makeFetchJobLogsCmd())
-			cmds = append(cmds, m.updateLists()...)
-			m.logsViewport.GotoTop()
+			cmds = append(cmds, m.onJobChanged()...)
 		}
 	case PaneSteps:
 		before := m.stepsList.Cursor()
@@ -258,18 +224,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		after := m.stepsList.Cursor()
 		if before != after {
-			job := m.jobsList.SelectedItem()
-			step := m.stepsList.SelectedItem()
-
-			if step != nil {
-				for i, log := range job.(*jobItem).logs {
-					if log.Time.After(step.(*stepItem).step.StartedAt) {
-						m.logsViewport.SetYOffset(i - 1)
-						break
-					}
-				}
-			}
-
+			m.onStepChanged()
 		}
 
 	case PaneLogs:
@@ -282,35 +237,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logsViewport.GotoTop()
 			}
 		}
-		log.Debug("updating viewport", "msg", msg, "offset",
-			m.logsViewport.HorizontalScrollPercent())
 		m.logsViewport, cmd = m.logsViewport.Update(msg)
-		log.Debug("after updating viewport", "msg", msg, "offset",
-			m.logsViewport.HorizontalScrollPercent())
 		cmds = append(cmds, cmd)
-	}
-
-	currJob := m.jobsList.SelectedItem()
-	currStep := m.stepsList.SelectedItem()
-	if currJob != nil && currStep != nil && len(currJob.(*jobItem).logs) > m.stepsList.Cursor() {
-		logs := strings.Builder{}
-		totalLines := fmt.Sprintf("%d", len(currJob.(*jobItem).logs))
-		for i, log := range currJob.(*jobItem).logs {
-			if strings.Contains(log.Log, errorMarker) {
-				log.Log = strings.Replace(log.Log, errorMarker, "", 1)
-				log.Log = errorBgStyle.Width(m.logsViewport.Width()).Render(
-					lipgloss.JoinHorizontal(lipgloss.Top,
-						errorTitleStyle.Render("Error: "), errorStyle.Render(log.Log)))
-			}
-			ln := fmt.Sprintf("%d", i+1)
-			ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
-			logs.WriteString(lineNumbersStyle.Render(ln))
-			logs.WriteString(log.Log)
-			logs.WriteString("\n")
-		}
-		m.logsViewport.SetContent(logs.String())
-	} else if currJob != nil && currJob.(*jobItem).kind == "check-run" && !currJob.(*jobItem).loadingLogs {
-		m.logsViewport.SetContent(currJob.(*jobItem).summary)
 	}
 
 	m.setFocusedPaneStyles()
@@ -343,37 +271,14 @@ func (m model) View() string {
 }
 
 func (m *model) viewLogs() string {
-	var content string
 	title := "Logs"
-
 	if m.focusedPane == PaneLogs {
 		title = focusedPaneTitleBarStyle.Render(focusedPaneTitleStyle.Render(title))
 	} else {
 		title = unfocusedPaneTitleBarStyle.Render(unfocusedPaneTitleStyle.Render(title))
 	}
 
-	job := m.jobsList.SelectedItem()
-	if job == nil || job.(*jobItem).loadingLogs || job.(*jobItem).loadingSteps {
-		content = lipgloss.Place(
-			m.logsWidth(),
-			m.height,
-			lipgloss.Center,
-			0.75,
-			"Loading...",
-			// m.spinner.View(),
-		)
-	} else {
-		if m.isScrollbarVisible() {
-			content = lipgloss.JoinHorizontal(lipgloss.Left,
-				m.logsViewport.View(),
-				m.scrollbar.(scrollbar.Vertical).View(),
-			)
-		} else {
-			content = m.logsViewport.View()
-		}
-	}
-
-	return lipgloss.JoinVertical(lipgloss.Left, title, content)
+	return lipgloss.JoinVertical(lipgloss.Left, title, m.logsContentView())
 }
 
 func (m *model) setFocusedPaneStyles() {
@@ -466,12 +371,12 @@ func (m *model) updateLists() []tea.Cmd {
 
 	run := m.runsList.SelectedItem().(*runItem)
 	jobs := make([]list.Item, 0)
-	for _, job := range run.jobs {
+	for _, job := range run.jobsItems {
 		jobs = append(jobs, job)
 	}
 	cmds = append(cmds, m.jobsList.SetItems(jobs))
 
-	if m.jobsList.Cursor() >= len(run.jobs) {
+	if m.jobsList.Cursor() >= len(run.jobsItems) {
 		return cmds
 	}
 
@@ -494,7 +399,21 @@ func (m *model) logsWidth() int {
 	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - borders - sb
 }
 
-func (m *model) noLogsView() string {
+func (m *model) loadingLogsView() string {
+	return m.fullScreenMessageView("Loading...")
+}
+
+func (m *model) fullScreenMessageView(message string) string {
+	return lipgloss.Place(
+		m.logsWidth(),
+		m.height,
+		lipgloss.Center,
+		0.75,
+		message,
+	)
+}
+
+func (m *model) noLogsView(message string) string {
 	emptySetArt := ""
 	for _, char := range art.EmptySet {
 		if char == '╱' {
@@ -512,10 +431,159 @@ func (m *model) noLogsView() string {
 		lipgloss.JoinVertical(
 			lipgloss.Center,
 			emptySetArt,
-			noLogsStyle.Render("This job doesn't have any logs"),
+			noLogsStyle.Render(message),
 		))
 }
 
 func (m *model) isScrollbarVisible() bool {
 	return m.logsViewport.TotalLineCount() > m.logsViewport.VisibleLineCount()
+}
+
+func (m *model) enrichRunWithJobsSteps(msg runJobsStepsFetchedMsg) {
+	jobsMap := make(map[string]api.JobSteps)
+	for _, job := range msg.jobsWithSteps.JobsSteps {
+		jobsMap[fmt.Sprintf("%d", job.DatabaseId)] = job
+	}
+
+	runs := m.runsList.Items()
+
+	// find runItem
+	var ri *runItem
+	for _, run := range runs {
+		run := run.(*runItem)
+		if run.run.Id == msg.runId {
+			ri = run
+			break
+		}
+	}
+
+	if ri == nil {
+		return
+	}
+
+	ri.loading = false
+	for jobIdx, job := range ri.jobsItems {
+		ri.jobsItems[jobIdx].loadingSteps = false
+		jobWithSteps, ok := jobsMap[job.job.Id]
+		if !ok {
+			continue
+		}
+
+		for _, step := range jobWithSteps.Steps {
+			si := NewStepItem(step, jobWithSteps.Url)
+			ri.jobsItems[jobIdx].steps = append(ri.jobsItems[jobIdx].steps, &si)
+		}
+
+	}
+}
+
+func (m *model) onRunChanged() []tea.Cmd {
+	runIdx := m.runsList.Cursor()
+	cmds := make([]tea.Cmd, 0)
+	m.jobsList.Select(0)
+	cmds = append(cmds, m.onJobChanged()...)
+	newRun := m.runsList.Items()[runIdx].(*runItem)
+	if newRun.loading {
+		cmds = append(cmds, m.makeFetchRunJobsStepsCmd(
+			m.runsList.Items()[runIdx].(*runItem).run.Id))
+	}
+	cmds = append(cmds, m.updateLists()...)
+	m.logsViewport.GotoTop()
+
+	return cmds
+}
+
+func (m *model) onJobChanged() []tea.Cmd {
+	log.Debug("🚨 jobChanged")
+	cmds := make([]tea.Cmd, 0)
+	m.stepsList.Select(0)
+
+	currJob := m.jobsList.SelectedItem()
+	if currJob != nil && !currJob.(*jobItem).initiatedLogsFetch {
+		cmds = append(cmds, m.makeFetchJobLogsCmd())
+	} else {
+		log.Debug("🚨 wat", "currJob", currJob)
+	}
+
+	m.renderJobLogs()
+	m.logsViewport.GotoTop()
+	cmds = append(cmds, m.updateLists()...)
+	return cmds
+}
+
+func (m *model) onStepChanged() {
+	job := m.jobsList.SelectedItem()
+	step := m.stepsList.SelectedItem()
+
+	if step != nil {
+		for i, log := range job.(*jobItem).logs {
+			if log.Time.After(step.(*stepItem).step.StartedAt) {
+				m.logsViewport.SetYOffset(i - 1)
+				break
+			}
+		}
+	}
+}
+
+func (m *model) renderJobLogs() {
+	currJob := m.jobsList.SelectedItem()
+	if currJob == nil || currJob.(*jobItem).loadingLogs {
+		m.logsViewport.SetContent("")
+	}
+
+	ji := currJob.(*jobItem)
+	if ji.renderedLogs != "" {
+		m.logsViewport.SetContent(ji.renderedLogs)
+		return
+	}
+
+	if ji.job.Kind == api.JobKindCheckRun {
+		ji.renderedLogs = currJob.(*jobItem).summary
+		m.logsViewport.SetContent(ji.renderedLogs)
+		return
+	}
+
+	// TODO: clean, move to a function, pull logic from parser? Because I go over the lines twice
+	logs := strings.Builder{}
+	totalLines := fmt.Sprintf("%d", len(ji.logs))
+	for i, log := range ji.logs {
+		if strings.Contains(log.Log, errorMarker) {
+			log.Log = strings.Replace(log.Log, errorMarker, "", 1)
+			log.Log = errorBgStyle.Width(m.logsViewport.Width()).Render(
+				lipgloss.JoinHorizontal(lipgloss.Top,
+					errorTitleStyle.Render("Error: "), errorStyle.Render(log.Log)))
+		}
+		ln := fmt.Sprintf("%d", i+1)
+		ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
+		logs.WriteString(lineNumbersStyle.Render(ln))
+		logs.WriteString(log.Log)
+		logs.WriteString("\n")
+	}
+	ji.renderedLogs = logs.String()
+	log.Debug("🔴 setting rendered logs")
+	m.logsViewport.SetContent(ji.renderedLogs)
+}
+
+func (m *model) logsContentView() string {
+	job := m.jobsList.SelectedItem()
+	if job == nil {
+		return m.loadingLogsView()
+	}
+
+	ji := job.(*jobItem)
+	if ji.job.State == api.StatusCheckConclusionSkipped {
+		return m.noLogsView("This job was skipped")
+	}
+
+	if ji.loadingLogs || ji.loadingSteps {
+		return m.loadingLogsView()
+	}
+
+	if m.isScrollbarVisible() {
+		return lipgloss.JoinHorizontal(lipgloss.Top,
+			m.logsViewport.View(),
+			m.scrollbar.(scrollbar.Vertical).View(),
+		)
+	}
+	return m.logsViewport.View()
 }

@@ -12,9 +12,9 @@ import (
 )
 
 type runItem struct {
-	run     *api.CheckRun
-	jobs    []*jobItem
-	loading bool
+	run       *api.CheckRun
+	jobsItems []*jobItem
+	loading   bool
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -22,8 +22,8 @@ func (i *runItem) Title() string {
 	status := i.viewWarnings()
 
 	name := i.run.Workflow
-	if name == "" && len(i.jobs) > 0 {
-		name = i.jobs[0].job.Name
+	if name == "" && len(i.jobsItems) > 0 {
+		name = i.jobsItems[0].job.Name
 	}
 
 	return fmt.Sprintf("%s %s", status, name)
@@ -99,8 +99,8 @@ func NewRunItem(run api.CheckRun) runItem {
 	}
 
 	return runItem{
-		run:     &run,
-		jobs:    jobs,
-		loading: true,
+		run:       &run,
+		jobsItems: jobs,
+		loading:   true,
 	}
 }

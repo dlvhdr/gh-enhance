@@ -12,14 +12,15 @@ import (
 )
 
 type jobItem struct {
-	job          *api.StatusCheck
-	logs         []api.StepLogsWithTime
-	summary      string
-	title        string
-	kind         string
-	loadingLogs  bool
-	loadingSteps bool
-	steps        []*stepItem
+	job                *api.Job
+	logs               []api.StepLogsWithTime
+	renderedLogs       string
+	summary            string
+	title              string
+	initiatedLogsFetch bool
+	loadingLogs        bool
+	loadingSteps       bool
+	steps              []*stepItem
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -96,7 +97,7 @@ func newCheckItemDelegate() list.DefaultDelegate {
 	return d
 }
 
-func NewJobItem(job api.StatusCheck) jobItem {
+func NewJobItem(job api.Job) jobItem {
 	return jobItem{
 		job:          &job,
 		logs:         make([]api.StepLogsWithTime, 0),

@@ -63,7 +63,7 @@ var (
 	stepStartMarkerStyle  = lipgloss.NewStyle().Bold(true).Inline(true)
 	groupStartMarkerStyle = lipgloss.NewStyle().Inline(true)
 
-	scrollbarStyle      = lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), true).BorderForeground(fainterColor)
+	scrollbarStyle      = lipgloss.NewStyle()
 	scrollbarThumbStyle = lipgloss.NewStyle().Foreground(faintColor)
 	scrollbarTrackStyle = lipgloss.NewStyle().Foreground(fainterColor)
 )

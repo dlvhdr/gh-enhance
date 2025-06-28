@@ -1,6 +1,11 @@
 package api
 
-import "time"
+import (
+	"fmt"
+	"time"
+
+	gh "github.com/cli/go-gh/v2/pkg/api"
+)
 
 const (
 	// Run statuses
@@ -56,7 +61,8 @@ var AllStatuses = []string{
 
 func IsFailureStatusCheckState(c StatusCheckConclusion) bool {
 	switch c {
-	case StatusCheckConclusionActionRequired, StatusCheckConclusionFailure, StatusCheckConclusionStartupFailure, StatusCheckConclusionTimedOut:
+	case StatusCheckConclusionActionRequired, StatusCheckConclusionFailure,
+		StatusCheckConclusionStartupFailure, StatusCheckConclusionTimedOut:
 		return true
 	default:
 		return false
@@ -89,19 +95,14 @@ type Step struct {
 	Status      Status
 }
 
-type JobWithSteps struct {
-	CompletedAt time.Time
-	Conclusion  string
-	DatabaseId  int
-	Name        string
-	StartedAt   time.Time
-	Status      string
-	Steps       []Step
-	Url         string
+type JobSteps struct {
+	DatabaseId int
+	Url        string
+	Steps      []Step
 }
 
-type CheckRunJobsWithSteps struct {
-	Jobs []JobWithSteps
+type CheckRunJobsSteps struct {
+	JobsSteps []JobSteps
 }
 
 type CheckRun struct {
@@ -110,18 +111,23 @@ type CheckRun struct {
 	Link     string
 	Workflow string
 	Event    string
-	Jobs     []StatusCheck
+	Jobs     []Job
 	Bucket   string // pass / skipping / fail / cancel / pending
 }
-
-type StepLogs string
 
 type StepLogsWithTime struct {
 	Log  string
 	Time time.Time
 }
 
-type StatusCheck struct {
+type JobKind int
+
+const (
+	JobKindJob JobKind = iota
+	JobKindCheckRun
+)
+
+type Job struct {
 	Id          string
 	State       StatusCheckConclusion
 	Name        string
@@ -134,4 +140,34 @@ type StatusCheck struct {
 	StartedAt   time.Time
 	CompletedAt time.Time
 	Bucket      string // pass / skipping / fail / cancel / pending
+	Kind        JobKind
+}
+
+type CheckRunOutput struct {
+	Title       string
+	Summary     string
+	Text        string
+	Description string
+}
+
+type CheckRunOutputResponse struct {
+	Id     int
+	Name   string
+	Url    string
+	Output CheckRunOutput
+}
+
+func FetchCheckRunOutput(repo string, runId string) (CheckRunOutputResponse, error) {
+	client, err := gh.DefaultRESTClient()
+	res := CheckRunOutputResponse{}
+	if err != nil {
+		return res, err
+	}
+
+	err = client.Get(fmt.Sprintf("repos/%s/check-runs/%s", repo, runId), &res)
+	if err != nil {
+		return res, err
+	}
+
+	return res, nil
 }
