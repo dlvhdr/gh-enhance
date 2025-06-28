@@ -14,6 +14,9 @@ import (
 type jobItem struct {
 	job          *api.StatusCheck
 	logs         []api.StepLogsWithTime
+	summary      string
+	title        string
+	kind         string
 	loadingLogs  bool
 	loadingSteps bool
 	steps        []*stepItem

@@ -17,9 +17,13 @@ import (
 )
 
 // https://github.com/neovim/neovim/actions/runs/15852696561/job/44690047836
-var jobUrlRegex = regexp.MustCompile(`https:\/\/github\.com\/(.*)\/(.*)\/actions\/runs\/(\d+)\/job\/(\d+)`)
+var jobUrlRegex = regexp.MustCompile(`^https:\/\/github\.com\/(.*)\/(.*)\/actions\/runs\/(\d+)\/job\/(\d+)$`)
 
 var jobSubexps = jobUrlRegex.NumSubexp()
+
+var checkRunRegex = regexp.MustCompile(`^https:\/\/github\.com\/(.*)\/(.*)\/runs\/(\d+)$`)
+
+var checkRunSubexp = checkRunRegex.NumSubexp()
 
 type runsFetchedMsg struct {
 	err  error
@@ -49,24 +53,40 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 			if name == "" {
 				name = statusCheck.Name
 			}
+			log.Debug("parsing check", "name", name, "link", statusCheck.Link)
+
+			matches := jobUrlRegex.FindAllSubmatch([]byte(statusCheck.Link), jobSubexps)
+			runId, jobId := "", ""
+			runLink := statusCheck.Link
+
+			if matches != nil {
+				runId = string(matches[0][3])
+				jobId = string(matches[0][4])
+				runLink = fmt.Sprintf("https://github.com/%s/%s/actions/runs/%s", string(matches[0][1]), string(matches[0][2]), runId)
+			} else if matches := checkRunRegex.FindAllSubmatch([]byte(statusCheck.Link), checkRunSubexp); matches != nil {
+				runId = string(matches[0][3])
+				jobId = runId
+				runLink = fmt.Sprintf("https://github.com/%s/%s/runs/%s", string(matches[0][1]), string(matches[0][2]), runId)
+				for _, match := range matches[0] {
+					log.Debug("🔵", "match", string(match))
+				}
+			} else {
+				log.Debug("🔴 no matches", "link", statusCheck.Link)
+			}
+			statusCheck.Id = jobId
 
 			run, ok := runsMap[name]
 			if ok {
 				run.Jobs = append(run.Jobs, statusCheck)
 			} else {
-				matches := jobUrlRegex.FindAllSubmatch([]byte(statusCheck.Link), jobSubexps)
-				runLink := statusCheck.Link
-				runId := ""
-				jobId := ""
-
-				if matches != nil {
-					runId = string(matches[0][3])
-					jobId = string(matches[0][4])
-					runLink = fmt.Sprintf("https://github.com/%s/%s/actions/runs/%s", string(matches[0][1]), string(matches[0][2]), runId)
+				run = api.CheckRun{
+					Id:       runId,
+					Name:     statusCheck.Name,
+					Link:     runLink,
+					Workflow: statusCheck.Workflow,
+					Event:    statusCheck.Event,
+					Bucket:   statusCheck.Bucket,
 				}
-
-				run = api.CheckRun{Id: runId, Name: statusCheck.Name, Link: runLink, Workflow: statusCheck.Workflow, Event: statusCheck.Event, Bucket: statusCheck.Bucket}
-				statusCheck.Id = jobId
 				run.Jobs = []api.StatusCheck{statusCheck}
 			}
 			runsMap[name] = run
@@ -110,9 +130,14 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 }
 
 type jobLogsFetchedMsg struct {
-	err   error
 	jobId string
 	logs  []api.StepLogsWithTime
+}
+
+type checkRunOutputFetchedMsg struct {
+	jobId   string
+	summary string
+	title   string
 }
 
 func (m *model) makeFetchJobLogsCmd() tea.Cmd {
@@ -128,17 +153,41 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	job := run.jobs[m.jobsList.Cursor()]
 	if job.loadingLogs == false {
 		logs := strings.Builder{}
-		for _, log := range job.logs {
-			logs.Write([]byte(log.Log))
+		if job.kind == "check-run" {
+			m.logsViewport.SetContent(job.summary)
+		} else {
+			for _, log := range job.logs {
+				logs.Write([]byte(log.Log))
+			}
+			m.logsViewport.SetContent(logs.String())
 		}
-		m.logsViewport.SetContent(logs.String())
+		m.logsViewport.GotoTop()
 		return nil
 	}
 
 	return func() tea.Msg {
+		if checkRunRegex.Match([]byte(job.job.Link)) {
+			log.Debug("fetching check run output", "link", job.job.Link)
+			output, err := api.FetchCheckRunOutput(m.repo, job.job.Id)
+			if err != nil {
+				log.Error("error fetching check run output", "checkRunId", job.job, "err", err)
+				return nil
+			}
+			summary, err := parseRunOutputMarkdown(output.Output.Summary, m.logsWidth())
+			if err != nil {
+				summary = output.Output.Summary
+			}
+			return checkRunOutputFetchedMsg{
+				jobId:   job.job.Id,
+				title:   output.Output.Title,
+				summary: summary,
+			}
+		}
+
 		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.job.Id)
 		if err != nil {
-			log.Error("error fetching job logs", "jobId", job.job.Id, "err", err, "stderr", stderr.String())
+			log.Error("error fetching job logs", "jobId", job.job.Id, "err", err, "stderr", stderr.String(), "job", job.job)
+			return nil
 		}
 		jobLogs := jobLogsRes.String()
 		log.Debug("success fetching job logs", "jobId", job.job.Id, "bytes", len(jobLogsRes.Bytes()))

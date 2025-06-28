@@ -120,8 +120,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		run := m.runsList.SelectedItem().(*runItem)
 		for i := range run.jobs {
 			if run.jobs[i].job.Id == msg.jobId {
-				log.Debug("caching job logs", "jobId", msg.jobId)
 				run.jobs[i].logs = msg.logs
+				run.jobs[i].loadingLogs = false
+				cmds = append(cmds, m.updateLists()...)
+				break
+			}
+		}
+
+	case checkRunOutputFetchedMsg:
+		run := m.runsList.SelectedItem().(*runItem)
+		for i := range run.jobs {
+			if run.jobs[i].job.Id == msg.jobId {
+				run.jobs[i].summary = msg.summary
+				run.jobs[i].title = msg.summary
+				run.jobs[i].kind = "check-run"
 				run.jobs[i].loadingLogs = false
 				cmds = append(cmds, m.updateLists()...)
 				break
@@ -252,7 +264,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logsViewport.GotoTop()
 			}
 		}
+		log.Debug("updating viewport", "msg", msg, "offset", m.logsViewport.YOffset)
 		m.logsViewport, cmd = m.logsViewport.Update(msg)
+		log.Debug("after updating viewport", "msg", msg, "offset", m.logsViewport.YOffset)
 		cmds = append(cmds, cmd)
 	}
 
@@ -273,6 +287,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			logs.WriteString("\n")
 		}
 		m.logsViewport.SetContent(logs.String())
+		// m.logsViewport.GotoTop()
+	} else if currJob != nil && currJob.(*jobItem).kind == "check-run" && !currJob.(*jobItem).loadingLogs {
+		m.logsViewport.SetContent(currJob.(*jobItem).summary)
+		// m.logsViewport.GotoTop()
 	}
 
 	m.setFocusedPaneStyles()
@@ -320,19 +338,6 @@ func (m *model) viewLogs() string {
 			"Loading...",
 			// m.spinner.View(),
 		)
-	} else if len(job.(*jobItem).logs) == 0 || len(job.(*jobItem).steps) == 0 {
-		if !job.(*jobItem).loadingSteps && len(job.(*jobItem).steps) == 0 {
-			content = lipgloss.Place(
-				m.logsWidth(),
-				m.height,
-				lipgloss.Center,
-				0.75,
-				"No steps...",
-				// m.spinner.View(),
-			)
-		} else {
-			content = m.noLogsView()
-		}
 	} else {
 		content = m.logsViewport.View()
 	}

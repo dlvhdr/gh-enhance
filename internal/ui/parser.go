@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
+	"github.com/dlvhdr/gh-enhance/internal/ui/markdown"
 )
 
 const (
@@ -84,4 +85,9 @@ func parseJobLogs(jobLogs string) []api.StepLogsWithTime {
 	}
 
 	return stepsLogs
+}
+
+func parseRunOutputMarkdown(output string, width int) (string, error) {
+	renderer := markdown.GetMarkdownRenderer(width)
+	return renderer.Render(output)
 }

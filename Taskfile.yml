@@ -10,6 +10,7 @@ tasks:
     interactive: true
   debug:
     cmds:
+      - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
       - DEBUG=true go run ./cmd/enhance {{.CLI_ARGS}}
     interactive: true
   mock:
@@ -21,6 +22,11 @@ tasks:
   start-mock-server:
     cmds:
       - killgrave --config ./imposters/config.yml &> ./.killgrave.log  &
+  local-gh:
+    cmds:
+      - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
+      - GH_PATH=/usr/local/bin/gh DEBUG=true go run ./cmd/enhance {{.CLI_ARGS}}
+    interactive: true
   logs:
     cmds:
       - rm -f ./debug.log

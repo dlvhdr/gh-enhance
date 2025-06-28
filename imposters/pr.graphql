@@ -1,0 +1,38 @@
+query {
+  resource(url:"https://github.com/port-labs/Port/pull/7521") {
+    ... on PullRequest {
+      title
+      statusCheckRollup {
+        state
+        contexts(first: 100) {
+          nodes {
+            ...on CheckRun {
+              id
+              name
+              status
+              title
+              url
+              conclusion
+              databaseId
+              startedAt
+              completedAt
+              # summary
+              # text
+              steps(first: 100) {
+                nodes {
+                  name
+                  number
+                  startedAt
+                  completedAt
+                  externalId
+                  secondsToCompletion
+                  status
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

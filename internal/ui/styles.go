@@ -25,7 +25,7 @@ var (
 	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(unfocusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground()).PaddingLeft(3)
 	paneStyle                   = lipgloss.NewStyle().BorderRight(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(faintColor)
 
-	lineNumbersStyle = lipgloss.NewStyle().Foreground(fainterColor)
+	lineNumbersStyle = lipgloss.NewStyle().Foreground(fainterColor).Align(lipgloss.Right)
 
 	canceledGlyph = lipgloss.NewStyle().
 			Foreground(faintColor).
