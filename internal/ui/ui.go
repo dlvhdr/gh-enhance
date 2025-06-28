@@ -37,7 +37,7 @@ type model struct {
 	jobsList      list.Model
 	stepsList     list.Model
 	logsViewport  viewport.Model
-	vertical      tea.Model
+	scrollbar     tea.Model
 	spinners      []spinner.Model
 	quitting      bool
 	focusedPane   focusedPane
@@ -83,8 +83,10 @@ func NewModel(repo string, number string) model {
 		key.WithHelp("←", "move left"),
 	)
 
-	vertical := scrollbar.NewVertical()
-	vertical.Style = vertical.Style.Border(lipgloss.RoundedBorder(), true).MarginLeft(2)
+	sb := scrollbar.NewVertical()
+	sb.Style = sb.Style.Inherit(scrollbarStyle)
+	sb.ThumbStyle = sb.ThumbStyle.Inherit(scrollbarThumbStyle)
+	sb.TrackStyle = sb.TrackStyle.Inherit(scrollbarTrackStyle)
 
 	m := model{
 		jobsList:      jobsList,
@@ -97,7 +99,7 @@ func NewModel(repo string, number string) model {
 		jobsDelegate:  jobsDelegate,
 		stepsDelegate: stepsDelegate,
 		logsViewport:  vp,
-		vertical:      vertical,
+		scrollbar:     sb,
 	}
 	m.setFocusedPaneStyles()
 	return m
@@ -190,7 +192,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.stepsList.SetHeight(msg.Height)
 		m.logsViewport.SetHeight(msg.Height - 2)
 		m.logsViewport.SetWidth(m.logsWidth())
-		m.vertical, cmd = m.vertical.Update(scrollbar.HeightMsg(m.logsViewport.Height()))
+		m.scrollbar, cmd = m.scrollbar.Update(scrollbar.HeightMsg(m.logsViewport.Height()))
 	case tea.KeyMsg:
 		log.Debug("key pressed", "key", msg.String())
 		if m.runsList.FilterState() == list.Filtering ||
@@ -313,7 +315,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.setFocusedPaneStyles()
 
-	m.vertical, cmd = m.vertical.Update(m.logsViewport)
+	m.scrollbar, cmd = m.scrollbar.Update(m.logsViewport)
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
@@ -364,7 +366,7 @@ func (m *model) viewLogs() string {
 		if m.isScrollbarVisible() {
 			content = lipgloss.JoinHorizontal(lipgloss.Left,
 				m.logsViewport.View(),
-				m.vertical.(scrollbar.Vertical).View(),
+				m.scrollbar.(scrollbar.Vertical).View(),
 			)
 		} else {
 			content = m.logsViewport.View()
@@ -487,7 +489,7 @@ func (m *model) logsWidth() int {
 	borders := 5
 	sb := 0
 	if m.isScrollbarVisible() {
-		sb = lipgloss.Width(m.vertical.(scrollbar.Vertical).View())
+		sb = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())
 	}
 	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - borders - sb
 }

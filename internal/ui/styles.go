@@ -17,13 +17,17 @@ var (
 	focusedPaneTitleBarStyle   = defaultListStyles.Title.UnsetBackground().Bold(true).PaddingLeft(1).PaddingRight(0).MarginBottom(1)
 	unfocusedPaneTitleBarStyle = defaultListStyles.Title.UnsetBackground().Faint(true).PaddingLeft(1).PaddingRight(0).MarginBottom(1)
 
-	defaultItemStyles           = list.NewDefaultItemStyles(true)
-	normalItemDescStyle         = defaultItemStyles.DimmedDesc.PaddingLeft(4)
-	focusedPaneItemTitleStyle   = defaultItemStyles.SelectedTitle.Bold(true).Foreground(focusedColor).BorderForeground(focusedColor).BorderStyle(lipgloss.InnerHalfBlockBorder())
+	defaultItemStyles         = list.NewDefaultItemStyles(true)
+	normalItemDescStyle       = defaultItemStyles.DimmedDesc.PaddingLeft(4)
+	focusedPaneItemTitleStyle = defaultItemStyles.SelectedTitle.Bold(true).Foreground(focusedColor).BorderForeground(
+		focusedColor).BorderStyle(lipgloss.InnerHalfBlockBorder())
 	unfocusedPaneItemTitleStyle = defaultItemStyles.SelectedTitle.Bold(true).Foreground(focusedColor).BorderForeground(unfocusedColor)
-	focusedPaneItemDescStyle    = defaultItemStyles.SelectedDesc.BorderForeground(focusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground()).BorderStyle(lipgloss.InnerHalfBlockBorder()).PaddingLeft(3)
-	unfocusedPaneItemDescStyle  = defaultItemStyles.SelectedDesc.BorderForeground(unfocusedColor).Foreground(defaultItemStyles.NormalDesc.GetForeground()).PaddingLeft(3)
-	paneStyle                   = lipgloss.NewStyle().BorderRight(true).BorderStyle(lipgloss.NormalBorder()).BorderForeground(faintColor)
+	focusedPaneItemDescStyle    = defaultItemStyles.SelectedDesc.BorderForeground(focusedColor).Foreground(
+		defaultItemStyles.NormalDesc.GetForeground()).BorderStyle(lipgloss.InnerHalfBlockBorder()).PaddingLeft(3)
+	unfocusedPaneItemDescStyle = defaultItemStyles.SelectedDesc.BorderForeground(unfocusedColor).Foreground(
+		defaultItemStyles.NormalDesc.GetForeground()).PaddingLeft(3)
+	paneStyle = lipgloss.NewStyle().BorderRight(true).BorderStyle(
+		lipgloss.NormalBorder()).BorderForeground(faintColor)
 
 	lineNumbersStyle = lipgloss.NewStyle().Foreground(fainterColor).Align(lipgloss.Right)
 
@@ -58,4 +62,8 @@ var (
 	commandStyle          = lipgloss.NewStyle().Foreground(lipgloss.Blue).Inline(true)
 	stepStartMarkerStyle  = lipgloss.NewStyle().Bold(true).Inline(true)
 	groupStartMarkerStyle = lipgloss.NewStyle().Inline(true)
+
+	scrollbarStyle      = lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), true).BorderForeground(fainterColor)
+	scrollbarThumbStyle = lipgloss.NewStyle().Foreground(faintColor)
+	scrollbarTrackStyle = lipgloss.NewStyle().Foreground(fainterColor)
 )
