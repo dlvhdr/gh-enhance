@@ -14,6 +14,7 @@ import (
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/ui/art"
+	"github.com/dlvhdr/gh-enhance/internal/ui/scrollbar"
 )
 
 type errMsg error
@@ -36,6 +37,7 @@ type model struct {
 	jobsList      list.Model
 	stepsList     list.Model
 	logsViewport  viewport.Model
+	vertical      tea.Model
 	spinners      []spinner.Model
 	quitting      bool
 	focusedPane   focusedPane
@@ -72,8 +74,17 @@ func NewModel(repo string, number string) model {
 
 	vp := viewport.New()
 	vp.SoftWrap = false
-	vp.KeyMap.Right = key.Binding{}
-	vp.KeyMap.Left = key.Binding{}
+	vp.KeyMap.Right = key.NewBinding(
+		key.WithKeys("right"),
+		key.WithHelp("→", "move right"),
+	)
+	vp.KeyMap.Left = key.NewBinding(
+		key.WithKeys("left"),
+		key.WithHelp("←", "move left"),
+	)
+
+	vertical := scrollbar.NewVertical()
+	vertical.Style = vertical.Style.Border(lipgloss.RoundedBorder(), true).MarginLeft(2)
 
 	m := model{
 		jobsList:      jobsList,
@@ -86,6 +97,7 @@ func NewModel(repo string, number string) model {
 		jobsDelegate:  jobsDelegate,
 		stepsDelegate: stepsDelegate,
 		logsViewport:  vp,
+		vertical:      vertical,
 	}
 	m.setFocusedPaneStyles()
 	return m
@@ -176,8 +188,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runsList.SetHeight(msg.Height)
 		m.jobsList.SetHeight(msg.Height)
 		m.stepsList.SetHeight(msg.Height)
-		m.logsViewport.SetHeight(msg.Height - 1)
+		m.logsViewport.SetHeight(msg.Height - 2)
 		m.logsViewport.SetWidth(m.logsWidth())
+		m.vertical, cmd = m.vertical.Update(scrollbar.HeightMsg(m.logsViewport.Height()))
 	case tea.KeyMsg:
 		log.Debug("key pressed", "key", msg.String())
 		if m.runsList.FilterState() == list.Filtering ||
@@ -267,9 +280,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logsViewport.GotoTop()
 			}
 		}
-		log.Debug("updating viewport", "msg", msg, "offset", m.logsViewport.YOffset)
+		log.Debug("updating viewport", "msg", msg, "offset",
+			m.logsViewport.HorizontalScrollPercent())
 		m.logsViewport, cmd = m.logsViewport.Update(msg)
-		log.Debug("after updating viewport", "msg", msg, "offset", m.logsViewport.YOffset)
+		log.Debug("after updating viewport", "msg", msg, "offset",
+			m.logsViewport.HorizontalScrollPercent())
 		cmds = append(cmds, cmd)
 	}
 
@@ -286,7 +301,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						errorTitleStyle.Render("Error: "), errorStyle.Render(log.Log)))
 			}
 			ln := fmt.Sprintf("%d", i+1)
-			ln = ln + strings.Repeat(" ", len(totalLines)-len(ln)) + "  "
+			ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
 			logs.WriteString(lineNumbersStyle.Render(ln))
 			logs.WriteString(log.Log)
 			logs.WriteString("\n")
@@ -297,6 +312,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	m.setFocusedPaneStyles()
+
+	m.vertical, cmd = m.vertical.Update(m.logsViewport)
+	cmds = append(cmds, cmd)
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -342,7 +361,14 @@ func (m *model) viewLogs() string {
 			// m.spinner.View(),
 		)
 	} else {
-		content = m.logsViewport.View()
+		if m.isScrollbarVisible() {
+			content = lipgloss.JoinHorizontal(lipgloss.Left,
+				m.logsViewport.View(),
+				m.vertical.(scrollbar.Vertical).View(),
+			)
+		} else {
+			content = m.logsViewport.View()
+		}
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, content)
@@ -459,7 +485,11 @@ func (m *model) updateLists() []tea.Cmd {
 
 func (m *model) logsWidth() int {
 	borders := 5
-	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - borders
+	sb := 0
+	if m.isScrollbarVisible() {
+		sb = lipgloss.Width(m.vertical.(scrollbar.Vertical).View())
+	}
+	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - borders - sb
 }
 
 func (m *model) noLogsView() string {
@@ -474,7 +504,7 @@ func (m *model) noLogsView() string {
 
 	return lipgloss.Place(
 		m.logsWidth(),
-		m.height,
+		m.logsViewport.Height(),
 		lipgloss.Center,
 		0.75,
 		lipgloss.JoinVertical(
@@ -482,4 +512,8 @@ func (m *model) noLogsView() string {
 			emptySetArt,
 			noLogsStyle.Render("This job doesn't have any logs"),
 		))
+}
+
+func (m *model) isScrollbarVisible() bool {
+	return m.logsViewport.TotalLineCount() > m.logsViewport.VisibleLineCount()
 }
