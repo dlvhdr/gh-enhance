@@ -219,9 +219,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.makeFetchJobLogsCmd())
 			newRun := m.runsList.Items()[after].(*runItem)
 			if newRun.loading {
-				cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(m.runsList.Items()[after].(*runItem).run.Id))
+				cmds = append(cmds, m.makeFetchRunJobsWithStepsCmd(
+					m.runsList.Items()[after].(*runItem).run.Id))
 			}
 			cmds = append(cmds, m.updateLists()...)
+			m.logsViewport.GotoTop()
 		}
 		break
 	case PaneJobs:
@@ -233,6 +235,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stepsList.Select(0)
 			cmds = append(cmds, m.makeFetchJobLogsCmd())
 			cmds = append(cmds, m.updateLists()...)
+			m.logsViewport.GotoTop()
 		}
 	case PaneSteps:
 		before := m.stepsList.Cursor()
@@ -278,7 +281,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for i, log := range currJob.(*jobItem).logs {
 			if strings.Contains(log.Log, errorMarker) {
 				log.Log = strings.Replace(log.Log, errorMarker, "", 1)
-				log.Log = errorBgStyle.Width(m.logsViewport.Width()).Render(lipgloss.JoinHorizontal(lipgloss.Top, errorTitleStyle.Render("Error: "), errorStyle.Render(log.Log)))
+				log.Log = errorBgStyle.Width(m.logsViewport.Width()).Render(
+					lipgloss.JoinHorizontal(lipgloss.Top,
+						errorTitleStyle.Render("Error: "), errorStyle.Render(log.Log)))
 			}
 			ln := fmt.Sprintf("%d", i+1)
 			ln = ln + strings.Repeat(" ", len(totalLines)-len(ln)) + "  "
@@ -287,10 +292,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			logs.WriteString("\n")
 		}
 		m.logsViewport.SetContent(logs.String())
-		// m.logsViewport.GotoTop()
 	} else if currJob != nil && currJob.(*jobItem).kind == "check-run" && !currJob.(*jobItem).loadingLogs {
 		m.logsViewport.SetContent(currJob.(*jobItem).summary)
-		// m.logsViewport.GotoTop()
 	}
 
 	m.setFocusedPaneStyles()
