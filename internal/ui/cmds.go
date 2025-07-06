@@ -28,39 +28,141 @@ var (
 
 type runsFetchedMsg struct {
 	err  error
-	runs []api.CheckRun
+	runs []WorkflowRun
 }
+
+// func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
+// 	return func() tea.Msg {
+// 		log.Debug("fetching check runs", "repo", m.repo, "prNumber", prNumber)
+// 		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo,
+// 			"--json", "name,workflow,link,state,event,startedAt,completedAt,bucket")
+// 		if err != nil {
+// 			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
+// 			return runsFetchedMsg{err: err}
+// 		}
+//
+// 		statusChecks := []api.Job{}
+//
+// 		if err := json.Unmarshal(checkRunsRes.Bytes(), &statusChecks); err != nil {
+// 			log.Error("error parsing checkouts json", "err", err)
+// 			return runsFetchedMsg{err: err}
+// 		}
+// 		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(statusChecks))
+// 		runsMap := make(map[string]WorkflowRun)
+//
+// 		for _, statusCheck := range statusChecks {
+// 			name := statusCheck.Workflow
+// 			if name == "" {
+// 				name = statusCheck.Name
+// 			}
+// 			log.Debug("parsing check", "name", name, "link", statusCheck.Link)
+//
+// 			matches := jobUrlRegex.FindAllSubmatch([]byte(statusCheck.Link), jobSubexps)
+// 			runId, jobId := "", ""
+// 			kind := api.JobKindJob
+// 			runLink := statusCheck.Link
+//
+// 			// TODO: clean
+// 			if matches != nil {
+// 				runId = string(matches[0][3])
+// 				jobId = string(matches[0][4])
+// 				runLink = fmt.Sprintf("https://github.com/%s/%s/actions/runs/%s",
+// 					string(matches[0][1]), string(matches[0][2]), runId)
+// 			} else if matches := checkRunRegex.FindAllSubmatch([]byte(statusCheck.Link), checkRunSubexp); matches != nil {
+// 				runId = string(matches[0][3])
+// 				jobId = runId
+// 				runLink = fmt.Sprintf("https://github.com/%s/%s/runs/%s",
+// 					string(matches[0][1]), string(matches[0][2]), runId)
+// 				kind = api.JobKindCheckRun
+// 			} else {
+// 				kind = api.JobKindExternal
+// 			}
+// 			statusCheck.Id = jobId
+// 			statusCheck.Kind = kind
+//
+// 			run, ok := runsMap[name]
+// 			if ok {
+// 				run.Jobs = append(run.Jobs, statusCheck)
+// 			} else {
+// 				run = WorkflowRun{
+// 					Id:       runId,
+// 					Name:     statusCheck.Name,
+// 					Link:     runLink,
+// 					Workflow: statusCheck.Workflow,
+// 					Event:    statusCheck.Event,
+// 					Bucket:   statusCheck.Bucket,
+// 				}
+// 				run.Jobs = []WorkflowJob{statusCheck}
+// 			}
+// 			runsMap[name] = run
+// 		}
+//
+// 		runs := make([]api.WorkflowRun, 0)
+// 		for _, run := range runsMap {
+// 			runs = append(runs, run)
+// 		}
+//
+// 		sort.Slice(runs, func(i, j int) bool {
+// 			nameA := runs[i].Workflow
+// 			if nameA == "" {
+// 				nameA = runs[i].Name
+// 			}
+//
+// 			nameB := runs[j].Workflow
+// 			if nameB == "" {
+// 				nameB = runs[j].Name
+// 			}
+//
+// 			if runs[i].Bucket == runs[j].Bucket {
+// 				return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
+// 			}
+//
+// 			if runs[i].Bucket == "fail" {
+// 				return true
+// 			}
+//
+// 			if runs[j].Bucket == "fail" {
+// 				return false
+// 			}
+//
+// 			return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
+// 		})
+//
+// 		return runsFetchedMsg{
+// 			runs: runs,
+// 		}
+// 	}
+// }
 
 func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
-		log.Debug("fetching check runs", "repo", m.repo, "prNumber", prNumber)
-		checkRunsRes, stderr, err := gh.Exec("pr", "checks", prNumber, "-R", m.repo,
-			"--json", "name,workflow,link,state,event,startedAt,completedAt,bucket")
+		checkRunsRes, err := api.FetchCheckRuns(m.repo, prNumber)
 		if err != nil {
-			log.Error("error fetching pr checks", "err", err, "stderr", stderr.String())
+			log.Error("error fetching pr checks", "err", err)
 			return runsFetchedMsg{err: err}
 		}
 
-		statusChecks := []api.Job{}
-
-		if err := json.Unmarshal(checkRunsRes.Bytes(), &statusChecks); err != nil {
-			log.Error("error parsing checkouts json", "err", err)
-			return runsFetchedMsg{err: err}
+		checkNodes := checkRunsRes.Resource.PullRequest.StatusCheckRollup.Contexts.Nodes
+		checkRuns := make([]api.CheckRun, 0)
+		for _, node := range checkNodes {
+			checkRuns = append(checkRuns, node.CheckRun)
 		}
-		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(statusChecks))
-		runsMap := make(map[string]api.CheckRun)
 
-		for _, statusCheck := range statusChecks {
-			name := statusCheck.Workflow
+		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(checkRuns))
+		runsMap := make(map[string]WorkflowRun)
+
+		for _, statusCheck := range checkRuns {
+			wf := statusCheck.CheckSuite.WorkflowRun.Workflow
+			name := wf.Name
 			if name == "" {
 				name = statusCheck.Name
 			}
-			log.Debug("parsing check", "name", name, "link", statusCheck.Link)
+			log.Debug("parsing check", "name", name, "link", statusCheck.Url)
 
-			matches := jobUrlRegex.FindAllSubmatch([]byte(statusCheck.Link), jobSubexps)
+			matches := jobUrlRegex.FindAllSubmatch([]byte(statusCheck.Url), jobSubexps)
 			runId, jobId := "", ""
-			kind := api.JobKindJob
-			runLink := statusCheck.Link
+			kind := JobKindJob
+			runLink := statusCheck.Url
 
 			// TODO: clean
 			if matches != nil {
@@ -68,36 +170,50 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 				jobId = string(matches[0][4])
 				runLink = fmt.Sprintf("https://github.com/%s/%s/actions/runs/%s",
 					string(matches[0][1]), string(matches[0][2]), runId)
-			} else if matches := checkRunRegex.FindAllSubmatch([]byte(statusCheck.Link), checkRunSubexp); matches != nil {
+			} else if matches := checkRunRegex.FindAllSubmatch([]byte(statusCheck.Url), checkRunSubexp); matches != nil {
 				runId = string(matches[0][3])
 				jobId = runId
 				runLink = fmt.Sprintf("https://github.com/%s/%s/runs/%s",
 					string(matches[0][1]), string(matches[0][2]), runId)
-				kind = api.JobKindCheckRun
+				kind = JobKindCheckRun
 			} else {
-				log.Error("no matches when parsing status check link", "link", statusCheck.Link)
+				kind = JobKindExternal
 			}
-			statusCheck.Id = jobId
-			statusCheck.Kind = kind
+
+			job := WorkflowJob{
+				Id:          jobId,
+				State:       api.StatusCheckConclusion(statusCheck.Status),
+				Name:        name,
+				Workflow:    wf.Name,
+				Event:       "",
+				Logs:        []LogsWithTime{},
+				Loading:     false,
+				Link:        runLink,
+				Steps:       []api.Step{},
+				StartedAt:   statusCheck.StartedAt,
+				CompletedAt: statusCheck.CompletedAt,
+				Bucket:      getConclusionBucket(statusCheck.Conclusion),
+				Kind:        kind,
+			}
 
 			run, ok := runsMap[name]
 			if ok {
-				run.Jobs = append(run.Jobs, statusCheck)
+				run.Jobs = append(run.Jobs, job)
 			} else {
-				run = api.CheckRun{
-					Id:       runId,
+				run = WorkflowRun{
+					Id:       fmt.Sprintf("%d", statusCheck.CheckSuite.WorkflowRun.DatabaseId),
 					Name:     statusCheck.Name,
 					Link:     runLink,
-					Workflow: statusCheck.Workflow,
-					Event:    statusCheck.Event,
-					Bucket:   statusCheck.Bucket,
+					Workflow: wf.Name,
+					Event:    statusCheck.CheckSuite.WorkflowRun.Event,
+					Bucket:   getConclusionBucket(statusCheck.Conclusion),
 				}
-				run.Jobs = []api.Job{statusCheck}
+				run.Jobs = []WorkflowJob{job}
 			}
 			runsMap[name] = run
 		}
 
-		runs := make([]api.CheckRun, 0)
+		runs := make([]WorkflowRun, 0)
 		for _, run := range runsMap {
 			runs = append(runs, run)
 		}
@@ -117,11 +233,11 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 				return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
 			}
 
-			if runs[i].Bucket == "fail" {
+			if runs[i].Bucket == CheckBucketFail {
 				return true
 			}
 
-			if runs[j].Bucket == "fail" {
+			if runs[j].Bucket == CheckBucketFail {
 				return false
 			}
 
@@ -136,7 +252,7 @@ func (m model) makeGetPrChecksCmd(prNumber string) tea.Cmd {
 
 type jobLogsFetchedMsg struct {
 	jobId string
-	logs  []api.StepLogsWithTime
+	logs  []LogsWithTime
 }
 
 type checkRunOutputFetchedMsg struct {
@@ -163,7 +279,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	job.initiatedLogsFetch = true
 	return func() tea.Msg {
 		log.Debug("🚨 fetching job logs", "link", job.job.Link)
-		if job.job.Kind == api.JobKindCheckRun {
+		if job.job.Kind == JobKindCheckRun || job.job.Kind == JobKindExternal {
 			log.Debug("🚨 fetching check run output", "link", job.job.Link)
 			output, err := api.FetchCheckRunOutput(m.repo, job.job.Id)
 			if err != nil {
@@ -217,6 +333,7 @@ func (m *model) makeFetchRunJobsStepsCmd(runId string) tea.Cmd {
 		if err != nil {
 			log.Error("error fetching all jobs steps for run", "repo", m.repo,
 				"prNumber", m.prNumber, "runId", runId, "err", err, "stderr", stderr.String())
+			return nil
 		}
 
 		jobsWithSteps := api.CheckRunJobsSteps{}
@@ -238,6 +355,40 @@ func (m *model) makeFetchRunJobsStepsCmd(runId string) tea.Cmd {
 		return runJobsStepsFetchedMsg{
 			runId:         runId,
 			jobsWithSteps: jobsWithSteps,
+		}
+	}
+}
+
+type runJobsStepsFetchedV2Msg struct {
+	runId string
+	data  api.WorkflowRunStepsQuery
+}
+
+func (m *model) makeFetchRunJobsStepsCmdV2(runId string) tea.Cmd {
+	return func() tea.Msg {
+		log.Debug("fetching all jobs steps for run", "repo", m.repo, "runId", runId)
+		jobsWithStepsRes, err := api.FetchCheckRunSteps(m.repo, runId)
+		if err != nil {
+			log.Error("error fetching all jobs steps for run", "repo", m.repo,
+				"prNumber", m.prNumber, "runId", runId, "err", err)
+			return nil
+		}
+
+		// jobsWithSteps := api.CheckRunJobsSteps{}
+		//
+		// log.Debug("successfully fetched all jobs steps for run", "repo", m.repo, "prNumber", m.prNumber, "runId", runId)
+		//
+		// for jobIdx := range jobsWithSteps.JobsSteps {
+		// 	sort.Slice(jobsWithSteps.JobsSteps[jobIdx].Steps, func(i, j int) bool {
+		// 		return jobsWithSteps.JobsSteps[jobIdx].Steps[i].Number <
+		// 			jobsWithSteps.JobsSteps[jobIdx].Steps[j].Number
+		// 	})
+		// }
+
+		log.Debug("runJobsStepsFetchedV2Msg", "data", jobsWithStepsRes)
+		return runJobsStepsFetchedV2Msg{
+			runId: runId,
+			data:  jobsWithStepsRes,
 		}
 	}
 }

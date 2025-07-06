@@ -16,19 +16,32 @@ query {
               databaseId
               startedAt
               completedAt
-              # summary
-              # text
-              steps(first: 100) {
-                nodes {
+              checkSuite {
+                app {
+                  id
                   name
-                  number
-                  startedAt
-                  completedAt
-                  externalId
-                  secondsToCompletion
-                  status
+                }
+                databaseId
+                workflowRun {
+                  runNumber
+                  workflow {
+                    name
+                  }
                 }
               }
+              # summary
+              # text
+              # steps(first: 100) {
+              #   nodes {
+              #     name
+              #     number
+              #     startedAt
+              #     completedAt
+              #     externalId
+              #     secondsToCompletion
+              #     status
+              #   }
+              # }
             }
           }
         }

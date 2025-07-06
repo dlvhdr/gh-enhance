@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/ui/markdown"
 )
 
@@ -19,9 +18,9 @@ const (
 	completeJobMarker    = "Cleaning up orphan processes"
 )
 
-func parseJobLogs(jobLogs string) []api.StepLogsWithTime {
+func parseJobLogs(jobLogs string) []LogsWithTime {
 	lines := strings.Lines(jobLogs)
-	stepsLogs := make([]api.StepLogsWithTime, 0)
+	stepsLogs := make([]LogsWithTime, 0)
 
 	var lastTime time.Time
 	var err error
@@ -81,7 +80,7 @@ func parseJobLogs(jobLogs string) []api.StepLogsWithTime {
 		}
 
 		log = strings.TrimRight(log, "\n")
-		stepsLogs = append(stepsLogs, api.StepLogsWithTime{Time: lineDate, Log: log})
+		stepsLogs = append(stepsLogs, LogsWithTime{Time: lineDate, Log: log})
 	}
 
 	return stepsLogs

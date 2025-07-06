@@ -7,13 +7,11 @@ import (
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
-
-	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
 type jobItem struct {
-	job                *api.Job
-	logs               []api.StepLogsWithTime
+	job                *WorkflowJob
+	logs               []LogsWithTime
 	renderedLogs       string
 	summary            string
 	title              string
@@ -28,7 +26,7 @@ func (i *jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *jobItem) Description() string {
-	if i.job.State == api.StatusCheckConclusionSkipped {
+	if i.job.Bucket == CheckBucketSkipping {
 		return "Skipped"
 	}
 
@@ -43,19 +41,19 @@ func (i *jobItem) Description() string {
 func (i *jobItem) FilterValue() string { return i.job.Name }
 
 func (i *jobItem) viewStatus() string {
-	if i.job.State == api.StatusCheckConclusionSuccess {
+	if i.job.Bucket == CheckBucketPass {
 		return successGlyph.Render()
 	}
 
-	if i.job.State == api.StatusCheckConclusionSkipped {
+	if i.job.Bucket == CheckBucketSkipping {
 		return skippedGlyph.Render()
 	}
 
-	if i.job.State == api.StatusCheckConclusionCancelled {
+	if i.job.Bucket == CheckBucketCancel {
 		return canceledGlyph.Render()
 	}
 
-	if api.IsFailureStatusCheckState(i.job.State) {
+	if i.job.Bucket == CheckBucketFail {
 		return failureGlyph.Render()
 	}
 
@@ -97,10 +95,10 @@ func newCheckItemDelegate() list.DefaultDelegate {
 	return d
 }
 
-func NewJobItem(job api.Job) jobItem {
+func NewJobItem(job WorkflowJob) jobItem {
 	return jobItem{
 		job:          &job,
-		logs:         make([]api.StepLogsWithTime, 0),
+		logs:         make([]LogsWithTime, 0),
 		loadingLogs:  true,
 		loadingSteps: true,
 		steps:        make([]*stepItem, 0),

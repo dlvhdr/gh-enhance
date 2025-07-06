@@ -115,7 +115,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if len(runItems) > 0 {
 			ri := runItems[0].(*runItem)
-			cmds = append(cmds, m.makeFetchRunJobsStepsCmd(ri.run.Id))
+			cmds = append(cmds, m.makeFetchRunJobsStepsCmdV2(ri.run.Id))
 			if len(ri.run.Jobs) > 0 {
 				m.jobsList.Select(0)
 				cmds = append(cmds, m.onJobChanged()...)
@@ -124,6 +124,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case runJobsStepsFetchedMsg:
 		m.enrichRunWithJobsSteps(msg)
+		cmds = append(cmds, m.updateLists()...)
+
+	case runJobsStepsFetchedV2Msg:
+		m.enrichRunWithJobsStepsV2(msg)
 		cmds = append(cmds, m.updateLists()...)
 
 	case jobLogsFetchedMsg:
@@ -477,6 +481,46 @@ func (m *model) enrichRunWithJobsSteps(msg runJobsStepsFetchedMsg) {
 	}
 }
 
+func (m *model) enrichRunWithJobsStepsV2(msg runJobsStepsFetchedV2Msg) {
+	jobsMap := make(map[string]api.CheckRunSteps)
+	checks := msg.data.Resource.WorkflowRun.CheckSuite.CheckRuns.Nodes
+	for _, check := range checks {
+		log.Debug("enrichRunWithJobsStepsV2", "checkId", check.DatabaseId)
+		jobsMap[fmt.Sprintf("%d", check.DatabaseId)] = check
+	}
+
+	runs := m.runsList.Items()
+
+	// find runItem
+	var ri *runItem
+	for _, run := range runs {
+		run := run.(*runItem)
+		if run.run.Id == msg.runId {
+			ri = run
+			break
+		}
+	}
+
+	if ri == nil {
+		return
+	}
+
+	ri.loading = false
+	for jobIdx, job := range ri.jobsItems {
+		ri.jobsItems[jobIdx].loadingSteps = false
+		jobWithSteps, ok := jobsMap[job.job.Id]
+		if !ok {
+			continue
+		}
+
+		for _, step := range jobWithSteps.Steps.Nodes {
+			si := NewStepItem(step, jobWithSteps.Url)
+			ri.jobsItems[jobIdx].steps = append(ri.jobsItems[jobIdx].steps, &si)
+		}
+
+	}
+}
+
 func (m *model) onRunChanged() []tea.Cmd {
 	runIdx := m.runsList.Cursor()
 	cmds := make([]tea.Cmd, 0)
@@ -484,7 +528,7 @@ func (m *model) onRunChanged() []tea.Cmd {
 	cmds = append(cmds, m.onJobChanged()...)
 	newRun := m.runsList.Items()[runIdx].(*runItem)
 	if newRun.loading {
-		cmds = append(cmds, m.makeFetchRunJobsStepsCmd(
+		cmds = append(cmds, m.makeFetchRunJobsStepsCmdV2(
 			m.runsList.Items()[runIdx].(*runItem).run.Id))
 	}
 	cmds = append(cmds, m.updateLists()...)
@@ -537,7 +581,7 @@ func (m *model) renderJobLogs() {
 		return
 	}
 
-	if ji.job.Kind == api.JobKindCheckRun {
+	if ji.job.Kind == JobKindCheckRun || ji.job.Kind == JobKindExternal {
 		ji.renderedLogs = currJob.(*jobItem).summary
 		m.logsViewport.SetContent(ji.renderedLogs)
 		return

@@ -7,12 +7,10 @@ import (
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
-
-	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
 type runItem struct {
-	run       *api.CheckRun
+	run       *WorkflowRun
 	jobsItems []*jobItem
 	loading   bool
 }
@@ -32,7 +30,7 @@ func (i *runItem) Title() string {
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *runItem) Description() string {
 	if i.run.Event == "" {
-		return i.run.Link
+		return i.run.Id
 	}
 
 	return fmt.Sprintf("on: %s", i.run.Event)
@@ -43,13 +41,13 @@ func (i *runItem) FilterValue() string { return i.run.Name }
 
 func (i *runItem) viewWarnings() string {
 	switch i.run.Bucket {
-	case "pass":
+	case CheckBucketPass:
 		return successGlyph.Render()
-	case "fail":
+	case CheckBucketFail:
 		return failureGlyph.Render()
-	case "skipping":
+	case CheckBucketSkipping:
 		return skippedGlyph.Render()
-	case "cancel":
+	case CheckBucketCancel:
 		return canceledGlyph.Render()
 	default:
 		return pendingGlyph.Render()
@@ -91,7 +89,7 @@ func newRunItemDelegate() list.DefaultDelegate {
 	return d
 }
 
-func NewRunItem(run api.CheckRun) runItem {
+func NewRunItem(run WorkflowRun) runItem {
 	jobs := make([]*jobItem, 0)
 	for _, job := range run.Jobs {
 		ji := NewJobItem(job)
