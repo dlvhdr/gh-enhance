@@ -40,8 +40,8 @@ type LogsWithTime struct {
 type JobKind int
 
 const (
-	JobKindJob JobKind = iota
-	JobKindCheckRun
+	JobKindCheckRun JobKind = iota
+	JobKindGithubActions
 	JobKindExternal
 )
 

@@ -496,15 +496,12 @@ func (m *model) onRunChanged() []tea.Cmd {
 }
 
 func (m *model) onJobChanged() []tea.Cmd {
-	log.Debug("🚨 jobChanged")
 	cmds := make([]tea.Cmd, 0)
 	m.stepsList.Select(0)
 
 	currJob := m.jobsList.SelectedItem()
 	if currJob != nil && !currJob.(*jobItem).initiatedLogsFetch {
 		cmds = append(cmds, m.makeFetchJobLogsCmd())
-	} else {
-		log.Debug("🚨 wat", "currJob", currJob)
 	}
 
 	m.renderJobLogs()
@@ -551,7 +548,7 @@ func (m *model) renderJobLogs() {
 	for i, log := range ji.logs {
 		if strings.Contains(log.Log, errorMarker) {
 			log.Log = strings.Replace(log.Log, errorMarker, "", 1)
-			log.Log = errorBgStyle.Width(m.logsViewport.Width()).Render(
+			log.Log = errorBgStyle.Width(m.logsViewport.Width() - scrollbarStyle.GetWidth()).Render(
 				lipgloss.JoinHorizontal(lipgloss.Top,
 					errorTitleStyle.Render("Error: "), errorStyle.Render(log.Log)))
 		}
@@ -562,7 +559,6 @@ func (m *model) renderJobLogs() {
 		logs.WriteString("\n")
 	}
 	ji.renderedLogs = logs.String()
-	log.Debug("🔴 setting rendered logs")
 	m.logsViewport.SetContent(ji.renderedLogs)
 }
 

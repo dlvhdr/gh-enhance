@@ -54,6 +54,7 @@ type CheckSuite struct {
 
 	// A WorkflowRun has one CheckSuite and is defined by a GitHub Actions file
 	WorkflowRun struct {
+		Url        string
 		DatabaseId int
 		Event      string
 		RunNumber  int

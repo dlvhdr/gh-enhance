@@ -53,31 +53,16 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 			if name == "" {
 				name = statusCheck.Name
 			}
-			log.Debug("parsing check", "name", name, "link", statusCheck.Url)
 
-			matches := jobUrlRegex.FindAllSubmatch([]byte(statusCheck.Url), jobSubexps)
-			runId, jobId := "", ""
-			kind := JobKindJob
-			runLink := statusCheck.Url
-
-			// TODO: clean
-			if matches != nil {
-				runId = string(matches[0][3])
-				jobId = string(matches[0][4])
-				runLink = fmt.Sprintf("https://github.com/%s/%s/actions/runs/%s",
-					string(matches[0][1]), string(matches[0][2]), runId)
-			} else if matches := checkRunRegex.FindAllSubmatch([]byte(statusCheck.Url), checkRunSubexp); matches != nil {
-				runId = string(matches[0][3])
-				jobId = runId
-				runLink = fmt.Sprintf("https://github.com/%s/%s/runs/%s",
-					string(matches[0][1]), string(matches[0][2]), runId)
-				kind = JobKindCheckRun
-			} else {
-				kind = JobKindExternal
+			kind := JobKindGithubActions
+			if statusCheck.CheckSuite.WorkflowRun.Workflow.Name == "GitHub Actions" {
+				kind = JobKindGithubActions
 			}
+			runLink := statusCheck.CheckSuite.WorkflowRun.Url
+			jobId := statusCheck.DatabaseId
 
 			job := WorkflowJob{
-				Id:          jobId,
+				Id:          fmt.Sprintf("%d", jobId),
 				State:       api.Conclusion(statusCheck.Status),
 				Name:        name,
 				Workflow:    wf.Name,
@@ -197,6 +182,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 			}
 		}
 
+		// Kind is JobKindGithubActions
 		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.job.Id)
 		if err != nil {
 			log.Error("error fetching job logs", "link", job.job.Link, "err", err, "stderr", stderr.String())
