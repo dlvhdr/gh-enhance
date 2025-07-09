@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -13,16 +12,6 @@ import (
 	"github.com/cli/go-gh/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
-)
-
-var (
-	// e.g. https://github.com/neovim/neovim/actions/runs/15852696561/job/44690047836
-	jobUrlRegex = regexp.MustCompile(`^https:\/\/github\.com\/(.*)\/(.*)\/actions\/runs\/(\d+)\/job\/(\d+)$`)
-	jobSubexps  = jobUrlRegex.NumSubexp()
-
-	// e.g. https://github.com/neovim/neovim/runs/15852696561
-	checkRunRegex  = regexp.MustCompile(`^https:\/\/github\.com\/(.*)\/(.*)\/runs\/(\d+)$`)
-	checkRunSubexp = checkRunRegex.NumSubexp()
 )
 
 type workflowRunsFetchedMsg struct {
