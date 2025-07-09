@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
@@ -12,6 +13,7 @@ import (
 	"github.com/cli/go-gh/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
+	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
 type workflowRunsFetchedMsg struct {
@@ -78,10 +80,14 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 			if ok {
 				run.Jobs = append(run.Jobs, job)
 			} else {
+				link := statusCheck.CheckSuite.WorkflowRun.Url
+				if link == "" {
+					link = statusCheck.Url
+				}
 				run = WorkflowRun{
 					Id:       fmt.Sprintf("%d", statusCheck.CheckSuite.WorkflowRun.DatabaseId),
 					Name:     wfName,
-					Link:     statusCheck.CheckSuite.WorkflowRun.Url,
+					Link:     link,
 					Workflow: wfr.Workflow.Name,
 					Event:    statusCheck.CheckSuite.WorkflowRun.Event,
 					Bucket:   getConclusionBucket(statusCheck.Conclusion),
@@ -154,6 +160,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	job := ri.jobsItems[m.jobsList.Cursor()]
 	job.initiatedLogsFetch = true
 	return func() tea.Msg {
+		defer utils.TimeTrack(time.Now(), "fetching job logs")
 		if job.job.Kind == JobKindCheckRun || job.job.Kind == JobKindExternal {
 			output, err := api.FetchCheckRunOutput(m.repo, job.job.Id)
 			if err != nil {

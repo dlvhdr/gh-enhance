@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
@@ -14,6 +15,7 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/ui/art"
 	"github.com/dlvhdr/gh-enhance/internal/ui/scrollbar"
+	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
 type errMsg error
@@ -536,6 +538,7 @@ func (m *model) renderJobLogs() {
 	}
 
 	// TODO: clean, move to a function, pull logic from parser? Because I go over the lines twice
+	defer utils.TimeTrack(time.Now(), "rendering logs")
 	logs := strings.Builder{}
 	totalLines := fmt.Sprintf("%d", len(ji.logs))
 	for i, log := range ji.logs {
