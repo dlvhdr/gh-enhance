@@ -148,8 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		run := m.runsList.SelectedItem().(*runItem)
 		for i := range run.jobsItems {
 			if run.jobsItems[i].job.Id == msg.jobId {
-				run.jobsItems[i].summary = msg.summary
-				run.jobsItems[i].title = msg.summary
+				run.jobsItems[i].renderedText = msg.renderedText
 				run.jobsItems[i].loadingLogs = false
 				currJob := m.jobsList.SelectedItem()
 				if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
@@ -443,7 +442,6 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) {
 	jobsMap := make(map[string]api.CheckRunWithSteps)
 	checks := msg.data.Resource.WorkflowRun.CheckSuite.CheckRuns.Nodes
 	for _, check := range checks {
-		log.Debug("enrichRunWithJobsStepsV2", "checkId", check.DatabaseId)
 		jobsMap[fmt.Sprintf("%d", check.DatabaseId)] = check
 	}
 
@@ -537,8 +535,7 @@ func (m *model) renderJobLogs() {
 	}
 
 	if ji.job.Kind == JobKindCheckRun || ji.job.Kind == JobKindExternal {
-		ji.renderedLogs = currJob.(*jobItem).summary
-		m.logsViewport.SetContent(ji.renderedLogs)
+		m.logsViewport.SetContent(ji.renderedText)
 		return
 	}
 

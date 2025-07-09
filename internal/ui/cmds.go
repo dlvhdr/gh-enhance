@@ -37,25 +37,34 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 		runsMap := make(map[string]WorkflowRun)
 
 		for _, statusCheck := range checkRuns {
-			wf := statusCheck.CheckSuite.WorkflowRun.Workflow
-			wfName := wf.Name
+			wfr := statusCheck.CheckSuite.WorkflowRun
+			wfName := ""
+			isGHA := statusCheck.CheckSuite.App.Name == api.GithubActionsAppName
+			if !isGHA {
+				wfName = statusCheck.CheckSuite.App.Name
+			} else {
+				wfName = wfr.Workflow.Name
+			}
 			if wfName == "" {
 				wfName = statusCheck.Name
 			}
 
-			kind := JobKindGithubActions
-			if statusCheck.CheckSuite.WorkflowRun.Workflow.Name == "GitHub Actions" {
+			var kind JobKind
+			if isGHA {
 				kind = JobKindGithubActions
+			} else if !strings.HasPrefix(statusCheck.DetailsUrl, "https://github.com/") {
+				kind = JobKindExternal
+			} else {
+				kind = JobKindCheckRun
 			}
 
 			job := WorkflowJob{
 				Id:          fmt.Sprintf("%d", statusCheck.DatabaseId),
 				State:       api.Conclusion(statusCheck.Status),
 				Name:        statusCheck.Name,
-				Workflow:    wf.Name,
+				Workflow:    wfr.Workflow.Name,
 				Event:       "",
 				Logs:        []LogsWithTime{},
-				Loading:     false,
 				Link:        statusCheck.Url,
 				Steps:       []api.Step{},
 				StartedAt:   statusCheck.StartedAt,
@@ -70,9 +79,9 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 			} else {
 				run = WorkflowRun{
 					Id:       fmt.Sprintf("%d", statusCheck.CheckSuite.WorkflowRun.DatabaseId),
-					Name:     statusCheck.Name,
+					Name:     wfName,
 					Link:     statusCheck.CheckSuite.WorkflowRun.Url,
-					Workflow: wf.Name,
+					Workflow: wfr.Workflow.Name,
 					Event:    statusCheck.CheckSuite.WorkflowRun.Event,
 					Bucket:   getConclusionBucket(statusCheck.Conclusion),
 				}
@@ -124,11 +133,11 @@ type jobLogsFetchedMsg struct {
 }
 
 type checkRunOutputFetchedMsg struct {
-	jobId       string
-	summary     string
-	text        string
-	description string
-	title       string
+	jobId        string
+	renderedText string
+	text         string
+	description  string
+	title        string
 }
 
 func (m *model) makeFetchJobLogsCmd() tea.Cmd {
@@ -150,22 +159,24 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 				log.Error("error fetching check run output", "link", job.job.Link, "err", err)
 				return nil
 			}
-			text := output.Output.Summary
+			text := "# " + output.Output.Title
+			text += "\n\n"
+			text += output.Output.Summary
 			text += "\n\n"
 			text += output.Output.Text
-			summary, err := parseRunOutputMarkdown(
+			renderedText, err := parseRunOutputMarkdown(
 				text,
 				m.logsWidth(),
 			)
 			if err != nil {
 				log.Error("failed rendering as markdown", "link", job.job.Link, "err", err)
-				summary = output.Output.Summary
+				renderedText = text
 			}
 			return checkRunOutputFetchedMsg{
-				jobId:       job.job.Id,
-				title:       output.Output.Title,
-				description: output.Output.Description,
-				summary:     summary,
+				jobId:        job.job.Id,
+				title:        output.Output.Title,
+				description:  output.Output.Description,
+				renderedText: renderedText,
 			}
 		}
 

@@ -29,6 +29,8 @@ const (
 	ConclusionStartupFailure Conclusion = "STARTUP_FAILURE"
 	ConclusionSuccess        Conclusion = "SUCCESS"
 	ConclusionTimedOut       Conclusion = "TIMED_OUT"
+
+	GithubActionsAppName = "GitHub Actions"
 )
 
 type Status string
@@ -71,6 +73,7 @@ type CheckRun struct {
 	Status      Status
 	Title       string
 	Url         string
+	DetailsUrl  string
 	Conclusion  Conclusion
 	DatabaseId  int
 	StartedAt   time.Time

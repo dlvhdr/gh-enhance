@@ -13,7 +13,7 @@ type jobItem struct {
 	job                *WorkflowJob
 	logs               []LogsWithTime
 	renderedLogs       string
-	summary            string
+	renderedText       string
 	title              string
 	initiatedLogsFetch bool
 	loadingLogs        bool
@@ -96,11 +96,15 @@ func newCheckItemDelegate() list.DefaultDelegate {
 }
 
 func NewJobItem(job WorkflowJob) jobItem {
+	loadingSteps := true
+	if job.Kind != JobKindGithubActions {
+		loadingSteps = false
+	}
 	return jobItem{
 		job:          &job,
 		logs:         make([]LogsWithTime, 0),
 		loadingLogs:  true,
-		loadingSteps: true,
+		loadingSteps: loadingSteps,
 		steps:        make([]*stepItem, 0),
 	}
 }

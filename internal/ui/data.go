@@ -23,7 +23,6 @@ type WorkflowJob struct {
 	Workflow    string
 	Event       string
 	Logs        []LogsWithTime
-	Loading     bool
 	Link        string
 	Steps       []api.Step
 	StartedAt   time.Time

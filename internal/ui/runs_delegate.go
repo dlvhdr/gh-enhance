@@ -18,13 +18,7 @@ type runItem struct {
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
 func (i *runItem) Title() string {
 	status := i.viewWarnings()
-
-	name := i.run.Workflow
-	if name == "" && len(i.jobsItems) > 0 {
-		name = i.jobsItems[0].job.Name
-	}
-
-	return fmt.Sprintf("%s %s", status, name)
+	return fmt.Sprintf("%s %s", status, i.run.Name)
 }
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
