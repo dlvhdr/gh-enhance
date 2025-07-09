@@ -12,153 +12,47 @@ import (
 
 const (
 	// Run statuses
-	StatusQueued     Status = "queued"
-	StatusCompleted  Status = "completed"
-	StatusInProgress Status = "in_progress"
-	StatusRequested  Status = "requested"
-	StatusWaiting    Status = "waiting"
-	StatusPending    Status = "pending"
-
-	// Check run statuses
-	CheckRunStatusQueued     CheckRunStatus = "QUEUED"
-	CheckRunStatusCompleted  CheckRunStatus = "COMPLETED"
-	CheckRunStatusInProgress CheckRunStatus = "IN_PROGRESS"
-	CheckRunStatusRequested  CheckRunStatus = "REQUESTED"
-	CheckRunStatusWaiting    CheckRunStatus = "WAITING"
-	CheckRunStatusPending    CheckRunStatus = "PENDING"
+	StatusQueued     Status = "QUEUED"
+	StatusCompleted  Status = "COMPLETED"
+	StatusInProgress Status = "IN_PROGRESS"
+	StatusRequested  Status = "REQUESTED"
+	StatusWaiting    Status = "WAITING"
+	StatusPending    Status = "PENDING"
 
 	// Run conclusions
-	StatusCheckConclusionActionRequired StatusCheckConclusion = "ACTION_REQUIRED"
-	StatusCheckConclusionCancelled      StatusCheckConclusion = "CANCELLED"
-	StatusCheckConclusionFailure        StatusCheckConclusion = "FAILURE"
-	StatusCheckConclusionNeutral        StatusCheckConclusion = "NEUTRAL"
-	StatusCheckConclusionSkipped        StatusCheckConclusion = "SKIPPED"
-	StatusCheckConclusionStale          StatusCheckConclusion = "STALE"
-	StatusCheckConclusionStartupFailure StatusCheckConclusion = "STARTUP_FAILURE"
-	StatusCheckConclusionSuccess        StatusCheckConclusion = "SUCCESS"
-	StatusCheckConclusionTimedOut       StatusCheckConclusion = "TIMED_OUT"
-
-	ConclusionActionRequired Conclusion = "action_required"
-	ConclusionCancelled      Conclusion = "cancelled"
-	ConclusionFailure        Conclusion = "failure"
-	ConclusionNeutral        Conclusion = "neutral"
-	ConclusionSkipped        Conclusion = "skipped"
-	ConclusionStale          Conclusion = "stale"
-	ConclusionStartupFailure Conclusion = "startup_failure"
-	ConclusionSuccess        Conclusion = "success"
-	ConclusionTimedOut       Conclusion = "timed_out"
-
-	AnnotationFailure Level = "failure"
-	AnnotationWarning Level = "warning"
+	ConclusionActionRequired Conclusion = "ACTION_REQUIRED"
+	ConclusionCancelled      Conclusion = "CANCELLED"
+	ConclusionFailure        Conclusion = "FAILURE"
+	ConclusionNeutral        Conclusion = "NEUTRAL"
+	ConclusionSkipped        Conclusion = "SKIPPED"
+	ConclusionStale          Conclusion = "STALE"
+	ConclusionStartupFailure Conclusion = "STARTUP_FAILURE"
+	ConclusionSuccess        Conclusion = "SUCCESS"
+	ConclusionTimedOut       Conclusion = "TIMED_OUT"
 )
-
-var AllStatuses = []string{
-	"queued",
-	"completed",
-	"in_progress",
-	"requested",
-	"waiting",
-	"pending",
-	"action_required",
-	"cancelled",
-	"failure",
-	"neutral",
-	"skipped",
-	"stale",
-	"startup_failure",
-	"success",
-	"timed_out",
-}
-
-func IsFailureStatusCheckState(c StatusCheckConclusion) bool {
-	switch c {
-	case StatusCheckConclusionActionRequired, StatusCheckConclusionFailure,
-		StatusCheckConclusionStartupFailure, StatusCheckConclusionTimedOut:
-		return true
-	default:
-		return false
-	}
-}
-
-func IsFailureConclusion(c Conclusion) bool {
-	switch c {
-	case ConclusionActionRequired, ConclusionFailure, ConclusionStartupFailure, ConclusionTimedOut:
-		return true
-	default:
-		return false
-	}
-}
-
-type CheckRunStatus string
 
 type Status string
 
-type StatusCheckConclusion string
-
 type Conclusion string
 
-type Level string
-
-type Step struct {
-	Conclusion  Conclusion
-	Name        string
-	Number      int
-	StartedAt   time.Time
-	CompletedAt time.Time
-	Status      Status
+func IsFailureConclusion(c Conclusion) bool {
+	switch c {
+	case ConclusionActionRequired, ConclusionFailure,
+		ConclusionStartupFailure, ConclusionTimedOut:
+		return true
+	default:
+		return false
+	}
 }
 
-type JobSteps struct {
-	DatabaseId int
-	Url        string
-	Steps      []Step
-}
-
-type CheckRunJobsSteps struct {
-	JobsSteps []JobSteps
-}
-
-type CheckRunOutput struct {
-	Title       string
-	Summary     string
-	Text        string
-	Description string
-}
-
-type CheckRun struct {
-	Id          string
-	Name        string
-	Status      CheckRunStatus
-	Title       string
-	Url         string
-	Conclusion  StatusCheckConclusion
-	DatabaseId  int
-	StartedAt   time.Time
-	CompletedAt time.Time
-	CheckSuite  CheckSuite
-}
-
-type CheckRunSteps struct {
-	Id         string
-	DatabaseId int
-	Url        string
-	Steps      struct {
-		Nodes []struct {
-			Conclusion  Conclusion
-			Name        string
-			Number      int
-			StartedAt   time.Time
-			CompletedAt time.Time
-			Status      Status
-		}
-	} `graphql:"steps(first: 100)"`
-}
-
+// CheckSuite is a grouping of CheckRuns
 type CheckSuite struct {
 	App struct {
 		Id   string
 		Name string
 	}
+
+	// A WorkflowRun has one CheckSuite and is defined by a GitHub Actions file
 	WorkflowRun struct {
 		DatabaseId int
 		Event      string
@@ -169,7 +63,40 @@ type CheckSuite struct {
 	}
 }
 
-type CheckRunsQuery struct {
+// CheckRun is a job running in CI on a specific commit. It is part of a CheckSuite.
+type CheckRun struct {
+	Id          string
+	Name        string
+	Status      Status
+	Title       string
+	Url         string
+	Conclusion  Conclusion
+	DatabaseId  int
+	StartedAt   time.Time
+	CompletedAt time.Time
+	CheckSuite  CheckSuite
+}
+
+// CheckRunWithSteps includes some basic identifying data for the check run as well as its steps
+type CheckRunWithSteps struct {
+	Id         string
+	DatabaseId int
+	Url        string
+	Steps      struct {
+		Nodes []Step
+	} `graphql:"steps(first: 100)"`
+}
+
+type Step struct {
+	Conclusion  Conclusion
+	Name        string
+	Number      int
+	StartedAt   time.Time
+	CompletedAt time.Time
+	Status      Status
+}
+
+type PRCheckRunsQuery struct {
 	Resource struct {
 		PullRequest struct {
 			Title             string
@@ -184,9 +111,9 @@ type CheckRunsQuery struct {
 	} `graphql:"resource(url: $url)"`
 }
 
-func FetchCheckRuns(repo string, prNumber string) (CheckRunsQuery, error) {
+func FetchPRCheckRuns(repo string, prNumber string) (PRCheckRunsQuery, error) {
 	client, err := gh.DefaultGraphQLClient()
-	res := CheckRunsQuery{}
+	res := PRCheckRunsQuery{}
 	if err != nil {
 		return res, err
 	}
@@ -216,21 +143,21 @@ type WorkflowRunStepsQuery struct {
 			}
 			CheckSuite struct {
 				CheckRuns struct {
-					Nodes []CheckRunSteps
+					Nodes []CheckRunWithSteps
 				} `graphql:"checkRuns(first: 100)"`
 			}
 		} `graphql:"... on WorkflowRun"`
 	} `graphql:"resource(url: $url)"`
 }
 
-func FetchCheckRunSteps(repo string, prNumber string) (WorkflowRunStepsQuery, error) {
+func FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunStepsQuery, error) {
 	client, err := gh.DefaultGraphQLClient()
 	res := WorkflowRunStepsQuery{}
 	if err != nil {
 		return res, err
 	}
 
-	runUrl, err := url.Parse(fmt.Sprintf("https://github.com/%s/actions/runs/%s", repo, prNumber))
+	runUrl, err := url.Parse(fmt.Sprintf("https://github.com/%s/actions/runs/%s", repo, runID))
 	if err != nil {
 		return res, err
 	}
@@ -254,14 +181,21 @@ type CheckRunOutputResponse struct {
 	Output CheckRunOutput
 }
 
-func FetchCheckRunOutput(repo string, runId string) (CheckRunOutputResponse, error) {
+type CheckRunOutput struct {
+	Title       string
+	Summary     string
+	Text        string
+	Description string
+}
+
+func FetchCheckRunOutput(repo string, runID string) (CheckRunOutputResponse, error) {
 	client, err := gh.DefaultRESTClient()
 	res := CheckRunOutputResponse{}
 	if err != nil {
 		return res, err
 	}
 
-	err = client.Get(fmt.Sprintf("repos/%s/check-runs/%s", repo, runId), &res)
+	err = client.Get(fmt.Sprintf("repos/%s/check-runs/%s", repo, runID), &res)
 	if err != nil {
 		return res, err
 	}

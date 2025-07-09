@@ -93,7 +93,7 @@ func NewModel(repo string, number string) model {
 }
 
 func (m model) Init() tea.Cmd {
-	return m.makeGetPrChecksCmd(m.prNumber)
+	return m.makeGetPRChecksCmd(m.prNumber)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -103,7 +103,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	log.Debug("got msg", "type", fmt.Sprintf("%T", msg))
 	switch msg := msg.(type) {
 
-	case runsFetchedMsg:
+	case workflowRunsFetchedMsg:
 		runItems := make([]list.Item, 0)
 		for _, run := range msg.runs {
 			ri := NewRunItem(run)
@@ -115,18 +115,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if len(runItems) > 0 {
 			ri := runItems[0].(*runItem)
-			cmds = append(cmds, m.makeFetchRunJobsStepsCmdV2(ri.run.Id))
+			cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(ri.run.Id))
 			if len(ri.run.Jobs) > 0 {
 				m.jobsList.Select(0)
 				cmds = append(cmds, m.onJobChanged()...)
 			}
 		}
 
-	case runJobsStepsFetchedMsg:
-		m.enrichRunWithJobsSteps(msg)
-		cmds = append(cmds, m.updateLists()...)
-
-	case runJobsStepsFetchedV2Msg:
+	case workflowRunStepsFetchedMsg:
 		m.enrichRunWithJobsStepsV2(msg)
 		cmds = append(cmds, m.updateLists()...)
 
@@ -443,46 +439,8 @@ func (m *model) isScrollbarVisible() bool {
 	return m.logsViewport.TotalLineCount() > m.logsViewport.VisibleLineCount()
 }
 
-func (m *model) enrichRunWithJobsSteps(msg runJobsStepsFetchedMsg) {
-	jobsMap := make(map[string]api.JobSteps)
-	for _, job := range msg.jobsWithSteps.JobsSteps {
-		jobsMap[fmt.Sprintf("%d", job.DatabaseId)] = job
-	}
-
-	runs := m.runsList.Items()
-
-	// find runItem
-	var ri *runItem
-	for _, run := range runs {
-		run := run.(*runItem)
-		if run.run.Id == msg.runId {
-			ri = run
-			break
-		}
-	}
-
-	if ri == nil {
-		return
-	}
-
-	ri.loading = false
-	for jobIdx, job := range ri.jobsItems {
-		ri.jobsItems[jobIdx].loadingSteps = false
-		jobWithSteps, ok := jobsMap[job.job.Id]
-		if !ok {
-			continue
-		}
-
-		for _, step := range jobWithSteps.Steps {
-			si := NewStepItem(step, jobWithSteps.Url)
-			ri.jobsItems[jobIdx].steps = append(ri.jobsItems[jobIdx].steps, &si)
-		}
-
-	}
-}
-
-func (m *model) enrichRunWithJobsStepsV2(msg runJobsStepsFetchedV2Msg) {
-	jobsMap := make(map[string]api.CheckRunSteps)
+func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) {
+	jobsMap := make(map[string]api.CheckRunWithSteps)
 	checks := msg.data.Resource.WorkflowRun.CheckSuite.CheckRuns.Nodes
 	for _, check := range checks {
 		log.Debug("enrichRunWithJobsStepsV2", "checkId", check.DatabaseId)
@@ -528,7 +486,7 @@ func (m *model) onRunChanged() []tea.Cmd {
 	cmds = append(cmds, m.onJobChanged()...)
 	newRun := m.runsList.Items()[runIdx].(*runItem)
 	if newRun.loading {
-		cmds = append(cmds, m.makeFetchRunJobsStepsCmdV2(
+		cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(
 			m.runsList.Items()[runIdx].(*runItem).run.Id))
 	}
 	cmds = append(cmds, m.updateLists()...)
@@ -615,7 +573,7 @@ func (m *model) logsContentView() string {
 	}
 
 	ji := job.(*jobItem)
-	if ji.job.State == api.StatusCheckConclusionSkipped {
+	if ji.job.State == api.ConclusionSkipped {
 		return m.noLogsView("This job was skipped")
 	}
 

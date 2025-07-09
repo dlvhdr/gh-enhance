@@ -18,7 +18,7 @@ type WorkflowRun struct {
 
 type WorkflowJob struct {
 	Id          string
-	State       api.StatusCheckConclusion
+	State       api.Conclusion
 	Name        string
 	Workflow    string
 	Event       string
@@ -55,7 +55,7 @@ const (
 	CheckBucketPending
 )
 
-func getConclusionBucket(conclusion api.StatusCheckConclusion) CheckBucket {
+func getConclusionBucket(conclusion api.Conclusion) CheckBucket {
 	switch conclusion {
 	case "SUCCESS":
 		return CheckBucketPass
