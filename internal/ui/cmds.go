@@ -49,27 +49,25 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 
 		for _, statusCheck := range checkRuns {
 			wf := statusCheck.CheckSuite.WorkflowRun.Workflow
-			name := wf.Name
-			if name == "" {
-				name = statusCheck.Name
+			wfName := wf.Name
+			if wfName == "" {
+				wfName = statusCheck.Name
 			}
 
 			kind := JobKindGithubActions
 			if statusCheck.CheckSuite.WorkflowRun.Workflow.Name == "GitHub Actions" {
 				kind = JobKindGithubActions
 			}
-			runLink := statusCheck.CheckSuite.WorkflowRun.Url
-			jobId := statusCheck.DatabaseId
 
 			job := WorkflowJob{
-				Id:          fmt.Sprintf("%d", jobId),
+				Id:          fmt.Sprintf("%d", statusCheck.DatabaseId),
 				State:       api.Conclusion(statusCheck.Status),
-				Name:        name,
+				Name:        statusCheck.Name,
 				Workflow:    wf.Name,
 				Event:       "",
 				Logs:        []LogsWithTime{},
 				Loading:     false,
-				Link:        runLink,
+				Link:        statusCheck.Url,
 				Steps:       []api.Step{},
 				StartedAt:   statusCheck.StartedAt,
 				CompletedAt: statusCheck.CompletedAt,
@@ -77,21 +75,21 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				Kind:        kind,
 			}
 
-			run, ok := runsMap[name]
+			run, ok := runsMap[wfName]
 			if ok {
 				run.Jobs = append(run.Jobs, job)
 			} else {
 				run = WorkflowRun{
 					Id:       fmt.Sprintf("%d", statusCheck.CheckSuite.WorkflowRun.DatabaseId),
 					Name:     statusCheck.Name,
-					Link:     runLink,
+					Link:     statusCheck.CheckSuite.WorkflowRun.Url,
 					Workflow: wf.Name,
 					Event:    statusCheck.CheckSuite.WorkflowRun.Event,
 					Bucket:   getConclusionBucket(statusCheck.Conclusion),
 				}
 				run.Jobs = []WorkflowJob{job}
 			}
-			runsMap[name] = run
+			runsMap[wfName] = run
 		}
 
 		runs := make([]WorkflowRun, 0)
