@@ -13,6 +13,7 @@ func GetMarkdownRenderer(width int) glamour.TermRenderer {
 		glamour.WithStyles(styles.DarkStyleConfig),
 		glamour.WithWordWrap(width),
 		glamour.WithEmoji(),
+		glamour.WithPreservedNewLines(),
 	)
 
 	return *markdownRenderer

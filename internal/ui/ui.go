@@ -127,31 +127,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.updateLists()...)
 
 	case jobLogsFetchedMsg:
-		for _, run := range m.runsList.Items() {
-			ri := run.(*runItem)
-			for i := range ri.jobsItems {
-				if ri.jobsItems[i].job.Id != msg.jobId {
-					continue
-				}
-
-				ri.jobsItems[i].logs = msg.logs
-				ri.jobsItems[i].loadingLogs = false
-				currJob := m.jobsList.SelectedItem()
-				if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
-					m.renderJobLogs()
-				}
-
-				cmds = append(cmds, m.updateLists()...)
-				break
+		ji := m.getJobItemById(msg.jobId)
+		if ji != nil {
+			ji.logs = msg.logs
+			ji.loadingLogs = false
+			currJob := m.jobsList.SelectedItem()
+			if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
+				m.renderJobLogs()
 			}
+
+			cmds = append(cmds, m.updateLists()...)
+			break
 		}
 
 	case checkRunOutputFetchedMsg:
-		run := m.runsList.SelectedItem().(*runItem)
-		for i := range run.jobsItems {
-			if run.jobsItems[i].job.Id == msg.jobId {
-				run.jobsItems[i].renderedText = msg.renderedText
-				run.jobsItems[i].loadingLogs = false
+		ji := m.getJobItemById(msg.jobId)
+		if ji != nil {
+			if ji.job.Id == msg.jobId {
+				ji.renderedText = msg.renderedText
+				ji.loadingLogs = false
 				currJob := m.jobsList.SelectedItem()
 				if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
 					m.renderJobLogs()
@@ -583,4 +577,16 @@ func (m *model) logsContentView() string {
 		)
 	}
 	return m.logsViewport.View()
+}
+
+func (m *model) getJobItemById(jobId string) *jobItem {
+	for _, run := range m.runsList.Items() {
+		ri := run.(*runItem)
+		for i := range ri.jobsItems {
+			if ri.jobsItems[i].job.Id == jobId {
+				return ri.jobsItems[i]
+			}
+		}
+	}
+	return nil
 }

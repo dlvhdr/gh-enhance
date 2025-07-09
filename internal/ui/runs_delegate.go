@@ -24,7 +24,7 @@ func (i *runItem) Title() string {
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *runItem) Description() string {
 	if i.run.Event == "" {
-		return i.run.Id
+		return i.run.Workflow
 	}
 
 	return fmt.Sprintf("on: %s", i.run.Event)
