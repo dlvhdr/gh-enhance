@@ -18,7 +18,8 @@ type WorkflowRun struct {
 
 type WorkflowJob struct {
 	Id          string
-	State       api.Conclusion
+	State       api.Status
+	Conclusion  api.Conclusion
 	Name        string
 	Workflow    string
 	Event       string

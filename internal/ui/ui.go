@@ -127,21 +127,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.updateLists()...)
 
 	case jobLogsFetchedMsg:
-		run := m.runsList.SelectedItem().(*runItem)
-		for i := range run.jobsItems {
-			if run.jobsItems[i].job.Id != msg.jobId {
-				continue
-			}
+		for _, run := range m.runsList.Items() {
+			ri := run.(*runItem)
+			for i := range ri.jobsItems {
+				if ri.jobsItems[i].job.Id != msg.jobId {
+					continue
+				}
 
-			run.jobsItems[i].logs = msg.logs
-			run.jobsItems[i].loadingLogs = false
-			currJob := m.jobsList.SelectedItem()
-			if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
-				m.renderJobLogs()
-			}
+				ri.jobsItems[i].logs = msg.logs
+				ri.jobsItems[i].loadingLogs = false
+				currJob := m.jobsList.SelectedItem()
+				if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
+					m.renderJobLogs()
+				}
 
-			cmds = append(cmds, m.updateLists()...)
-			break
+				cmds = append(cmds, m.updateLists()...)
+				break
+			}
 		}
 
 	case checkRunOutputFetchedMsg:
@@ -566,7 +568,7 @@ func (m *model) logsContentView() string {
 	}
 
 	ji := job.(*jobItem)
-	if ji.job.State == api.ConclusionSkipped {
+	if ji.job.Conclusion == api.ConclusionSkipped {
 		return m.noLogsView("This job was skipped")
 	}
 

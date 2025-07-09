@@ -60,7 +60,8 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 
 			job := WorkflowJob{
 				Id:          fmt.Sprintf("%d", statusCheck.DatabaseId),
-				State:       api.Conclusion(statusCheck.Status),
+				State:       statusCheck.Status,
+				Conclusion:  statusCheck.Conclusion,
 				Name:        statusCheck.Name,
 				Workflow:    wfr.Workflow.Name,
 				Event:       "",
