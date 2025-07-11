@@ -1,4 +1,4 @@
-package ui
+package tui
 
 import (
 	"fmt"
@@ -15,6 +15,7 @@ import (
 type stepItem struct {
 	step   *api.Step
 	jobUrl string
+	styles styles
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -36,23 +37,23 @@ func (i *stepItem) FilterValue() string { return i.step.Name }
 
 func (i *stepItem) viewConclusion() string {
 	if i.step.Conclusion == api.ConclusionSuccess {
-		return successGlyph.Render()
+		return i.styles.successGlyph.Render()
 	}
 
 	if api.IsFailureConclusion(i.step.Conclusion) {
-		return failureGlyph.Render()
+		return i.styles.failureGlyph.Render()
 	}
 
 	if i.step.Status == api.StatusInProgress {
-		return waitingGlyph.Render()
+		return i.styles.waitingGlyph.Render()
 	}
 
 	if i.step.Status == api.StatusPending {
-		return pendingGlyph.Render()
+		return i.styles.pendingGlyph.Render()
 	}
 
 	if i.step.Status == api.StatusCompleted {
-		return successGlyph.Render()
+		return i.styles.successGlyph.Render()
 	}
 
 	return string(i.step.Status)
@@ -97,9 +98,10 @@ func (si *stepItem) Link() string {
 	return fmt.Sprintf("%s#step:%d:1", si.jobUrl, si.step.Number)
 }
 
-func NewStepItem(step api.Step, url string) stepItem {
+func NewStepItem(step api.Step, url string, styles styles) stepItem {
 	return stepItem{
 		jobUrl: url,
 		step:   &step,
+		styles: styles,
 	}
 }

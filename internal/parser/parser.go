@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dlvhdr/gh-enhance/internal/data"
-	"github.com/dlvhdr/gh-enhance/internal/ui/markdown"
+	"github.com/dlvhdr/gh-enhance/internal/tui/markdown"
 )
 
 const (

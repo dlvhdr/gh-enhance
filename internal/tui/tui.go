@@ -1,4 +1,4 @@
-package ui
+package tui
 
 import (
 	"fmt"
@@ -11,12 +11,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log"
+	tint "github.com/lrstanley/bubbletint/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/data"
 	"github.com/dlvhdr/gh-enhance/internal/parser"
-	"github.com/dlvhdr/gh-enhance/internal/ui/art"
-	"github.com/dlvhdr/gh-enhance/internal/ui/scrollbar"
+	"github.com/dlvhdr/gh-enhance/internal/tui/art"
+	"github.com/dlvhdr/gh-enhance/internal/tui/scrollbar"
 	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
@@ -47,6 +48,7 @@ type model struct {
 	runsDelegate  list.DefaultDelegate
 	jobsDelegate  list.DefaultDelegate
 	stepsDelegate list.DefaultDelegate
+	styles        styles
 }
 
 const (
@@ -55,6 +57,11 @@ const (
 )
 
 func NewModel(repo string, number string) model {
+	tint.NewDefaultRegistry()
+	tint.SetTint(tint.TintTokyoNight)
+
+	s := makeStyles()
+
 	runsList, runsDelegate := newRunsDefaultList()
 	runsList.Title = "Runs"
 	runsList.SetStatusBarItemName("run", "runs")
@@ -76,9 +83,9 @@ func NewModel(repo string, number string) model {
 	vp.KeyMap.Left = leftKey
 
 	sb := scrollbar.NewVertical()
-	sb.Style = sb.Style.Inherit(scrollbarStyle)
-	sb.ThumbStyle = sb.ThumbStyle.Inherit(scrollbarThumbStyle)
-	sb.TrackStyle = sb.TrackStyle.Inherit(scrollbarTrackStyle)
+	sb.Style = sb.Style.Inherit(s.scrollbarStyle)
+	sb.ThumbStyle = sb.ThumbStyle.Inherit(s.scrollbarThumbStyle)
+	sb.TrackStyle = sb.TrackStyle.Inherit(s.scrollbarTrackStyle)
 
 	m := model{
 		jobsList:      jobsList,
@@ -91,6 +98,7 @@ func NewModel(repo string, number string) model {
 		stepsDelegate: stepsDelegate,
 		logsViewport:  vp,
 		scrollbar:     sb,
+		styles:        s,
 	}
 	m.setFocusedPaneStyles()
 	return m
@@ -110,7 +118,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case workflowRunsFetchedMsg:
 		runItems := make([]list.Item, 0)
 		for _, run := range msg.runs {
-			ri := NewRunItem(run)
+			ri := NewRunItem(run, m.styles)
 			runItems = append(runItems, &ri)
 		}
 
@@ -261,9 +269,9 @@ func (m model) View() string {
 		Render(
 			lipgloss.JoinHorizontal(
 				lipgloss.Top,
-				paneStyle.Render(m.runsList.View()),
-				paneStyle.Render(m.jobsList.View()),
-				paneStyle.Render(m.stepsList.View()),
+				m.styles.paneStyle.Render(m.runsList.View()),
+				m.styles.paneStyle.Render(m.jobsList.View()),
+				m.styles.paneStyle.Render(m.stepsList.View()),
 				m.viewLogs(),
 			),
 		)
@@ -272,9 +280,11 @@ func (m model) View() string {
 func (m *model) viewLogs() string {
 	title := "Logs"
 	if m.focusedPane == PaneLogs {
-		title = focusedPaneTitleBarStyle.Render(focusedPaneTitleStyle.Render(title))
+		title = m.styles.focusedPaneTitleBarStyle.Render(
+			m.styles.focusedPaneTitleStyle.Render(title))
 	} else {
-		title = unfocusedPaneTitleBarStyle.Render(unfocusedPaneTitleStyle.Render(title))
+		title = m.styles.unfocusedPaneTitleBarStyle.Render(
+			m.styles.unfocusedPaneTitleStyle.Render(title))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, m.logsContentView())
@@ -283,47 +293,47 @@ func (m *model) viewLogs() string {
 func (m *model) setFocusedPaneStyles() {
 	switch m.focusedPane {
 	case PaneRuns:
-		setListFocusedStyles(&m.runsList, &m.runsDelegate)
-		setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
-		setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
+		m.setListFocusedStyles(&m.runsList, &m.runsDelegate)
+		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
+		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
 	case PaneJobs:
-		setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
-		setListFocusedStyles(&m.jobsList, &m.jobsDelegate)
-		setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
+		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
+		m.setListFocusedStyles(&m.jobsList, &m.jobsDelegate)
+		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
 	case PaneSteps:
-		setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
-		setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
-		setListFocusedStyles(&m.stepsList, &m.stepsDelegate)
+		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
+		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
+		m.setListFocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
 	case PaneLogs:
-		setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
-		setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
-		setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
+		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
+		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
+		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	}
 
 	m.logsViewport.SetWidth(m.logsWidth())
 }
 
-func setListFocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
-	l.Styles.Title = focusedPaneTitleStyle
-	l.Styles.TitleBar = focusedPaneTitleBarStyle.Width(focusedPaneWidth)
-	delegate.Styles.SelectedTitle = focusedPaneItemTitleStyle
-	delegate.Styles.SelectedDesc = focusedPaneItemDescStyle
-	delegate.Styles.NormalDesc = normalItemDescStyle
-	delegate.Styles.DimmedDesc = normalItemDescStyle
+func (m *model) setListFocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
+	l.Styles.Title = m.styles.focusedPaneTitleStyle
+	l.Styles.TitleBar = m.styles.focusedPaneTitleBarStyle.Width(focusedPaneWidth)
+	delegate.Styles.SelectedTitle = m.styles.focusedPaneItemTitleStyle
+	delegate.Styles.SelectedDesc = m.styles.focusedPaneItemDescStyle
+	delegate.Styles.NormalDesc = m.styles.normalItemDescStyle
+	delegate.Styles.DimmedDesc = m.styles.normalItemDescStyle
 	l.SetDelegate(delegate)
 	l.SetWidth(focusedPaneWidth)
 }
 
-func setListUnfocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
-	l.Styles.Title = unfocusedPaneTitleStyle
-	l.Styles.TitleBar = unfocusedPaneTitleBarStyle.Width(unfocusedPaneWidth)
-	delegate.Styles.SelectedTitle = unfocusedPaneItemTitleStyle
-	delegate.Styles.SelectedDesc = unfocusedPaneItemDescStyle
-	delegate.Styles.NormalDesc = normalItemDescStyle
-	delegate.Styles.DimmedDesc = normalItemDescStyle
+func (m *model) setListUnfocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
+	l.Styles.Title = m.styles.unfocusedPaneTitleStyle
+	l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle.Width(unfocusedPaneWidth)
+	delegate.Styles.SelectedTitle = m.styles.unfocusedPaneItemTitleStyle
+	delegate.Styles.SelectedDesc = m.styles.unfocusedPaneItemDescStyle
+	delegate.Styles.NormalDesc = m.styles.normalItemDescStyle
+	delegate.Styles.DimmedDesc = m.styles.normalItemDescStyle
 	l.SetDelegate(delegate)
 	l.SetWidth(unfocusedPaneWidth)
 }
@@ -418,7 +428,7 @@ func (m *model) noLogsView(message string) string {
 		if char == '╱' {
 			emptySetArt += lipgloss.NewStyle().Foreground(lipgloss.Red).Render("╱")
 		} else {
-			emptySetArt += watermarkIllustrationStyle.Render(string(char))
+			emptySetArt += m.styles.watermarkIllustrationStyle.Render(string(char))
 		}
 	}
 
@@ -430,7 +440,7 @@ func (m *model) noLogsView(message string) string {
 		lipgloss.JoinVertical(
 			lipgloss.Center,
 			emptySetArt,
-			noLogsStyle.Render(message),
+			m.styles.noLogsStyle.Render(message),
 		))
 }
 
@@ -470,7 +480,7 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) {
 		}
 
 		for _, step := range jobWithSteps.Steps.Nodes {
-			si := NewStepItem(step, jobWithSteps.Url)
+			si := NewStepItem(step, jobWithSteps.Url, m.styles)
 			ri.jobsItems[jobIdx].steps = append(ri.jobsItems[jobIdx].steps, &si)
 		}
 
@@ -583,37 +593,38 @@ func (m *model) renderLogs(ji *jobItem) string {
 	defer utils.TimeTrack(time.Now(), "rendering logs")
 	logs := strings.Builder{}
 	totalLines := fmt.Sprintf("%d", len(ji.logs))
-	w := m.logsViewport.Width() - scrollbarStyle.GetWidth()
+	w := m.logsViewport.Width() - m.styles.scrollbarStyle.GetWidth()
 	expand := ExpandSymbol + " "
 	for i, log := range ji.logs {
 		rendered := log.Log
 		switch log.Kind {
 		case data.LogKindError:
 			rendered = strings.Replace(rendered, parser.ErrorMarker, "", 1)
-			rendered = errorBgStyle.Width(w).Render(
-				lipgloss.JoinHorizontal(lipgloss.Top, errorTitleStyle.Render("Error: "), errorStyle.Render(rendered)))
+			rendered = m.styles.errorBgStyle.Width(w).Render(
+				lipgloss.JoinHorizontal(lipgloss.Top,
+					m.styles.errorTitleStyle.Render("Error: "), m.styles.errorStyle.Render(rendered)))
 		case data.LogKindCommand:
 			rendered = strings.Replace(rendered, parser.CommandMarker, "", 1)
-			rendered = commandStyle.Render(rendered)
+			rendered = m.styles.commandStyle.Render(rendered)
 		case data.LogKindGroupStart:
 			rendered = strings.Replace(rendered, parser.GroupStartMarker, expand, 1)
-			rendered = groupStartMarkerStyle.Render(rendered)
+			rendered = m.styles.groupStartMarkerStyle.Render(rendered)
 		case data.LogKindJobCleanup:
-			rendered = stepStartMarkerStyle.Render(rendered)
+			rendered = m.styles.stepStartMarkerStyle.Render(rendered)
 		case data.LogKindStepStart:
 			rendered = strings.Replace(rendered, parser.GroupStartMarker, expand, 1)
-			rendered = stepStartMarkerStyle.Render(rendered)
+			rendered = m.styles.stepStartMarkerStyle.Render(rendered)
 		case data.LogKindStepNone:
 			sep := ""
 			if log.Depth > 0 {
-				sep = separatorStyle.Render(strings.Repeat(
+				sep = m.styles.separatorStyle.Render(strings.Repeat(
 					fmt.Sprintf("%s  ", Separator), log.Depth))
 			}
 			rendered = sep + rendered
 		}
 		ln := fmt.Sprintf("%d", i+1)
 		ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
-		logs.WriteString(lineNumbersStyle.Render(ln))
+		logs.WriteString(m.styles.lineNumbersStyle.Render(ln))
 		logs.WriteString(rendered)
 		logs.WriteString("\n")
 	}

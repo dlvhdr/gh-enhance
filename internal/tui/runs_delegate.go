@@ -1,4 +1,4 @@
-package ui
+package tui
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 
 type runItem struct {
 	run       *data.WorkflowRun
+	styles    styles
 	jobsItems []*jobItem
 	loading   bool
 }
@@ -20,7 +21,7 @@ type runItem struct {
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
 func (i *runItem) Title() string {
 	status := i.viewWarnings()
-	return fmt.Sprintf("%s %s", status, i.run.Name)
+	return i.styles.focusedPaneItemTitleStyle.Render(fmt.Sprintf("%s %s", status, i.run.Name))
 }
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
@@ -38,15 +39,15 @@ func (i *runItem) FilterValue() string { return i.run.Name }
 func (i *runItem) viewWarnings() string {
 	switch i.run.Bucket {
 	case data.CheckBucketPass:
-		return successGlyph.Render()
+		return i.styles.successGlyph.Render()
 	case data.CheckBucketFail:
-		return failureGlyph.Render()
+		return i.styles.failureGlyph.Render()
 	case data.CheckBucketSkipping:
-		return skippedGlyph.Render()
+		return i.styles.skippedGlyph.Render()
 	case data.CheckBucketCancel:
-		return canceledGlyph.Render()
+		return i.styles.canceledGlyph.Render()
 	default:
-		return pendingGlyph.Render()
+		return i.styles.pendingGlyph.Render()
 	}
 }
 
@@ -85,10 +86,10 @@ func newRunItemDelegate() list.DefaultDelegate {
 	return d
 }
 
-func NewRunItem(run data.WorkflowRun) runItem {
+func NewRunItem(run data.WorkflowRun, styles styles) runItem {
 	jobs := make([]*jobItem, 0)
 	for _, job := range run.Jobs {
-		ji := NewJobItem(job)
+		ji := NewJobItem(job, styles)
 		jobs = append(jobs, &ji)
 	}
 
@@ -96,5 +97,6 @@ func NewRunItem(run data.WorkflowRun) runItem {
 		run:       &run,
 		jobsItems: jobs,
 		loading:   true,
+		styles:    styles,
 	}
 }

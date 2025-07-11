@@ -11,7 +11,7 @@ import (
 	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 
-	"github.com/dlvhdr/gh-enhance/internal/ui"
+	"github.com/dlvhdr/gh-enhance/internal/tui"
 )
 
 var rootCmd = &cobra.Command{
@@ -27,7 +27,8 @@ func init() {
 
 	if debug {
 		var fileErr error
-		newConfigFile, fileErr := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		newConfigFile, fileErr := os.OpenFile("debug.log",
+			os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if fileErr == nil {
 			log.SetColorProfile(termenv.TrueColor)
 			log.SetOutput(newConfigFile)
@@ -75,7 +76,7 @@ func init() {
 
 	rootCmd.Run = func(_ *cobra.Command, args []string) {
 		if len(args) > 0 {
-			p := tea.NewProgram(ui.NewModel(repo, args[0]), tea.WithAltScreen())
+			p := tea.NewProgram(tui.NewModel(repo, args[0]), tea.WithAltScreen())
 			if _, err := p.Run(); err != nil {
 				log.Error("failed starting program", "err", err)
 				fmt.Println(err)

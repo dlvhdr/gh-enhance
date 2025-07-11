@@ -1,4 +1,4 @@
-package ui
+package tui
 
 import (
 	"fmt"
@@ -21,6 +21,7 @@ type jobItem struct {
 	loadingLogs        bool
 	loadingSteps       bool
 	steps              []*stepItem
+	styles             styles
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -44,22 +45,22 @@ func (i *jobItem) FilterValue() string { return i.job.Name }
 
 func (i *jobItem) viewStatus() string {
 	if i.job.Bucket == data.CheckBucketPass {
-		return successGlyph.Render()
+		return i.styles.successGlyph.Render()
 	}
 
 	if i.job.Bucket == data.CheckBucketSkipping {
-		return skippedGlyph.Render()
+		return i.styles.skippedGlyph.Render()
 	}
 
 	if i.job.Bucket == data.CheckBucketCancel {
-		return canceledGlyph.Render()
+		return i.styles.canceledGlyph.Render()
 	}
 
 	if i.job.Bucket == data.CheckBucketFail {
-		return failureGlyph.Render()
+		return i.styles.failureGlyph.Render()
 	}
 
-	return waitingGlyph.Render()
+	return i.styles.waitingGlyph.Render()
 }
 
 func newCheckItemDelegate() list.DefaultDelegate {
@@ -97,7 +98,7 @@ func newCheckItemDelegate() list.DefaultDelegate {
 	return d
 }
 
-func NewJobItem(job data.WorkflowJob) jobItem {
+func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
 	loadingSteps := true
 	if job.Kind != data.JobKindGithubActions {
 		loadingSteps = false
@@ -108,5 +109,6 @@ func NewJobItem(job data.WorkflowJob) jobItem {
 		loadingLogs:  true,
 		loadingSteps: loadingSteps,
 		steps:        make([]*stepItem, 0),
+		styles:       styles,
 	}
 }
