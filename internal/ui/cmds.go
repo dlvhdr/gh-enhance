@@ -66,7 +66,7 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				Conclusion:  statusCheck.Conclusion,
 				Name:        statusCheck.Name,
 				Workflow:    wfr.Workflow.Name,
-				Event:       "",
+				Event:       wfr.Event,
 				Logs:        []LogsWithTime{},
 				Link:        statusCheck.Url,
 				Steps:       []api.Step{},

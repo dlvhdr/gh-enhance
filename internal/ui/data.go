@@ -32,9 +32,24 @@ type WorkflowJob struct {
 	Kind        JobKind
 }
 
+type LogKind int
+
+const (
+	LogKindStepNone LogKind = iota
+	LogKindStepStart
+	LogKindGroupStart
+	LogKindGroupEnd
+	LogKindCommand
+	LogKindError
+	LogKindJobCleanup
+	LogKindCompleteJob
+)
+
 type LogsWithTime struct {
-	Log  string
-	Time time.Time
+	Log   string
+	Time  time.Time
+	Kind  LogKind
+	Depth int
 }
 
 type JobKind int

@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -53,34 +52,29 @@ func parseJobLogs(jobLogs string) []LogsWithTime {
 			lineDate = lastTime
 		}
 
-		expand := ExpandSymbol + " "
-		log := strings.Join(dateAndLog[1:], "")
+		text := strings.Join(dateAndLog[1:], "")
+		log := LogsWithTime{Time: lineDate}
 		if strings.Contains(line, stepStartMarker) {
 			depth++
-			log = strings.Replace(log, groupStartMarker, expand, 1)
-			log = stepStartMarkerStyle.Render(log)
+			log.Kind = LogKindStepStart
 		} else if strings.Contains(line, groupStartMarker) {
 			depth++
-			log = strings.Replace(log, groupStartMarker, expand, 1)
-			log = groupStartMarkerStyle.Render(log)
-		} else if strings.Contains(log, groupEndMarker) {
+			log.Kind = LogKindGroupStart
+		} else if strings.Contains(text, groupEndMarker) {
 			depth = max(0, depth-1)
-			log = "\n"
-		} else if strings.Contains(log, postJobCleanupMarker) {
-			log = stepStartMarkerStyle.Render(log)
-		} else if strings.Contains(log, commandMarker) {
-			log = strings.Replace(log, commandMarker, "", 1)
-			log = commandStyle.Render(log)
-		} else {
-			sep := ""
-			if depth > 0 {
-				sep = separatorStyle.Render(strings.Repeat(fmt.Sprintf("%s  ", Separator), depth))
-			}
-			log = sep + log
+			text = "\n"
+			log.Kind = LogKindGroupEnd
+		} else if strings.Contains(text, postJobCleanupMarker) {
+			log.Kind = LogKindJobCleanup
+		} else if strings.Contains(text, commandMarker) {
+			log.Kind = LogKindCommand
+		} else if strings.Contains(text, errorMarker) {
+			log.Kind = LogKindError
 		}
 
-		log = strings.TrimRight(log, "\n")
-		stepsLogs = append(stepsLogs, LogsWithTime{Time: lineDate, Log: log})
+		log.Depth = depth
+		log.Log = strings.TrimRight(text, "\n")
+		stepsLogs = append(stepsLogs, log)
 	}
 
 	return stepsLogs

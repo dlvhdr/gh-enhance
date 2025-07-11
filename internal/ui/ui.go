@@ -537,24 +537,7 @@ func (m *model) renderJobLogs() {
 		return
 	}
 
-	// TODO: clean, move to a function, pull logic from parser? Because I go over the lines twice
-	defer utils.TimeTrack(time.Now(), "rendering logs")
-	logs := strings.Builder{}
-	totalLines := fmt.Sprintf("%d", len(ji.logs))
-	for i, log := range ji.logs {
-		if strings.Contains(log.Log, errorMarker) {
-			log.Log = strings.Replace(log.Log, errorMarker, "", 1)
-			log.Log = errorBgStyle.Width(m.logsViewport.Width() - scrollbarStyle.GetWidth()).Render(
-				lipgloss.JoinHorizontal(lipgloss.Top,
-					errorTitleStyle.Render("Error: "), errorStyle.Render(log.Log)))
-		}
-		ln := fmt.Sprintf("%d", i+1)
-		ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
-		logs.WriteString(lineNumbersStyle.Render(ln))
-		logs.WriteString(log.Log)
-		logs.WriteString("\n")
-	}
-	ji.renderedLogs = logs.String()
+	ji.renderedLogs = m.renderLogs(ji)
 	m.logsViewport.SetContent(ji.renderedLogs)
 }
 
@@ -592,4 +575,45 @@ func (m *model) getJobItemById(jobId string) *jobItem {
 		}
 	}
 	return nil
+}
+
+func (m *model) renderLogs(ji *jobItem) string {
+	defer utils.TimeTrack(time.Now(), "rendering logs")
+	logs := strings.Builder{}
+	totalLines := fmt.Sprintf("%d", len(ji.logs))
+	w := m.logsViewport.Width() - scrollbarStyle.GetWidth()
+	expand := ExpandSymbol + " "
+	for i, log := range ji.logs {
+		rendered := log.Log
+		switch log.Kind {
+		case LogKindError:
+			rendered = strings.Replace(rendered, errorMarker, "", 1)
+			rendered = errorBgStyle.Width(w).Render(
+				lipgloss.JoinHorizontal(lipgloss.Top, errorTitleStyle.Render("Error: "), errorStyle.Render(rendered)))
+		case LogKindCommand:
+			rendered = strings.Replace(rendered, commandMarker, "", 1)
+			rendered = commandStyle.Render(rendered)
+		case LogKindGroupStart:
+			rendered = strings.Replace(rendered, groupStartMarker, expand, 1)
+			rendered = groupStartMarkerStyle.Render(rendered)
+		case LogKindJobCleanup:
+			rendered = stepStartMarkerStyle.Render(rendered)
+		case LogKindStepStart:
+			rendered = strings.Replace(rendered, groupStartMarker, expand, 1)
+			rendered = stepStartMarkerStyle.Render(rendered)
+		case LogKindStepNone:
+			sep := ""
+			if log.Depth > 0 {
+				sep = separatorStyle.Render(strings.Repeat(
+					fmt.Sprintf("%s  ", Separator), log.Depth))
+			}
+			rendered = sep + rendered
+		}
+		ln := fmt.Sprintf("%d", i+1)
+		ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
+		logs.WriteString(lineNumbersStyle.Render(ln))
+		logs.WriteString(rendered)
+		logs.WriteString("\n")
+	}
+	return logs.String()
 }
