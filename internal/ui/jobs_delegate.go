@@ -7,11 +7,13 @@ import (
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log"
+
+	"github.com/dlvhdr/gh-enhance/internal/data"
 )
 
 type jobItem struct {
-	job                *WorkflowJob
-	logs               []LogsWithTime
+	job                *data.WorkflowJob
+	logs               []data.LogsWithTime
 	renderedLogs       string
 	renderedText       string
 	title              string
@@ -26,7 +28,7 @@ func (i *jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *jobItem) Description() string {
-	if i.job.Bucket == CheckBucketSkipping {
+	if i.job.Bucket == data.CheckBucketSkipping {
 		return "Skipped"
 	}
 
@@ -41,19 +43,19 @@ func (i *jobItem) Description() string {
 func (i *jobItem) FilterValue() string { return i.job.Name }
 
 func (i *jobItem) viewStatus() string {
-	if i.job.Bucket == CheckBucketPass {
+	if i.job.Bucket == data.CheckBucketPass {
 		return successGlyph.Render()
 	}
 
-	if i.job.Bucket == CheckBucketSkipping {
+	if i.job.Bucket == data.CheckBucketSkipping {
 		return skippedGlyph.Render()
 	}
 
-	if i.job.Bucket == CheckBucketCancel {
+	if i.job.Bucket == data.CheckBucketCancel {
 		return canceledGlyph.Render()
 	}
 
-	if i.job.Bucket == CheckBucketFail {
+	if i.job.Bucket == data.CheckBucketFail {
 		return failureGlyph.Render()
 	}
 
@@ -95,14 +97,14 @@ func newCheckItemDelegate() list.DefaultDelegate {
 	return d
 }
 
-func NewJobItem(job WorkflowJob) jobItem {
+func NewJobItem(job data.WorkflowJob) jobItem {
 	loadingSteps := true
-	if job.Kind != JobKindGithubActions {
+	if job.Kind != data.JobKindGithubActions {
 		loadingSteps = false
 	}
 	return jobItem{
 		job:          &job,
-		logs:         make([]LogsWithTime, 0),
+		logs:         make([]data.LogsWithTime, 0),
 		loadingLogs:  true,
 		loadingSteps: loadingSteps,
 		steps:        make([]*stepItem, 0),

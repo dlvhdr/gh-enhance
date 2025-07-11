@@ -1,4 +1,4 @@
-package ui
+package data
 
 import (
 	"time"
@@ -70,7 +70,7 @@ const (
 	CheckBucketPending
 )
 
-func getConclusionBucket(conclusion api.Conclusion) CheckBucket {
+func GetConclusionBucket(conclusion api.Conclusion) CheckBucket {
 	switch conclusion {
 	case "SUCCESS":
 		return CheckBucketPass

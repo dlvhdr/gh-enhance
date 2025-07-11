@@ -13,6 +13,8 @@ import (
 	"github.com/charmbracelet/log"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
+	"github.com/dlvhdr/gh-enhance/internal/data"
+	"github.com/dlvhdr/gh-enhance/internal/parser"
 	"github.com/dlvhdr/gh-enhance/internal/ui/art"
 	"github.com/dlvhdr/gh-enhance/internal/ui/scrollbar"
 	"github.com/dlvhdr/gh-enhance/internal/utils"
@@ -532,7 +534,7 @@ func (m *model) renderJobLogs() {
 		return
 	}
 
-	if ji.job.Kind == JobKindCheckRun || ji.job.Kind == JobKindExternal {
+	if ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
 		m.logsViewport.SetContent(ji.renderedText)
 		return
 	}
@@ -586,22 +588,22 @@ func (m *model) renderLogs(ji *jobItem) string {
 	for i, log := range ji.logs {
 		rendered := log.Log
 		switch log.Kind {
-		case LogKindError:
-			rendered = strings.Replace(rendered, errorMarker, "", 1)
+		case data.LogKindError:
+			rendered = strings.Replace(rendered, parser.ErrorMarker, "", 1)
 			rendered = errorBgStyle.Width(w).Render(
 				lipgloss.JoinHorizontal(lipgloss.Top, errorTitleStyle.Render("Error: "), errorStyle.Render(rendered)))
-		case LogKindCommand:
-			rendered = strings.Replace(rendered, commandMarker, "", 1)
+		case data.LogKindCommand:
+			rendered = strings.Replace(rendered, parser.CommandMarker, "", 1)
 			rendered = commandStyle.Render(rendered)
-		case LogKindGroupStart:
-			rendered = strings.Replace(rendered, groupStartMarker, expand, 1)
+		case data.LogKindGroupStart:
+			rendered = strings.Replace(rendered, parser.GroupStartMarker, expand, 1)
 			rendered = groupStartMarkerStyle.Render(rendered)
-		case LogKindJobCleanup:
+		case data.LogKindJobCleanup:
 			rendered = stepStartMarkerStyle.Render(rendered)
-		case LogKindStepStart:
-			rendered = strings.Replace(rendered, groupStartMarker, expand, 1)
+		case data.LogKindStepStart:
+			rendered = strings.Replace(rendered, parser.GroupStartMarker, expand, 1)
 			rendered = stepStartMarkerStyle.Render(rendered)
-		case LogKindStepNone:
+		case data.LogKindStepNone:
 			sep := ""
 			if log.Depth > 0 {
 				sep = separatorStyle.Render(strings.Repeat(

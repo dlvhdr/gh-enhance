@@ -13,12 +13,14 @@ import (
 	"github.com/cli/go-gh/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
+	"github.com/dlvhdr/gh-enhance/internal/data"
+	"github.com/dlvhdr/gh-enhance/internal/parser"
 	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
 type workflowRunsFetchedMsg struct {
 	err  error
-	runs []WorkflowRun
+	runs []data.WorkflowRun
 }
 
 func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
@@ -36,7 +38,7 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 		}
 
 		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(checkRuns))
-		runsMap := make(map[string]WorkflowRun)
+		runsMap := make(map[string]data.WorkflowRun)
 
 		for _, statusCheck := range checkRuns {
 			wfr := statusCheck.CheckSuite.WorkflowRun
@@ -51,28 +53,28 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				wfName = statusCheck.Name
 			}
 
-			var kind JobKind
+			var kind data.JobKind
 			if isGHA {
-				kind = JobKindGithubActions
+				kind = data.JobKindGithubActions
 			} else if !strings.HasPrefix(statusCheck.DetailsUrl, "https://github.com/") {
-				kind = JobKindExternal
+				kind = data.JobKindExternal
 			} else {
-				kind = JobKindCheckRun
+				kind = data.JobKindCheckRun
 			}
 
-			job := WorkflowJob{
+			job := data.WorkflowJob{
 				Id:          fmt.Sprintf("%d", statusCheck.DatabaseId),
 				State:       statusCheck.Status,
 				Conclusion:  statusCheck.Conclusion,
 				Name:        statusCheck.Name,
 				Workflow:    wfr.Workflow.Name,
 				Event:       wfr.Event,
-				Logs:        []LogsWithTime{},
+				Logs:        []data.LogsWithTime{},
 				Link:        statusCheck.Url,
 				Steps:       []api.Step{},
 				StartedAt:   statusCheck.StartedAt,
 				CompletedAt: statusCheck.CompletedAt,
-				Bucket:      getConclusionBucket(statusCheck.Conclusion),
+				Bucket:      data.GetConclusionBucket(statusCheck.Conclusion),
 				Kind:        kind,
 			}
 
@@ -84,20 +86,20 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				if link == "" {
 					link = statusCheck.Url
 				}
-				run = WorkflowRun{
+				run = data.WorkflowRun{
 					Id:       fmt.Sprintf("%d", statusCheck.CheckSuite.WorkflowRun.DatabaseId),
 					Name:     wfName,
 					Link:     link,
 					Workflow: wfr.Workflow.Name,
 					Event:    statusCheck.CheckSuite.WorkflowRun.Event,
-					Bucket:   getConclusionBucket(statusCheck.Conclusion),
+					Bucket:   data.GetConclusionBucket(statusCheck.Conclusion),
 				}
-				run.Jobs = []WorkflowJob{job}
+				run.Jobs = []data.WorkflowJob{job}
 			}
 			runsMap[wfName] = run
 		}
 
-		runs := make([]WorkflowRun, 0)
+		runs := make([]data.WorkflowRun, 0)
 		for _, run := range runsMap {
 			runs = append(runs, run)
 		}
@@ -117,11 +119,11 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
 			}
 
-			if runs[i].Bucket == CheckBucketFail {
+			if runs[i].Bucket == data.CheckBucketFail {
 				return true
 			}
 
-			if runs[j].Bucket == CheckBucketFail {
+			if runs[j].Bucket == data.CheckBucketFail {
 				return false
 			}
 
@@ -136,7 +138,7 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 
 type jobLogsFetchedMsg struct {
 	jobId string
-	logs  []LogsWithTime
+	logs  []data.LogsWithTime
 }
 
 type checkRunOutputFetchedMsg struct {
@@ -161,7 +163,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	job.initiatedLogsFetch = true
 	return func() tea.Msg {
 		defer utils.TimeTrack(time.Now(), "fetching job logs")
-		if job.job.Kind == JobKindCheckRun || job.job.Kind == JobKindExternal {
+		if job.job.Kind == data.JobKindCheckRun || job.job.Kind == data.JobKindExternal {
 			output, err := api.FetchCheckRunOutput(m.repo, job.job.Id)
 			if err != nil {
 				log.Error("error fetching check run output", "link", job.job.Link, "err", err)
@@ -172,7 +174,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 			text += output.Output.Summary
 			text += "\n\n"
 			text += output.Output.Text
-			renderedText, err := parseRunOutputMarkdown(
+			renderedText, err := parser.ParseRunOutputMarkdown(
 				text,
 				m.logsWidth(),
 			)
@@ -199,7 +201,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 
 		return jobLogsFetchedMsg{
 			jobId: job.job.Id,
-			logs:  parseJobLogs(jobLogs),
+			logs:  parser.ParseJobLogs(jobLogs),
 		}
 	}
 }

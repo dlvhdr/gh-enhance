@@ -1,25 +1,26 @@
-package ui
+package parser
 
 import (
 	"strings"
 	"time"
 
+	"github.com/dlvhdr/gh-enhance/internal/data"
 	"github.com/dlvhdr/gh-enhance/internal/ui/markdown"
 )
 
 const (
-	stepStartMarker      = "##[group]Run "
-	groupStartMarker     = "##[group]"
-	groupEndMarker       = "##[endgroup]"
-	commandMarker        = "[command]"
-	errorMarker          = "##[error]"
-	postJobCleanupMarker = "Post job cleanup."
-	completeJobMarker    = "Cleaning up orphan processes"
+	StepStartMarker      = "##[group]Run "
+	GroupStartMarker     = "##[group]"
+	GroupEndMarker       = "##[endgroup]"
+	CommandMarker        = "[command]"
+	ErrorMarker          = "##[error]"
+	PostJobCleanupMarker = "Post job cleanup."
+	CompleteJobMarker    = "Cleaning up orphan processes"
 )
 
-func parseJobLogs(jobLogs string) []LogsWithTime {
+func ParseJobLogs(jobLogs string) []data.LogsWithTime {
 	lines := strings.Lines(jobLogs)
-	stepsLogs := make([]LogsWithTime, 0)
+	stepsLogs := make([]data.LogsWithTime, 0)
 
 	var lastTime time.Time
 	var err error
@@ -53,23 +54,23 @@ func parseJobLogs(jobLogs string) []LogsWithTime {
 		}
 
 		text := strings.Join(dateAndLog[1:], "")
-		log := LogsWithTime{Time: lineDate}
-		if strings.Contains(line, stepStartMarker) {
+		log := data.LogsWithTime{Time: lineDate}
+		if strings.Contains(line, StepStartMarker) {
 			depth++
-			log.Kind = LogKindStepStart
-		} else if strings.Contains(line, groupStartMarker) {
+			log.Kind = data.LogKindStepStart
+		} else if strings.Contains(line, GroupStartMarker) {
 			depth++
-			log.Kind = LogKindGroupStart
-		} else if strings.Contains(text, groupEndMarker) {
+			log.Kind = data.LogKindGroupStart
+		} else if strings.Contains(text, GroupEndMarker) {
 			depth = max(0, depth-1)
 			text = "\n"
-			log.Kind = LogKindGroupEnd
-		} else if strings.Contains(text, postJobCleanupMarker) {
-			log.Kind = LogKindJobCleanup
-		} else if strings.Contains(text, commandMarker) {
-			log.Kind = LogKindCommand
-		} else if strings.Contains(text, errorMarker) {
-			log.Kind = LogKindError
+			log.Kind = data.LogKindGroupEnd
+		} else if strings.Contains(text, PostJobCleanupMarker) {
+			log.Kind = data.LogKindJobCleanup
+		} else if strings.Contains(text, CommandMarker) {
+			log.Kind = data.LogKindCommand
+		} else if strings.Contains(text, ErrorMarker) {
+			log.Kind = data.LogKindError
 		}
 
 		log.Depth = depth
@@ -80,7 +81,7 @@ func parseJobLogs(jobLogs string) []LogsWithTime {
 	return stepsLogs
 }
 
-func parseRunOutputMarkdown(output string, width int) (string, error) {
+func ParseRunOutputMarkdown(output string, width int) (string, error) {
 	renderer := markdown.GetMarkdownRenderer(width)
 	return renderer.Render(output)
 }
