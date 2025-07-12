@@ -45,9 +45,9 @@ type model struct {
 	quitting      bool
 	focusedPane   focusedPane
 	err           error
-	runsDelegate  list.DefaultDelegate
-	jobsDelegate  list.DefaultDelegate
-	stepsDelegate list.DefaultDelegate
+	runsDelegate  list.ItemDelegate
+	jobsDelegate  list.ItemDelegate
+	stepsDelegate list.ItemDelegate
 	styles        styles
 }
 
@@ -62,17 +62,17 @@ func NewModel(repo string, number string) model {
 
 	s := makeStyles()
 
-	runsList, runsDelegate := newRunsDefaultList()
+	runsList, runsDelegate := newRunsDefaultList(s)
 	runsList.Title = "Runs"
 	runsList.SetStatusBarItemName("run", "runs")
 	runsList.SetWidth(focusedPaneWidth)
 
-	jobsList, jobsDelegate := newJobsDefaultList()
+	jobsList, jobsDelegate := newJobsDefaultList(s)
 	jobsList.Title = "Jobs"
 	jobsList.SetStatusBarItemName("job", "jobs")
 	jobsList.SetWidth(unfocusedPaneWidth)
 
-	stepsList, stepsDelegate := newStepsDefaultList()
+	stepsList, stepsDelegate := newStepsDefaultList(s)
 	stepsList.Title = "Steps"
 	stepsList.SetStatusBarItemName("step", "steps")
 	stepsList.SetWidth(unfocusedPaneWidth)
@@ -278,13 +278,13 @@ func (m model) View() string {
 }
 
 func (m *model) viewLogs() string {
-	title := "Logs"
+	title := "Full Job Logs"
 	if m.focusedPane == PaneLogs {
 		title = m.styles.focusedPaneTitleBarStyle.Render(
-			m.styles.focusedPaneTitleStyle.Render(title))
+			m.styles.focusedPaneTitleStyle.Width(m.logsWidth() - 1).Render(title))
 	} else {
 		title = m.styles.unfocusedPaneTitleBarStyle.Render(
-			m.styles.unfocusedPaneTitleStyle.Render(title))
+			m.styles.unfocusedPaneTitleStyle.Width(m.logsWidth() - 1).Render(title))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, m.logsContentView())
@@ -293,21 +293,33 @@ func (m *model) viewLogs() string {
 func (m *model) setFocusedPaneStyles() {
 	switch m.focusedPane {
 	case PaneRuns:
+		m.runsDelegate.(*runsDelegate).focused = true
+		m.jobsDelegate.(*jobsDelegate).focused = false
+		m.stepsDelegate.(*stepsDelegate).focused = false
 		m.setListFocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
 	case PaneJobs:
+		m.runsDelegate.(*runsDelegate).focused = false
+		m.jobsDelegate.(*jobsDelegate).focused = true
+		m.stepsDelegate.(*stepsDelegate).focused = false
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListFocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
 	case PaneSteps:
+		m.runsDelegate.(*runsDelegate).focused = false
+		m.jobsDelegate.(*jobsDelegate).focused = false
+		m.stepsDelegate.(*stepsDelegate).focused = true
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListFocusedStyles(&m.stepsList, &m.stepsDelegate)
 		break
 	case PaneLogs:
+		m.runsDelegate.(*runsDelegate).focused = false
+		m.jobsDelegate.(*jobsDelegate).focused = false
+		m.stepsDelegate.(*stepsDelegate).focused = false
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
@@ -316,30 +328,22 @@ func (m *model) setFocusedPaneStyles() {
 	m.logsViewport.SetWidth(m.logsWidth())
 }
 
-func (m *model) setListFocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
+func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
 	l.Styles.Title = m.styles.focusedPaneTitleStyle
 	l.Styles.TitleBar = m.styles.focusedPaneTitleBarStyle.Width(focusedPaneWidth)
-	delegate.Styles.SelectedTitle = m.styles.focusedPaneItemTitleStyle
-	delegate.Styles.SelectedDesc = m.styles.focusedPaneItemDescStyle
-	delegate.Styles.NormalDesc = m.styles.normalItemDescStyle
-	delegate.Styles.DimmedDesc = m.styles.normalItemDescStyle
-	l.SetDelegate(delegate)
+	l.SetDelegate(*delegate)
 	l.SetWidth(focusedPaneWidth)
 }
 
-func (m *model) setListUnfocusedStyles(l *list.Model, delegate *list.DefaultDelegate) {
+func (m *model) setListUnfocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
 	l.Styles.Title = m.styles.unfocusedPaneTitleStyle
 	l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle.Width(unfocusedPaneWidth)
-	delegate.Styles.SelectedTitle = m.styles.unfocusedPaneItemTitleStyle
-	delegate.Styles.SelectedDesc = m.styles.unfocusedPaneItemDescStyle
-	delegate.Styles.NormalDesc = m.styles.normalItemDescStyle
-	delegate.Styles.DimmedDesc = m.styles.normalItemDescStyle
-	l.SetDelegate(delegate)
+	l.SetDelegate(*delegate)
 	l.SetWidth(unfocusedPaneWidth)
 }
 
-func newRunsDefaultList() (list.Model, list.DefaultDelegate) {
-	d := newRunItemDelegate()
+func newRunsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
+	d := newRunItemDelegate(styles)
 	l := list.New([]list.Item{}, d, 0, 0)
 	l.KeyMap.NextPage = key.Binding{}
 	l.KeyMap.PrevPage = key.Binding{}
@@ -349,8 +353,8 @@ func newRunsDefaultList() (list.Model, list.DefaultDelegate) {
 	return l, d
 }
 
-func newJobsDefaultList() (list.Model, list.DefaultDelegate) {
-	d := newCheckItemDelegate()
+func newJobsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
+	d := newJobItemDelegate(styles)
 	l := list.New([]list.Item{}, d, 0, 0)
 	l.KeyMap.NextPage = key.Binding{}
 	l.KeyMap.PrevPage = key.Binding{}
@@ -360,8 +364,8 @@ func newJobsDefaultList() (list.Model, list.DefaultDelegate) {
 	return l, d
 }
 
-func newStepsDefaultList() (list.Model, list.DefaultDelegate) {
-	d := newStepItemDelegate()
+func newStepsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
+	d := newStepItemDelegate(styles)
 	l := list.New([]list.Item{}, d, 0, 0)
 	l.KeyMap.NextPage = key.Binding{}
 	l.KeyMap.PrevPage = key.Binding{}
@@ -400,7 +404,7 @@ func (m *model) updateLists() []tea.Cmd {
 }
 
 func (m *model) logsWidth() int {
-	borders := 5
+	borders := 3
 	sb := 0
 	if m.isScrollbarVisible() {
 		sb = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())

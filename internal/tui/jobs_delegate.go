@@ -1,17 +1,19 @@
 package tui
 
 import (
-	"fmt"
+	"io"
 
-	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dlvhdr/gh-enhance/internal/data"
 )
 
 type jobItem struct {
+	meta               itemMeta
 	job                *data.WorkflowJob
 	logs               []data.LogsWithTime
 	renderedLogs       string
@@ -25,77 +27,86 @@ type jobItem struct {
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
-func (i *jobItem) Title() string { return fmt.Sprintf("%s %s", i.viewStatus(), i.job.Name) }
+func (i *jobItem) Title() string {
+	status := i.viewStatus()
+	s := i.meta.TitleStyle()
+	w := i.meta.width - lipgloss.Width(status) - 2
+	return lipgloss.JoinHorizontal(lipgloss.Top, s.Render(status), s.Render(" "),
+		s.Width(w).Render(ansi.Truncate(s.Render(i.job.Name), w, Ellipsis)))
+}
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *jobItem) Description() string {
 	if i.job.Bucket == data.CheckBucketSkipping {
 		return "Skipped"
 	}
+	if i.job.Bucket == data.CheckBucketPending {
+		return "Pending"
+	}
 
-	if i.job.CompletedAt.IsZero() || i.job.StartedAt.IsZero() {
+	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
 		return "Running..."
 	}
 
-	return i.job.CompletedAt.Sub(i.job.StartedAt).String()
+	// return i.job.CompletedAt.Sub(i.job.StartedAt).String()
+	return string(i.job.Conclusion)
 }
 
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
 func (i *jobItem) FilterValue() string { return i.job.Name }
 
 func (i *jobItem) viewStatus() string {
-	if i.job.Bucket == data.CheckBucketPass {
-		return i.styles.successGlyph.Render()
+	s := i.meta.TitleStyle()
+	switch i.job.Bucket {
+	case data.CheckBucketPass:
+		return i.meta.styles.successGlyph.Inherit(s).Render()
+	case data.CheckBucketFail:
+		return i.meta.styles.failureGlyph.Inherit(s).Render()
+	case data.CheckBucketSkipping:
+		return i.meta.styles.skippedGlyph.Inherit(s).Render()
+	case data.CheckBucketCancel:
+		return i.meta.styles.canceledGlyph.Inherit(s).Render()
+	default:
+		return i.meta.styles.pendingGlyph.Inherit(s).Render()
 	}
-
-	if i.job.Bucket == data.CheckBucketSkipping {
-		return i.styles.skippedGlyph.Render()
-	}
-
-	if i.job.Bucket == data.CheckBucketCancel {
-		return i.styles.canceledGlyph.Render()
-	}
-
-	if i.job.Bucket == data.CheckBucketFail {
-		return i.styles.failureGlyph.Render()
-	}
-
-	return i.styles.waitingGlyph.Render()
 }
 
-func newCheckItemDelegate() list.DefaultDelegate {
-	d := list.NewDefaultDelegate()
+// jobsDelegate implements list.ItemDelegate
+type jobsDelegate struct {
+	commonDelegate
+}
 
-	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		job, ok := m.SelectedItem().(*jobItem)
-		if !ok {
-			return nil
-		}
+func newJobItemDelegate(styles styles) list.ItemDelegate {
+	d := jobsDelegate{commonDelegate{styles: styles, focused: true}}
+	return &d
+}
 
-		switch msg := msg.(type) {
-		case tea.KeyPressMsg:
-			log.Debug("key pressed on run", "key", msg.Text)
-			switch msg.Text {
-			case "o":
-				return makeOpenUrlCmd(job.job.Link)
-			}
-		}
+func (d *jobsDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	ji, ok := item.(*jobItem)
+	if !ok {
+		return
+	}
 
+	d.commonDelegate.Render(w, m, index, ji, &ji.meta)
+}
+
+// Update implements github.com/charmbracelet/bubbles.list.ItemDelegate.Update
+func (d *jobsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
+	job, ok := m.SelectedItem().(*jobItem)
+	if !ok {
 		return nil
 	}
 
-	keys := newDelegateKeyMap()
-	help := []key.Binding{keys.openInBrowser}
-
-	d.ShortHelpFunc = func() []key.Binding {
-		return help
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		log.Debug("key pressed on job", "key", msg.Text)
+		switch msg.Text {
+		case "o":
+			return makeOpenUrlCmd(job.job.Link)
+		}
 	}
 
-	d.FullHelpFunc = func() [][]key.Binding {
-		return [][]key.Binding{help}
-	}
-
-	return d
+	return nil
 }
 
 func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
@@ -104,11 +115,11 @@ func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
 		loadingSteps = false
 	}
 	return jobItem{
+		meta:         itemMeta{styles: styles},
 		job:          &job,
 		logs:         make([]data.LogsWithTime, 0),
 		loadingLogs:  true,
 		loadingSteps: loadingSteps,
 		steps:        make([]*stepItem, 0),
-		styles:       styles,
 	}
 }

@@ -2,26 +2,31 @@ package tui
 
 import (
 	"fmt"
+	"io"
 
-	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dlvhdr/gh-enhance/internal/data"
 )
 
 type runItem struct {
+	meta      itemMeta
 	run       *data.WorkflowRun
-	styles    styles
 	jobsItems []*jobItem
 	loading   bool
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
 func (i *runItem) Title() string {
-	status := i.viewWarnings()
-	return i.styles.focusedPaneItemTitleStyle.Render(fmt.Sprintf("%s %s", status, i.run.Name))
+	status := i.viewStatus()
+	s := i.meta.TitleStyle()
+	w := i.meta.width - lipgloss.Width(status) - 2
+	return lipgloss.JoinHorizontal(lipgloss.Top, s.Render(status), s.Render(" "),
+		s.Width(w).Render(ansi.Truncate(s.Render(i.run.Name), w, Ellipsis)))
 }
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
@@ -36,54 +41,75 @@ func (i *runItem) Description() string {
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
 func (i *runItem) FilterValue() string { return i.run.Name }
 
-func (i *runItem) viewWarnings() string {
+func (i *runItem) viewStatus() string {
+	s := i.meta.TitleStyle()
 	switch i.run.Bucket {
 	case data.CheckBucketPass:
-		return i.styles.successGlyph.Render()
+		return i.meta.styles.successGlyph.Inherit(s).Render()
 	case data.CheckBucketFail:
-		return i.styles.failureGlyph.Render()
+		return i.meta.styles.failureGlyph.Inherit(s).Render()
 	case data.CheckBucketSkipping:
-		return i.styles.skippedGlyph.Render()
+		return i.meta.styles.skippedGlyph.Inherit(s).Render()
 	case data.CheckBucketCancel:
-		return i.styles.canceledGlyph.Render()
+		return i.meta.styles.canceledGlyph.Inherit(s).Render()
 	default:
-		return i.styles.pendingGlyph.Render()
+		return i.meta.styles.pendingGlyph.Inherit(s).Render()
 	}
 }
 
-func newRunItemDelegate() list.DefaultDelegate {
-	d := list.NewDefaultDelegate()
+// runsDelegate implements list.ItemDelegate
+type runsDelegate struct {
+	commonDelegate
+}
 
-	d.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
-		run, ok := m.SelectedItem().(*runItem)
-		if !ok {
-			return nil
-		}
+func (d *runsDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
+	ri, ok := item.(*runItem)
+	if !ok {
+		return
+	}
 
-		switch msg := msg.(type) {
-		case tea.KeyPressMsg:
-			log.Debug("key pressed on run", "key", msg.Text)
-			switch msg.Text {
-			case "o":
-				return makeOpenUrlCmd(run.run.Link)
-			}
-		}
+	d.commonDelegate.Render(w, m, index, ri, &ri.meta)
+}
 
+// Height implements github.com/charmbracelet/bubbles.list.ItemDelegate.Height
+func (d *runsDelegate) Height() int {
+	return 2
+}
+
+// Spacing implements github.com/charmbracelet/bubbles.list.ItemDelegate.Spacing
+func (d *runsDelegate) Spacing() int {
+	return 1
+}
+
+// Update implements github.com/charmbracelet/bubbles.list.ItemDelegate.Update
+func (d *runsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
+	selected, ok := m.SelectedItem().(*runItem)
+
+	if !ok {
 		return nil
 	}
 
-	keys := newDelegateKeyMap()
-	help := []key.Binding{keys.openInBrowser}
-
-	d.ShortHelpFunc = func() []key.Binding {
-		return help
+	selectedID := selected.run.Id
+	for _, it := range m.Items() {
+		ri := it.(*runItem)
+		ri.meta.focused = selectedID == ri.run.Id
 	}
 
-	d.FullHelpFunc = func() [][]key.Binding {
-		return [][]key.Binding{help}
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		log.Debug("key pressed on run", "key", msg.Text)
+		switch msg.Text {
+		case "o":
+			return makeOpenUrlCmd(selected.run.Link)
+		}
 	}
 
-	return d
+	return nil
+}
+
+func newRunItemDelegate(styles styles) list.ItemDelegate {
+	d := runsDelegate{commonDelegate{styles: styles, focused: true}}
+	return &d
 }
 
 func NewRunItem(run data.WorkflowRun, styles styles) runItem {
@@ -94,9 +120,9 @@ func NewRunItem(run data.WorkflowRun, styles styles) runItem {
 	}
 
 	return runItem{
+		meta:      itemMeta{styles: styles},
 		run:       &run,
 		jobsItems: jobs,
 		loading:   true,
-		styles:    styles,
 	}
 }

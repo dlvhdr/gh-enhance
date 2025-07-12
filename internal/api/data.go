@@ -49,7 +49,8 @@ func IsFailureConclusion(c Conclusion) bool {
 
 // CheckSuite is a grouping of CheckRuns
 type CheckSuite struct {
-	App struct {
+	Conclusion Conclusion
+	App        struct {
 		Id   string
 		Name string
 	}

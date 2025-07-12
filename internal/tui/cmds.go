@@ -92,7 +92,7 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 					Link:     link,
 					Workflow: wfr.Workflow.Name,
 					Event:    statusCheck.CheckSuite.WorkflowRun.Event,
-					Bucket:   data.GetConclusionBucket(statusCheck.Conclusion),
+					Bucket:   data.GetConclusionBucket(statusCheck.CheckSuite.Conclusion),
 				}
 				run.Jobs = []data.WorkflowJob{job}
 			}
@@ -236,3 +236,25 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 		return nil
 	}
 }
+
+// func calcRunBucket(soFar data.CheckBucket, jobBucket data.CheckBucket) data.CheckBucket {
+// 	switch jobBucket {
+// 	case data.CheckBucketSkipping:
+// 		if soFar == data.CheckBucketSkipping {
+// 			return data.CheckBucketSkipping
+// 		}
+// 		return soFar
+// 	case data.CheckBucketFail:
+// 		return data.CheckBucketFail
+// 	case data.CheckBucketPass:
+// 		if soFar != data.CheckBucketFail {
+// 			return data.CheckBucketPass
+// 		}
+// 	case data.CheckBucketPending:
+// 		return data.CheckBucketPending
+// 	default:
+// 		return data.CheckBucketPass
+// 	}
+//
+// 	return data.CheckBucketPass
+// }
