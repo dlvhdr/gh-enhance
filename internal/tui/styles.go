@@ -67,11 +67,9 @@ func makeStyles() styles {
 	return styles{
 		focusedPaneTitleStyle: lipgloss.NewStyle().Bold(true).PaddingLeft(0).PaddingRight(0).Margin(
 			0).Foreground(focusedColor),
-		unfocusedPaneTitleStyle: lipgloss.NewStyle().Faint(true).PaddingLeft(0).PaddingRight(0).Margin(0),
-		focusedPaneTitleBarStyle: lipgloss.NewStyle().Bold(true).PaddingLeft(1).PaddingRight(0).BorderBottom(
-			true).Border(lipgloss.ThickBorder(), false, false, true, false).BorderForeground(focusedColor),
-		unfocusedPaneTitleBarStyle: lipgloss.NewStyle().Faint(true).PaddingLeft(1).PaddingRight(0).BorderBottom(
-			true).Border(lipgloss.NormalBorder(), false, false, true, false).BorderForeground(faintColor),
+		unfocusedPaneTitleStyle:    lipgloss.NewStyle().Faint(true).PaddingLeft(0).PaddingRight(0).Margin(0),
+		focusedPaneTitleBarStyle:   lipgloss.NewStyle().Bold(true).PaddingRight(0).MarginBottom(1),
+		unfocusedPaneTitleBarStyle: lipgloss.NewStyle().Bold(true).Faint(true).PaddingRight(0).MarginBottom(1),
 
 		normalItemDescStyle: defaultItemStyles.DimmedDesc.PaddingLeft(4),
 

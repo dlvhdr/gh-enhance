@@ -18,5 +18,6 @@ const (
 
 	Separator    = "│"
 	ExpandSymbol = "▶"
+	ListSymbol   = "≡"
 	Ellipsis     = "…"
 )

@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
+	"github.com/charmbracelet/bubbles/v2/spinner"
 	"github.com/charmbracelet/bubbles/v2/viewport"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
@@ -63,17 +64,17 @@ func NewModel(repo string, number string) model {
 	s := makeStyles()
 
 	runsList, runsDelegate := newRunsDefaultList(s)
-	runsList.Title = "Runs"
+	runsList.Title = ListSymbol + " Runs"
 	runsList.SetStatusBarItemName("run", "runs")
 	runsList.SetWidth(focusedPaneWidth)
 
 	jobsList, jobsDelegate := newJobsDefaultList(s)
-	jobsList.Title = "Jobs"
+	jobsList.Title = ListSymbol + " Jobs"
 	jobsList.SetStatusBarItemName("job", "jobs")
 	jobsList.SetWidth(unfocusedPaneWidth)
 
 	stepsList, stepsDelegate := newStepsDefaultList(s)
-	stepsList.Title = "Steps"
+	stepsList.Title = ListSymbol + " Steps"
 	stepsList.SetStatusBarItemName("step", "steps")
 	stepsList.SetWidth(unfocusedPaneWidth)
 
@@ -105,7 +106,7 @@ func NewModel(repo string, number string) model {
 }
 
 func (m model) Init() tea.Cmd {
-	return m.makeGetPRChecksCmd(m.prNumber)
+	return tea.Batch(m.runsList.StartSpinner(), m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -116,6 +117,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case workflowRunsFetchedMsg:
+		m.runsList.StopSpinner()
+		m.jobsList.StopSpinner()
 		runItems := make([]list.Item, 0)
 		for _, run := range msg.runs {
 			ri := NewRunItem(run, m.styles)
@@ -200,6 +203,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
+	case spinner.TickMsg:
+		m.runsList, cmd = m.runsList.Update(msg)
+		cmds = append(cmds, cmd)
+		m.jobsList, cmd = m.jobsList.Update(msg)
+		cmds = append(cmds, cmd)
+		m.stepsList, cmd = m.stepsList.Update(msg)
+		cmds = append(cmds, cmd)
+		return m, tea.Batch(cmds...)
+
 	case errMsg:
 		m.err = msg
 		return m, nil
@@ -278,7 +290,7 @@ func (m model) View() string {
 }
 
 func (m *model) viewLogs() string {
-	title := "Full Job Logs"
+	title := "⏺︎ Full Job Logs"
 	if m.focusedPane == PaneLogs {
 		title = m.styles.focusedPaneTitleBarStyle.Render(
 			m.styles.focusedPaneTitleStyle.Width(m.logsWidth() - 1).Render(title))
@@ -330,49 +342,46 @@ func (m *model) setFocusedPaneStyles() {
 
 func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
 	l.Styles.Title = m.styles.focusedPaneTitleStyle
-	l.Styles.TitleBar = m.styles.focusedPaneTitleBarStyle.Width(focusedPaneWidth)
+	l.Styles.TitleBar = m.styles.focusedPaneTitleBarStyle
+	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1).Width(focusedPaneWidth)
 	l.SetDelegate(*delegate)
 	l.SetWidth(focusedPaneWidth)
 }
 
 func (m *model) setListUnfocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
 	l.Styles.Title = m.styles.unfocusedPaneTitleStyle
-	l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle.Width(unfocusedPaneWidth)
+	l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle
+	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1).Width(unfocusedPaneWidth)
 	l.SetDelegate(*delegate)
 	l.SetWidth(unfocusedPaneWidth)
 }
 
 func newRunsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 	d := newRunItemDelegate(styles)
-	l := list.New([]list.Item{}, d, 0, 0)
-	l.KeyMap.NextPage = key.Binding{}
-	l.KeyMap.PrevPage = key.Binding{}
-	l.SetShowHelp(false)
-	l.SetShowStatusBar(false)
-
-	return l, d
+	return newList(d), d
 }
 
 func newJobsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 	d := newJobItemDelegate(styles)
-	l := list.New([]list.Item{}, d, 0, 0)
-	l.KeyMap.NextPage = key.Binding{}
-	l.KeyMap.PrevPage = key.Binding{}
-	l.SetShowHelp(false)
-	l.SetShowStatusBar(false)
-
-	return l, d
+	return newList(d), d
 }
 
 func newStepsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 	d := newStepItemDelegate(styles)
-	l := list.New([]list.Item{}, d, 0, 0)
+	return newList(d), d
+}
+
+func newList(delegate list.ItemDelegate) list.Model {
+	l := list.New([]list.Item{}, delegate, 0, 0)
+	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1)
+	l.Styles.Spinner = lipgloss.NewStyle().Width(5).Background(lipgloss.Red)
+	l.SetSpinner(spinner.Dot)
 	l.KeyMap.NextPage = key.Binding{}
 	l.KeyMap.PrevPage = key.Binding{}
+	l.StartSpinner()
 	l.SetShowHelp(false)
-	l.SetShowStatusBar(false)
-
-	return l, d
+	l.SetShowStatusBar(true)
+	return l
 }
 
 func (m *model) updateLists() []tea.Cmd {
