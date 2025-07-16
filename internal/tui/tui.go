@@ -145,6 +145,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ji := m.getJobItemById(msg.jobId)
 		if ji != nil {
 			ji.logs = msg.logs
+			ji.logsErr = msg.err
+			ji.logsStderr = msg.stderr
 			ji.loadingLogs = false
 			currJob := m.jobsList.SelectedItem()
 			if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
@@ -572,6 +574,12 @@ func (m *model) renderJobLogs() {
 	}
 
 	ji := currJob.(*jobItem)
+
+	if ji.logsErr != nil {
+		m.logsViewport.SetContent(ji.logsStderr)
+		return
+	}
+
 	if ji.renderedLogs != "" {
 		m.logsViewport.SetContent(ji.renderedLogs)
 		return
@@ -599,6 +607,10 @@ func (m *model) logsContentView() string {
 
 	if ji.loadingLogs || ji.loadingSteps {
 		return m.loadingLogsView()
+	}
+
+	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "HTTP 410:") {
+		return m.fullScreenMessageView("The logs for this run have expired and are no longer available.")
 	}
 
 	if m.isScrollbarVisible() {

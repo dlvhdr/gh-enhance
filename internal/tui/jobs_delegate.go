@@ -16,6 +16,8 @@ type jobItem struct {
 	meta               itemMeta
 	job                *data.WorkflowJob
 	logs               []data.LogsWithTime
+	logsErr            error
+	logsStderr         string
 	renderedLogs       string
 	renderedText       string
 	title              string

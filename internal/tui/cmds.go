@@ -143,8 +143,10 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 }
 
 type jobLogsFetchedMsg struct {
-	jobId string
-	logs  []data.LogsWithTime
+	jobId  string
+	logs   []data.LogsWithTime
+	err    error
+	stderr string
 }
 
 type checkRunOutputFetchedMsg struct {
@@ -200,7 +202,11 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.job.Id)
 		if err != nil {
 			log.Error("error fetching job logs", "link", job.job.Link, "err", err, "stderr", stderr.String())
-			return nil
+			return jobLogsFetchedMsg{
+				jobId:  job.job.Id,
+				err:    err,
+				stderr: stderr.String(),
+			}
 		}
 		jobLogs := jobLogsRes.String()
 		log.Debug("success fetching job logs", "link", job.job.Link, "bytes", len(jobLogsRes.Bytes()))
