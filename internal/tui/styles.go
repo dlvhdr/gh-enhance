@@ -59,8 +59,8 @@ func makeStyles() styles {
 	defaultItemStyles := list.NewDefaultItemStyles(true)
 	focusedColor := t.Blue
 	unfocusedColor := tint.Darken(t.BrightBlue, 70)
-	faintColor := lipgloss.Color("8")
-	fainterColor := lipgloss.Color("236")
+	faintColor := tint.Darken(focusedColor, 50)
+	fainterColor := tint.Darken(focusedColor, 80)
 
 	errorBgStyle := lipgloss.NewStyle().Background(lipgloss.Color("#1C0D0F"))
 	bg := tint.Lighten(t.Bg, 10)
@@ -103,7 +103,7 @@ func makeStyles() styles {
 		},
 
 		paneStyle: lipgloss.NewStyle().BorderRight(true).BorderStyle(
-			lipgloss.NormalBorder()).BorderForeground(faintColor),
+			lipgloss.NormalBorder()).BorderForeground(fainterColor),
 		lineNumbersStyle:           lipgloss.NewStyle().Foreground(fainterColor).Align(lipgloss.Right),
 		canceledGlyph:              lipgloss.NewStyle().Foreground(faintColor).SetString(CanceledIcon),
 		skippedGlyph:               lipgloss.NewStyle().Foreground(faintColor).SetString(SkippedIcon),

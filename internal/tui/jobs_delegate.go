@@ -48,8 +48,7 @@ func (i *jobItem) Description() string {
 		return "Running..."
 	}
 
-	// return i.job.CompletedAt.Sub(i.job.StartedAt).String()
-	return string(i.job.Conclusion)
+	return i.job.CompletedAt.Sub(i.job.StartedAt).String()
 }
 
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
