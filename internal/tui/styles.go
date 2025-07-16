@@ -57,17 +57,19 @@ func makeStyles() styles {
 	t := tint.Current()
 
 	defaultItemStyles := list.NewDefaultItemStyles(true)
-	focusedColor := t.BrightBlue
+	focusedColor := t.Blue
+	unfocusedColor := tint.Darken(t.BrightBlue, 70)
 	faintColor := lipgloss.Color("8")
 	fainterColor := lipgloss.Color("236")
 
 	errorBgStyle := lipgloss.NewStyle().Background(lipgloss.Color("#1C0D0F"))
 	bg := tint.Lighten(t.Bg, 10)
 
+	baseTitleStyle := lipgloss.NewStyle().Bold(true).PaddingLeft(1).PaddingRight(1).Margin(0)
+
 	return styles{
-		focusedPaneTitleStyle: lipgloss.NewStyle().Bold(true).PaddingLeft(0).PaddingRight(0).Margin(
-			0).Foreground(focusedColor),
-		unfocusedPaneTitleStyle:    lipgloss.NewStyle().Faint(true).PaddingLeft(0).PaddingRight(0).Margin(0),
+		focusedPaneTitleStyle:      baseTitleStyle.Foreground(t.Black).Background(focusedColor),
+		unfocusedPaneTitleStyle:    baseTitleStyle.Background(unfocusedColor).Foreground(t.Fg),
 		focusedPaneTitleBarStyle:   lipgloss.NewStyle().Bold(true).PaddingRight(0).MarginBottom(1),
 		unfocusedPaneTitleBarStyle: lipgloss.NewStyle().Bold(true).Faint(true).PaddingRight(0).MarginBottom(1),
 

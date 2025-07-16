@@ -291,12 +291,13 @@ func (m model) View() string {
 
 func (m *model) viewLogs() string {
 	title := "⏺︎ Full Job Logs"
+	w := m.logsWidth() - 1
 	if m.focusedPane == PaneLogs {
-		title = m.styles.focusedPaneTitleBarStyle.Render(
-			m.styles.focusedPaneTitleStyle.Width(m.logsWidth() - 1).Render(title))
+		s := m.styles.focusedPaneTitleBarStyle.Width(w)
+		title = s.Render(m.styles.focusedPaneTitleStyle.Render(title))
 	} else {
-		title = m.styles.unfocusedPaneTitleBarStyle.Render(
-			m.styles.unfocusedPaneTitleStyle.Width(m.logsWidth() - 1).Render(title))
+		s := m.styles.unfocusedPaneTitleBarStyle.Width(w)
+		title = s.Render(m.styles.unfocusedPaneTitleStyle.Render(title))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, m.logsContentView())
@@ -311,7 +312,6 @@ func (m *model) setFocusedPaneStyles() {
 		m.setListFocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
-		break
 	case PaneJobs:
 		m.runsDelegate.(*runsDelegate).focused = false
 		m.jobsDelegate.(*jobsDelegate).focused = true
@@ -319,7 +319,6 @@ func (m *model) setFocusedPaneStyles() {
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListFocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
-		break
 	case PaneSteps:
 		m.runsDelegate.(*runsDelegate).focused = false
 		m.jobsDelegate.(*jobsDelegate).focused = false
@@ -327,7 +326,6 @@ func (m *model) setFocusedPaneStyles() {
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListFocusedStyles(&m.stepsList, &m.stepsDelegate)
-		break
 	case PaneLogs:
 		m.runsDelegate.(*runsDelegate).focused = false
 		m.jobsDelegate.(*jobsDelegate).focused = false
