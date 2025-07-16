@@ -34,7 +34,7 @@ var (
 	)
 
 	gotoBottomKey = key.NewBinding(
-		key.WithKeys("shift+g"),
+		key.WithKeys("shift+g", "G"),
 		key.WithHelp("G", "go to bottom"),
 	)
 
