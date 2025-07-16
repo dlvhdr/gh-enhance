@@ -228,7 +228,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.updateLists()...)
 			cmds = append(cmds, m.onRunChanged()...)
 		}
-		break
 	case PaneJobs:
 		before := m.jobsList.Cursor()
 		m.jobsList, cmd = m.jobsList.Update(msg)
@@ -372,13 +371,12 @@ func newStepsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 func newList(delegate list.ItemDelegate) list.Model {
 	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1)
-	l.Styles.Spinner = lipgloss.NewStyle().Width(5).Background(lipgloss.Red)
 	l.SetSpinner(spinner.Dot)
 	l.KeyMap.NextPage = key.Binding{}
 	l.KeyMap.PrevPage = key.Binding{}
 	l.StartSpinner()
 	l.SetShowHelp(false)
-	l.SetShowStatusBar(true)
+	l.SetShowStatusBar(false)
 	return l
 }
 
@@ -390,11 +388,27 @@ func (m *model) updateLists() []tea.Cmd {
 	}
 
 	run := m.runsList.SelectedItem().(*runItem)
+	if run.loading {
+		cmds = append(cmds, m.stepsList.StartSpinner())
+	} else {
+		m.stepsList.StopSpinner()
+	}
+	if len(m.runsList.Items()) > 0 || m.runsList.FilterState() == list.FilterApplied {
+		m.runsList.SetShowStatusBar(true)
+	} else {
+		m.runsList.SetShowStatusBar(false)
+	}
+
 	jobs := make([]list.Item, 0)
 	for _, job := range run.jobsItems {
 		jobs = append(jobs, job)
 	}
 	cmds = append(cmds, m.jobsList.SetItems(jobs))
+	if len(m.jobsList.Items()) > 0 || m.jobsList.FilterState() == list.FilterApplied {
+		m.jobsList.SetShowStatusBar(true)
+	} else {
+		m.jobsList.SetShowStatusBar(false)
+	}
 
 	if m.jobsList.Cursor() >= len(run.jobsItems) {
 		return cmds
@@ -406,6 +420,11 @@ func (m *model) updateLists() []tea.Cmd {
 		steps = append(steps, step)
 	}
 	cmds = append(cmds, m.stepsList.SetItems(steps))
+	if len(m.stepsList.Items()) > 0 || m.stepsList.FilterState() == list.FilterApplied {
+		m.stepsList.SetShowStatusBar(true)
+	} else {
+		m.stepsList.SetShowStatusBar(false)
+	}
 
 	return cmds
 }
@@ -479,7 +498,10 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) {
 	}
 
 	if ri == nil {
+		log.Error("run not found when trying to enrich with steps", "msg", msg)
 		return
+	} else {
+		log.Error("wat", "msg", msg, "ri", ri.Title())
 	}
 
 	ri.loading = false

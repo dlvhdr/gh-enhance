@@ -86,8 +86,14 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				if link == "" {
 					link = statusCheck.Url
 				}
+				var id int
+				if statusCheck.CheckSuite.WorkflowRun.DatabaseId == 0 {
+					id = statusCheck.CheckSuite.DatabaseId
+				} else {
+					id = statusCheck.CheckSuite.WorkflowRun.DatabaseId
+				}
 				run = data.WorkflowRun{
-					Id:       fmt.Sprintf("%d", statusCheck.CheckSuite.WorkflowRun.DatabaseId),
+					Id:       fmt.Sprintf("%d", id),
 					Name:     wfName,
 					Link:     link,
 					Workflow: wfr.Workflow.Name,

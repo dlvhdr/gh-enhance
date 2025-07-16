@@ -1,0 +1,544 @@
+{
+  "data": {
+    "resource": {
+      "title": "fix(prompt): prompt mark not placed after text edits correctly",
+      "statusCheckRollup": {
+        "state": "FAILURE",
+        "contexts": {
+          "nodes": [
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilauA",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094648",
+              "name": "ubuntu asan clang functionaltest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094648",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094648,
+              "startedAt": "2025-06-27T14:33:14Z",
+              "completedAt": "2025-06-27T14:51:17Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdila4Q",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094689",
+              "name": "ubuntu asan clang oldtest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094689",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094689,
+              "startedAt": "2025-06-27T14:38:12Z",
+              "completedAt": "2025-06-27T14:45:57Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilawg",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094658",
+              "name": "ubuntu tsan clang functionaltest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094658",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094658,
+              "startedAt": "2025-06-27T14:33:51Z",
+              "completedAt": "2025-06-27T14:54:05Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilatQ",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094645",
+              "name": "ubuntu release gcc unittest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094645",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094645,
+              "startedAt": "2025-06-27T14:33:41Z",
+              "completedAt": "2025-06-27T14:37:18Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilaqA",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094632",
+              "name": "ubuntu release gcc functionaltest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094632",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094632,
+              "startedAt": "2025-06-27T14:36:54Z",
+              "completedAt": "2025-06-27T14:46:28Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilasw",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094643",
+              "name": "ubuntu release gcc oldtest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094643",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094643,
+              "startedAt": "2025-06-27T14:29:42Z",
+              "completedAt": "2025-06-27T14:33:31Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilbBg",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094726",
+              "name": "macos intel clang unittest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094726",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094726,
+              "startedAt": "2025-06-27T14:36:49Z",
+              "completedAt": "2025-06-27T14:40:40Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilauQ",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094649",
+              "name": "macos intel clang functionaltest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094649",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094649,
+              "startedAt": "2025-06-27T14:31:22Z",
+              "completedAt": "2025-06-27T14:43:15Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilavQ",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094653",
+              "name": "macos intel clang oldtest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094653",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094653,
+              "startedAt": "2025-06-27T14:32:16Z",
+              "completedAt": "2025-06-27T14:40:28Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilazA",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094668",
+              "name": "macos arm clang unittest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094668",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094668,
+              "startedAt": "2025-06-27T14:26:41Z",
+              "completedAt": "2025-06-27T14:28:23Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilazw",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094671",
+              "name": "macos arm clang functionaltest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094671",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094671,
+              "startedAt": "2025-06-27T14:35:58Z",
+              "completedAt": "2025-06-27T14:44:15Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdila2Q",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094681",
+              "name": "macos arm clang oldtest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094681",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094681,
+              "startedAt": "2025-06-27T14:40:31Z",
+              "completedAt": "2025-06-27T14:43:46Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdila0w",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094675",
+              "name": "ubuntu puc-lua gcc functionaltest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094675",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094675,
+              "startedAt": "2025-06-27T14:32:30Z",
+              "completedAt": "2025-06-27T14:41:43Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilatA",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094644",
+              "name": "ubuntu puc-lua gcc oldtest",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094644",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094644,
+              "startedAt": "2025-06-27T14:33:41Z",
+              "completedAt": "2025-06-27T14:36:50Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilapg",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094630",
+              "name": "build using zig build",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094630",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094630,
+              "startedAt": "2025-06-27T14:36:39Z",
+              "completedAt": "2025-06-27T14:55:12Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilavw",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094655",
+              "name": "windows / windows (functional)",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094655",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094655,
+              "startedAt": "2025-06-27T14:26:06Z",
+              "completedAt": "2025-06-27T14:41:04Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilatw",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094647",
+              "name": "windows / windows (old)",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094647",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094647,
+              "startedAt": "2025-06-27T14:28:06Z",
+              "completedAt": "2025-06-27T14:35:54Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilauw",
+              "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656131/job/44932094651",
+              "name": "with-external-deps",
+              "status": "COMPLETED",
+              "title": null,
+              "url": "https://github.com/neovim/neovim/runs/44932094651",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932094651,
+              "startedAt": "2025-06-27T14:37:42Z",
+              "completedAt": "2025-06-27T14:38:56Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825235042",
+                "app": {
+                  "id": "MDM6QXBwMTUzNjg=",
+                  "name": "GitHub Actions"
+                },
+                "databaseId": 40825235042,
+                "workflowRun": {
+                  "runNumber": 37273,
+                  "workflow": {
+                    "name": "test"
+                  }
+                }
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdjF7Xw",
+              "detailsUrl": "https://github.com/neovim/neovim/runs/44932627295",
+              "name": "CodeQL",
+              "status": "COMPLETED",
+              "title": "No new alerts in code changed by this pull request",
+              "url": "https://github.com/neovim/neovim/runs/44932627295",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932627295,
+              "startedAt": "2025-06-27T14:32:41Z",
+              "completedAt": "2025-06-27T14:32:43Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825692003",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825692003",
+                "app": {
+                  "id": "MDM6QXBwNTc3ODk=",
+                  "name": "GitHub Advanced Security"
+                },
+                "databaseId": 40825692003,
+                "workflowRun": null
+              }
+            },
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilgNw",
+              "detailsUrl": "https://cirrus-ci.com/task/6714374376652800",
+              "name": "FreeBSD",
+              "status": "COMPLETED",
+              "title": "Task Summary",
+              "url": "https://github.com/neovim/neovim/runs/44932096055",
+              "conclusion": "SUCCESS",
+              "databaseId": 44932096055,
+              "startedAt": "2025-06-27T14:26:35Z",
+              "completedAt": "2025-06-27T14:36:00Z",
+              "checkSuite": {
+                "url": "https://github.com/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825236642",
+                "resourcePath": "/neovim/neovim/commit/dd72b33fefda51ac4318c0322efa95b960f30851/checks?check_suite_id=40825236642",
+                "app": {
+                  "id": "MDM6QXBwMzIzMg==",
+                  "name": "Cirrus CI"
+                },
+                "databaseId": 40825236642,
+                "workflowRun": null
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
