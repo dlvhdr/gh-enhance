@@ -613,6 +613,10 @@ func (m *model) logsContentView() string {
 		return m.fullScreenMessageView("This job was cancelled")
 	}
 
+	if ji.job.Bucket == data.CheckBucketPending {
+		return m.fullScreenMessageView("This job is still running")
+	}
+
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "HTTP 410:") {
 		return m.fullScreenMessageView("The logs for this run have expired and are no longer available.")
 	}
