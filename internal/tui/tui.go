@@ -274,6 +274,11 @@ func (m model) View() string {
 		return m.err.Error()
 	}
 
+	steps := ""
+	if m.shouldShowSteps() {
+		steps = m.styles.paneStyle.Render(m.stepsList.View())
+	}
+
 	return lipgloss.NewStyle().
 		Width(m.width).
 		MaxWidth(m.width).
@@ -284,10 +289,21 @@ func (m model) View() string {
 				lipgloss.Top,
 				m.styles.paneStyle.Render(m.runsList.View()),
 				m.styles.paneStyle.Render(m.jobsList.View()),
-				m.styles.paneStyle.Render(m.stepsList.View()),
+				steps,
 				m.viewLogs(),
 			),
 		)
+}
+
+func (m *model) shouldShowSteps() bool {
+	job := m.jobsList.SelectedItem()
+	loadingSteps := false
+	if job != nil {
+		ji := job.(*jobItem)
+		loadingSteps = ji.loadingSteps
+	}
+
+	return loadingSteps || len(m.stepsList.Items()) > 0
 }
 
 func (m *model) viewLogs() string {
@@ -432,12 +448,17 @@ func (m *model) updateLists() []tea.Cmd {
 }
 
 func (m *model) logsWidth() int {
-	borders := 3
+	borders := 2
 	sb := 0
 	if m.isScrollbarVisible() {
 		sb = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())
 	}
-	return m.width - m.runsList.Width() - m.jobsList.Width() - m.stepsList.Width() - borders - sb
+	steps := 0
+	if m.shouldShowSteps() {
+		steps = m.stepsList.Width()
+		borders = borders + 1
+	}
+	return m.width - m.runsList.Width() - m.jobsList.Width() - steps - borders - sb
 }
 
 func (m *model) loadingLogsView() string {
