@@ -3,6 +3,11 @@ package tui
 import "github.com/charmbracelet/bubbles/v2/key"
 
 var (
+	openPR = key.NewBinding(
+		key.WithKeys("O"),
+		key.WithHelp("O", "open PR"),
+	)
+
 	quitKeys = key.NewBinding(
 		key.WithKeys("ctrl+c"),
 		key.WithHelp("ctrl+c", "press q to quit"),

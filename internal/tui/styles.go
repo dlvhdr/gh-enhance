@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"image/color"
+
 	"github.com/charmbracelet/bubbles/v2/list"
 	"github.com/charmbracelet/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
@@ -20,7 +22,16 @@ type paneItemStyles struct {
 	focusedSelectedStyle lipgloss.Style
 }
 
+type colors struct {
+	focusedColor   color.Color
+	unfocusedColor color.Color
+	faintColor     color.Color
+	fainterColor   color.Color
+}
+
 type styles struct {
+	colors colors
+
 	defaultListStyles          lipgloss.Style
 	focusedPaneTitleStyle      lipgloss.Style
 	unfocusedPaneTitleStyle    lipgloss.Style
@@ -51,6 +62,10 @@ type styles struct {
 	scrollbarStyle             lipgloss.Style
 	scrollbarThumbStyle        lipgloss.Style
 	scrollbarTrackStyle        lipgloss.Style
+
+	headerStyle lipgloss.Style
+	logoStyle   lipgloss.Style
+	footerStyle lipgloss.Style
 }
 
 func makeStyles() styles {
@@ -58,20 +73,32 @@ func makeStyles() styles {
 
 	defaultItemStyles := list.NewDefaultItemStyles(true)
 	focusedColor := t.Blue
-	unfocusedColor := tint.Darken(t.BrightBlue, 70)
-	faintColor := tint.Darken(focusedColor, 50)
-	fainterColor := tint.Darken(focusedColor, 80)
+	colors := colors{
+		focusedColor:   focusedColor,
+		unfocusedColor: tint.Darken(t.BrightBlue, 70),
+		// unfocusedColor: lipgloss.Red,
+		faintColor:   tint.Darken(focusedColor, 50),
+		fainterColor: tint.Darken(focusedColor, 80),
+	}
 
 	errorBgStyle := lipgloss.NewStyle().Background(lipgloss.Color("#1C0D0F"))
 	bg := tint.Lighten(t.Bg, 10)
 
-	baseTitleStyle := lipgloss.NewStyle().Bold(true).PaddingLeft(1).PaddingRight(1).Margin(0)
+	baseTitleStyle := lipgloss.NewStyle().Bold(true).Margin(0)
 
 	return styles{
-		focusedPaneTitleStyle:      baseTitleStyle.Foreground(t.Black).Background(focusedColor),
-		unfocusedPaneTitleStyle:    baseTitleStyle.Background(unfocusedColor).Foreground(t.Fg),
+		colors: colors,
+
+		headerStyle: lipgloss.NewStyle().Foreground(focusedColor).PaddingLeft(1).PaddingRight(1).Border(
+			lipgloss.NormalBorder(), true, false, true,
+			false).BorderForeground(colors.faintColor),
+		logoStyle:   lipgloss.NewStyle().Bold(true).Italic(true).Foreground(t.Blue),
+		footerStyle: lipgloss.NewStyle().Background(colors.fainterColor).Foreground(focusedColor).PaddingLeft(1).PaddingRight(1),
+
+		focusedPaneTitleStyle:      baseTitleStyle.Foreground(t.Black),
+		unfocusedPaneTitleStyle:    baseTitleStyle.Foreground(t.Fg),
 		focusedPaneTitleBarStyle:   lipgloss.NewStyle().Bold(true).PaddingRight(0).MarginBottom(1),
-		unfocusedPaneTitleBarStyle: lipgloss.NewStyle().Bold(true).Faint(true).PaddingRight(0).MarginBottom(1),
+		unfocusedPaneTitleBarStyle: lipgloss.NewStyle().Bold(true).PaddingRight(0).MarginBottom(1),
 
 		normalItemDescStyle: defaultItemStyles.DimmedDesc.PaddingLeft(4),
 
@@ -99,30 +126,36 @@ func makeStyles() styles {
 			unfocusedTitleStyle: lipgloss.NewStyle().Bold(true),
 
 			selectedDescStyle: lipgloss.NewStyle().Foreground(t.White).PaddingLeft(2).Background(bg),
-			descStyle:         lipgloss.NewStyle().Foreground(faintColor).PaddingLeft(2),
+			descStyle:         lipgloss.NewStyle().Foreground(colors.faintColor).PaddingLeft(2),
 		},
 
 		paneStyle: lipgloss.NewStyle().BorderRight(true).BorderStyle(
-			lipgloss.NormalBorder()).BorderForeground(fainterColor),
-		lineNumbersStyle:           lipgloss.NewStyle().Foreground(fainterColor).Align(lipgloss.Right),
-		canceledGlyph:              lipgloss.NewStyle().Foreground(faintColor).SetString(CanceledIcon),
-		skippedGlyph:               lipgloss.NewStyle().Foreground(faintColor).SetString(SkippedIcon),
+			lipgloss.NormalBorder()).BorderForeground(colors.fainterColor),
+		lineNumbersStyle:           lipgloss.NewStyle().Foreground(colors.fainterColor).Align(lipgloss.Right),
+		canceledGlyph:              lipgloss.NewStyle().Foreground(colors.faintColor).SetString(CanceledIcon),
+		skippedGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(SkippedIcon),
 		waitingGlyph:               lipgloss.NewStyle().Foreground(lipgloss.Yellow).SetString(WaitingIcon),
 		pendingGlyph:               lipgloss.NewStyle().Foreground(lipgloss.Yellow).SetString(PendingIcon),
 		failureGlyph:               lipgloss.NewStyle().Foreground(lipgloss.Red).SetString(FailureIcon),
 		successGlyph:               lipgloss.NewStyle().Foreground(lipgloss.Green).SetString(SuccessIcon),
-		noLogsStyle:                lipgloss.NewStyle().Foreground(faintColor).Bold(true),
+		noLogsStyle:                lipgloss.NewStyle().Foreground(colors.faintColor).Bold(true),
 		watermarkIllustrationStyle: lipgloss.NewStyle().Foreground(lipgloss.White),
 		debugStyle:                 lipgloss.NewStyle().Background(lipgloss.Color("1")),
 		errorBgStyle:               errorBgStyle,
 		errorStyle:                 errorBgStyle.Foreground(lipgloss.Red).Bold(false),
 		errorTitleStyle:            errorBgStyle.Foreground(lipgloss.Red).Bold(true),
-		separatorStyle:             lipgloss.NewStyle().Foreground(fainterColor),
+		separatorStyle:             lipgloss.NewStyle().Foreground(colors.fainterColor),
 		commandStyle:               lipgloss.NewStyle().Foreground(lipgloss.Blue).Inline(true),
 		stepStartMarkerStyle:       lipgloss.NewStyle().Bold(true).Inline(true),
 		groupStartMarkerStyle:      lipgloss.NewStyle().Inline(true),
 		scrollbarStyle:             lipgloss.NewStyle(),
-		scrollbarThumbStyle:        lipgloss.NewStyle().Foreground(faintColor),
-		scrollbarTrackStyle:        lipgloss.NewStyle().Foreground(fainterColor),
+		scrollbarThumbStyle:        lipgloss.NewStyle().Foreground(colors.faintColor),
+		scrollbarTrackStyle:        lipgloss.NewStyle().Foreground(colors.fainterColor),
 	}
+}
+
+func makePill(text string, textStyle lipgloss.Style, bg color.Color) string {
+	sBg := lipgloss.NewStyle().Foreground(bg)
+	sFg := lipgloss.NewStyle().Inherit(textStyle).Background(bg)
+	return lipgloss.JoinHorizontal(lipgloss.Top, sBg.Render(""), sFg.Render(text), sBg.Render(""))
 }

@@ -54,7 +54,9 @@ func (i *jobItem) Description() string {
 }
 
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
-func (i *jobItem) FilterValue() string { return i.job.Name }
+func (i *jobItem) FilterValue() string {
+	return i.job.Name
+}
 
 func (i *jobItem) viewStatus() string {
 	s := i.meta.TitleStyle()

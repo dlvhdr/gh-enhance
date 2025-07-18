@@ -90,7 +90,7 @@ func (d *runsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	}
 
 	selectedID := selected.run.Id
-	for _, it := range m.Items() {
+	for _, it := range m.VisibleItems() {
 		ri := it.(*runItem)
 		ri.meta.focused = selectedID == ri.run.Id
 	}

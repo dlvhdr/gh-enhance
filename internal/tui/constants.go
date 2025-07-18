@@ -20,4 +20,6 @@ const (
 	ExpandSymbol = "▶"
 	ListSymbol   = "≡"
 	Ellipsis     = "…"
+	Logo         = "〓"
+	// ⟋⟋ ⧸⧸ ╱╱ ⚌ ⩵ ⫽ 〓⤬ ⊜
 )

@@ -102,18 +102,25 @@ type Step struct {
 	Status      Status
 }
 
+type PR struct {
+	Title      string
+	Number     int
+	Url        string
+	Repository struct {
+		NameWithOwner string
+	}
+	StatusCheckRollup struct {
+		Contexts struct {
+			Nodes []struct {
+				CheckRun CheckRun `graphql:"... on CheckRun"`
+			}
+		} `graphql:"contexts(first: 100)"`
+	}
+}
+
 type PRCheckRunsQuery struct {
 	Resource struct {
-		PullRequest struct {
-			Title             string
-			StatusCheckRollup struct {
-				Contexts struct {
-					Nodes []struct {
-						CheckRun CheckRun `graphql:"... on CheckRun"`
-					}
-				} `graphql:"contexts(first: 100)"`
-			}
-		} `graphql:"... on PullRequest"`
+		PullRequest PR `graphql:"... on PullRequest"`
 	} `graphql:"resource(url: $url)"`
 }
 

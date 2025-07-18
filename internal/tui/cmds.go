@@ -19,19 +19,20 @@ import (
 )
 
 type workflowRunsFetchedMsg struct {
-	err  error
+	pr   api.PR
 	runs []data.WorkflowRun
+	err  error
 }
 
 func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
-		checkRunsRes, err := api.FetchPRCheckRuns(m.repo, prNumber)
+		response, err := api.FetchPRCheckRuns(m.repo, prNumber)
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err)
 			return workflowRunsFetchedMsg{err: err}
 		}
 
-		checkNodes := checkRunsRes.Resource.PullRequest.StatusCheckRollup.Contexts.Nodes
+		checkNodes := response.Resource.PullRequest.StatusCheckRollup.Contexts.Nodes
 		checkRuns := make([]api.CheckRun, 0)
 		for _, node := range checkNodes {
 			checkRuns = append(checkRuns, node.CheckRun)
@@ -137,6 +138,7 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 		})
 
 		return workflowRunsFetchedMsg{
+			pr:   response.Resource.PullRequest,
 			runs: runs,
 		}
 	}
@@ -158,23 +160,29 @@ type checkRunOutputFetchedMsg struct {
 }
 
 func (m *model) makeFetchJobLogsCmd() tea.Cmd {
-	if len(m.runsList.Items()) == 0 {
+	if len(m.runsList.VisibleItems()) == 0 {
 		return nil
 	}
-
 	ri := m.runsList.SelectedItem().(*runItem)
 	if len(ri.jobsItems) == 0 {
 		return nil
 	}
+	job := m.jobsList.SelectedItem()
+	if job == nil {
+		return nil
+	}
+	ji, ok := job.(*jobItem)
+	if !ok {
+		return nil
+	}
 
-	job := ri.jobsItems[m.jobsList.Cursor()]
-	job.initiatedLogsFetch = true
+	ji.initiatedLogsFetch = true
 	return func() tea.Msg {
 		defer utils.TimeTrack(time.Now(), "fetching job logs")
-		if job.job.Kind == data.JobKindCheckRun || job.job.Kind == data.JobKindExternal {
-			output, err := api.FetchCheckRunOutput(m.repo, job.job.Id)
+		if ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
+			output, err := api.FetchCheckRunOutput(m.repo, ji.job.Id)
 			if err != nil {
-				log.Error("error fetching check run output", "link", job.job.Link, "err", err)
+				log.Error("error fetching check run output", "link", ji.job.Link, "err", err)
 				return nil
 			}
 			text := "# " + output.Output.Title
@@ -187,11 +195,11 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 				m.logsWidth(),
 			)
 			if err != nil {
-				log.Error("failed rendering as markdown", "link", job.job.Link, "err", err)
+				log.Error("failed rendering as markdown", "link", ji.job.Link, "err", err)
 				renderedText = text
 			}
 			return checkRunOutputFetchedMsg{
-				jobId:        job.job.Id,
+				jobId:        ji.job.Id,
 				title:        output.Output.Title,
 				description:  output.Output.Description,
 				renderedText: renderedText,
@@ -199,20 +207,20 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		}
 
 		// Kind is JobKindGithubActions
-		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", job.job.Id)
+		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", ji.job.Id)
 		if err != nil {
-			log.Error("error fetching job logs", "link", job.job.Link, "err", err, "stderr", stderr.String())
+			log.Error("error fetching job logs", "link", ji.job.Link, "err", err, "stderr", stderr.String())
 			return jobLogsFetchedMsg{
-				jobId:  job.job.Id,
+				jobId:  ji.job.Id,
 				err:    err,
 				stderr: stderr.String(),
 			}
 		}
 		jobLogs := jobLogsRes.String()
-		log.Debug("success fetching job logs", "link", job.job.Link, "bytes", len(jobLogsRes.Bytes()))
+		log.Debug("success fetching job logs", "link", ji.job.Link, "bytes", len(jobLogsRes.Bytes()))
 
 		return jobLogsFetchedMsg{
-			jobId: job.job.Id,
+			jobId: ji.job.Id,
 			logs:  parser.ParseJobLogs(jobLogs),
 		}
 	}
@@ -248,25 +256,3 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 		return nil
 	}
 }
-
-// func calcRunBucket(soFar data.CheckBucket, jobBucket data.CheckBucket) data.CheckBucket {
-// 	switch jobBucket {
-// 	case data.CheckBucketSkipping:
-// 		if soFar == data.CheckBucketSkipping {
-// 			return data.CheckBucketSkipping
-// 		}
-// 		return soFar
-// 	case data.CheckBucketFail:
-// 		return data.CheckBucketFail
-// 	case data.CheckBucketPass:
-// 		if soFar != data.CheckBucketFail {
-// 			return data.CheckBucketPass
-// 		}
-// 	case data.CheckBucketPending:
-// 		return data.CheckBucketPending
-// 	default:
-// 		return data.CheckBucketPass
-// 	}
-//
-// 	return data.CheckBucketPass
-// }
