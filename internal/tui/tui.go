@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
+	"github.com/charmbracelet/bubbles/v2/paginator"
 	"github.com/charmbracelet/bubbles/v2/spinner"
 	"github.com/charmbracelet/bubbles/v2/viewport"
 	tea "github.com/charmbracelet/bubbletea/v2"
@@ -57,6 +58,7 @@ type model struct {
 	jobsDelegate  list.ItemDelegate
 	stepsDelegate list.ItemDelegate
 	styles        styles
+	logsSpinner   spinner.Model
 }
 
 const (
@@ -98,6 +100,8 @@ func NewModel(repo string, number string) model {
 	sb.ThumbStyle = sb.ThumbStyle.Inherit(s.scrollbarThumbStyle)
 	sb.TrackStyle = sb.TrackStyle.Inherit(s.scrollbarTrackStyle)
 
+	ls := spinner.New(spinner.WithSpinner(LogsFrames))
+
 	m := model{
 		jobsList:      jobsList,
 		runsList:      runsList,
@@ -110,13 +114,14 @@ func NewModel(repo string, number string) model {
 		logsViewport:  vp,
 		scrollbar:     sb,
 		styles:        s,
+		logsSpinner:   ls,
 	}
 	m.setFocusedPaneStyles()
 	return m
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(m.runsList.StartSpinner(), m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
+	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -143,7 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ri := runItems[0].(*runItem)
 			cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(ri.run.Id))
 			if len(ri.run.Jobs) > 0 {
-				m.jobsList.Select(0)
+				m.jobsList.ResetSelected()
 				cmds = append(cmds, m.onJobChanged()...)
 			}
 		}
@@ -165,7 +170,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			cmds = append(cmds, m.updateLists()...)
-			break
 		}
 
 	case checkRunOutputFetchedMsg:
@@ -222,6 +226,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case spinner.TickMsg:
+		currJob := m.jobsList.SelectedItem()
+		if currJob == nil || currJob.(*jobItem).loadingLogs {
+			m.logsSpinner, cmd = m.logsSpinner.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 		m.runsList, cmd = m.runsList.Update(msg)
 		cmds = append(cmds, cmd)
 		m.jobsList, cmd = m.jobsList.Update(msg)
@@ -243,8 +252,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		after := m.runsList.GlobalIndex()
 		if before != after {
-			cmds = append(cmds, m.updateLists()...)
 			cmds = append(cmds, m.onRunChanged()...)
+			cmds = append(cmds, m.updateLists()...)
 		}
 	case PaneJobs:
 		before := m.jobsList.GlobalIndex()
@@ -322,11 +331,9 @@ func (m *model) viewHeader() string {
 	pr := lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render("Loading...")
 	if m.pr.Title != "" {
 		pr = lipgloss.JoinHorizontal(lipgloss.Top,
-			lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
-			" ",
-			lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render("·"),
-			" ",
 			lipgloss.NewStyle().Bold(true).Render(m.pr.Title),
+			" ",
+			lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
 			" ",
 			lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
 		)
@@ -341,7 +348,39 @@ func (m *model) viewHeader() string {
 }
 
 func (m *model) viewFooter() string {
-	return m.styles.footerStyle.Width(m.width).Render("1 failing, 2 skipped, 3 successful")
+	failing, successful, skipped := 0, 0, 0
+	for _, count := range m.pr.StatusCheckRollup.Contexts.CheckRunCountsByState {
+		switch count.State {
+		case api.ConclusionFailure:
+			failing += count.Count
+		case api.ConclusionActionRequired:
+		case api.ConclusionCancelled:
+		case api.ConclusionNeutral:
+		case api.ConclusionSkipped:
+			skipped += count.Count
+		case api.ConclusionStale:
+			skipped += count.Count
+		case api.ConclusionStartupFailure:
+			failing += count.Count
+		case api.ConclusionSuccess:
+			successful += count.Count
+		case api.ConclusionTimedOut:
+			failing += count.Count
+		}
+	}
+
+	texts := make([]string, 0)
+	if failing > 0 {
+		texts = append(texts, fmt.Sprintf("%d failing", failing))
+	}
+	if skipped > 0 {
+		texts = append(texts, fmt.Sprintf("%d skipped", skipped))
+	}
+	if successful > 0 {
+		texts = append(texts, fmt.Sprintf("%d successful", successful))
+	}
+
+	return m.styles.footerStyle.Width(m.width).Render(strings.Join(texts, ", "))
 }
 
 func (m *model) shouldShowSteps() bool {
@@ -432,21 +471,28 @@ func (m *model) setListUnfocusedStyles(l *list.Model, delegate *list.ItemDelegat
 
 func newRunsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 	d := newRunItemDelegate(styles)
-	return newList(d), d
+	return newList(styles, d), d
 }
 
 func newJobsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 	d := newJobItemDelegate(styles)
-	return newList(d), d
+	return newList(styles, d), d
 }
 
 func newStepsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 	d := newStepItemDelegate(styles)
-	return newList(d), d
+	return newList(styles, d), d
 }
 
-func newList(delegate list.ItemDelegate) list.Model {
+func newList(styles styles, delegate list.ItemDelegate) list.Model {
 	l := list.New([]list.Item{}, delegate, 0, 0)
+	l.Paginator.Type = paginator.Arabic
+	l.Styles.StatusBar = l.Styles.StatusBar.Foreground(styles.colors.faintColor)
+	l.Styles.StatusEmpty = l.Styles.StatusEmpty.Foreground(styles.colors.faintColor)
+	l.Styles.StatusBarActiveFilter = l.Styles.StatusBarActiveFilter.Foreground(styles.colors.faintColor)
+	l.Styles.StatusBarFilterCount = l.Styles.StatusBarFilterCount.Foreground(styles.colors.faintColor)
+	l.Styles.NoItems = l.Styles.NoItems.Foreground(styles.colors.faintColor)
+	l.Styles.PaginationStyle = lipgloss.NewStyle().Foreground(styles.colors.faintColor).MarginLeft(1).MarginBottom(1)
 	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1)
 	l.SetSpinner(spinner.Dot)
 	l.KeyMap.NextPage = key.Binding{}
@@ -535,7 +581,8 @@ func (m *model) logsWidth() int {
 }
 
 func (m *model) loadingLogsView() string {
-	return m.fullScreenMessageView("Loading...")
+	return m.fullScreenMessageView(
+		lipgloss.JoinVertical(lipgloss.Left, m.logsSpinner.View()))
 }
 
 func (m *model) fullScreenMessageView(message string) string {
@@ -613,12 +660,18 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) {
 
 func (m *model) onRunChanged() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
-	m.jobsList.Select(0)
+	m.jobsList.ResetSelected()
+	m.jobsList.ResetFilter()
 	cmds = append(cmds, m.onJobChanged()...)
-	newRun := m.runsList.SelectedItem().(*runItem)
-	if newRun.loading {
-		cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(
-			m.runsList.SelectedItem().(*runItem).run.Id))
+	newRun := m.runsList.SelectedItem()
+
+	ri, ok := newRun.(*runItem)
+	if !ok {
+		return cmds
+	}
+
+	if ri.loading {
+		cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(ri.run.Id))
 	}
 	cmds = append(cmds, m.updateLists()...)
 	m.logsViewport.GotoTop()
@@ -628,7 +681,10 @@ func (m *model) onRunChanged() []tea.Cmd {
 
 func (m *model) onJobChanged() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
-	m.stepsList.Select(0)
+	m.stepsList.ResetSelected()
+	m.stepsList.ResetFilter()
+
+	cmds = append(cmds, m.logsSpinner.Tick)
 
 	currJob := m.jobsList.SelectedItem()
 	if currJob != nil && !currJob.(*jobItem).initiatedLogsFetch {
@@ -687,7 +743,7 @@ func (m *model) renderJobLogs() {
 func (m *model) logsContentView() string {
 	job := m.jobsList.SelectedItem()
 	if job == nil {
-		return m.loadingLogsView()
+		return "Nothing selected..."
 	}
 
 	ji := job.(*jobItem)
@@ -721,7 +777,7 @@ func (m *model) logsContentView() string {
 }
 
 func (m *model) getJobItemById(jobId string) *jobItem {
-	for _, run := range m.runsList.VisibleItems() {
+	for _, run := range m.runsList.Items() {
 		ri := run.(*runItem)
 		for i := range ri.jobsItems {
 			if ri.jobsItems[i].job.Id == jobId {

@@ -102,6 +102,16 @@ type Step struct {
 	Status      Status
 }
 
+type CommitState string
+
+const (
+	CommitStatusExpected = "EXPECTED"
+	CommitStatusError    = "ERROR"
+	CommitStatusFailure  = "FAILURE"
+	CommitStatusPending  = "PENDING"
+	CommitStatusSuccess  = "SUCCESS"
+)
+
 type PR struct {
 	Title      string
 	Number     int
@@ -110,7 +120,12 @@ type PR struct {
 		NameWithOwner string
 	}
 	StatusCheckRollup struct {
+		State    CommitState
 		Contexts struct {
+			CheckRunCountsByState []struct {
+				Count int
+				State Conclusion
+			}
 			Nodes []struct {
 				CheckRun CheckRun `graphql:"... on CheckRun"`
 			}
