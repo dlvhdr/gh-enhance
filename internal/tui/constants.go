@@ -26,7 +26,10 @@ const (
 	ExpandSymbol = "▶"
 	ListSymbol   = "≡"
 	Ellipsis     = "…"
-	Logo         = "〓"
+	ParentLogo   = "〓"
+
+	Logo = `▐▔▔▐▚ ▌▐ ▌▐▔▌▐▚ ▌▐▔▔▐▔▔
+▐▛▁▐ ▚▌▐▔▌▐▔▌▐ ▚▌▐▁▁▐▛▁`
 	// ⟋⟋ ⧸⧸ ╱╱ ⚌ ⩵ ⫽ 〓⤬ ⊜
 )
 

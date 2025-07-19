@@ -36,7 +36,7 @@ const (
 )
 
 const (
-	headerHeight = 3
+	headerHeight = 4
 	footerHeight = 1
 )
 
@@ -121,6 +121,7 @@ func NewModel(repo string, number string) model {
 }
 
 func (m model) Init() tea.Cmd {
+	// return nil
 	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
 }
 
@@ -330,18 +331,19 @@ func (m model) View() string {
 func (m *model) viewHeader() string {
 	pr := lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render("Loading...")
 	if m.pr.Title != "" {
-		pr = lipgloss.JoinHorizontal(lipgloss.Top,
+		pr = lipgloss.JoinVertical(lipgloss.Left,
+			lipgloss.JoinHorizontal(lipgloss.Top,
+				lipgloss.NewStyle().Foreground(m.styles.colors.lightColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
+				" ",
+				lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
+			),
 			lipgloss.NewStyle().Bold(true).Render(m.pr.Title),
-			" ",
-			lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
-			" ",
-			lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
 		)
 	}
-	logo := lipgloss.JoinHorizontal(lipgloss.Top,
-		m.styles.logoStyle.UnsetItalic().Render(fmt.Sprintf("%s", Logo)), m.styles.logoStyle.Render("ENHANCE"),
+	logo := lipgloss.JoinHorizontal(lipgloss.Bottom,
+		m.styles.logoStyle.Render(Logo),
 		" ",
-		lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render("v0.1.0"))
+		lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render("v0.1.0〓"))
 	w := m.width - lipgloss.Width(logo) - m.styles.headerStyle.GetHorizontalFrameSize()
 	return m.styles.headerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Left,
 		lipgloss.NewStyle().Width(w).Render(pr), logo))
@@ -370,17 +372,19 @@ func (m *model) viewFooter() string {
 	}
 
 	texts := make([]string, 0)
+	bg := lipgloss.NewStyle().Background(m.styles.footerStyle.GetBackground())
 	if failing > 0 {
-		texts = append(texts, fmt.Sprintf("%d failing", failing))
-	}
-	if skipped > 0 {
-		texts = append(texts, fmt.Sprintf("%d skipped", skipped))
+		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(fmt.Sprintf("%d failing", failing)))
 	}
 	if successful > 0 {
-		texts = append(texts, fmt.Sprintf("%d successful", successful))
+		texts = append(texts, bg.Foreground(m.styles.colors.successColor).Render(
+			fmt.Sprintf("%d successful", successful)))
+	}
+	if skipped > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("%d skipped", skipped)))
 	}
 
-	return m.styles.footerStyle.Width(m.width).Render(strings.Join(texts, ", "))
+	return m.styles.footerStyle.Width(m.width).Render(strings.Join(texts, bg.Render(", ")))
 }
 
 func (m *model) shouldShowSteps() bool {
@@ -662,11 +666,11 @@ func (m *model) onRunChanged() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 	m.jobsList.ResetSelected()
 	m.jobsList.ResetFilter()
-	cmds = append(cmds, m.onJobChanged()...)
 	newRun := m.runsList.SelectedItem()
 
 	ri, ok := newRun.(*runItem)
 	if !ok {
+		log.Error("run changed but there is no run", "newRun", newRun)
 		return cmds
 	}
 
@@ -674,6 +678,7 @@ func (m *model) onRunChanged() []tea.Cmd {
 		cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(ri.run.Id))
 	}
 	cmds = append(cmds, m.updateLists()...)
+	cmds = append(cmds, m.onJobChanged()...)
 	m.logsViewport.GotoTop()
 
 	return cmds
@@ -689,6 +694,8 @@ func (m *model) onJobChanged() []tea.Cmd {
 	currJob := m.jobsList.SelectedItem()
 	if currJob != nil && !currJob.(*jobItem).initiatedLogsFetch {
 		cmds = append(cmds, m.makeFetchJobLogsCmd())
+	} else {
+		log.Error("job changed but current job is nil", "currJob", currJob)
 	}
 
 	m.renderJobLogs()

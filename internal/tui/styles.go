@@ -23,6 +23,11 @@ type paneItemStyles struct {
 }
 
 type colors struct {
+	darkColor      color.Color
+	lightColor     color.Color
+	errorColor     color.Color
+	warnColor      color.Color
+	successColor   color.Color
 	focusedColor   color.Color
 	unfocusedColor color.Color
 	faintColor     color.Color
@@ -77,6 +82,11 @@ func makeStyles() styles {
 		focusedColor:   focusedColor,
 		unfocusedColor: tint.Darken(t.BrightBlue, 70),
 		// unfocusedColor: lipgloss.Red,
+		darkColor:    tint.Darken(focusedColor, 20),
+		lightColor:   tint.Lighten(focusedColor, 20),
+		errorColor:   t.Red,
+		warnColor:    t.Yellow,
+		successColor: t.Green,
 		faintColor:   tint.Darken(focusedColor, 50),
 		fainterColor: tint.Darken(focusedColor, 80),
 	}
@@ -92,7 +102,7 @@ func makeStyles() styles {
 		headerStyle: lipgloss.NewStyle().Foreground(focusedColor).PaddingLeft(1).PaddingRight(1).Border(
 			lipgloss.NormalBorder(), true, false, true,
 			false).BorderForeground(colors.faintColor),
-		logoStyle:   lipgloss.NewStyle().Bold(true).Italic(true).Foreground(t.Blue),
+		logoStyle:   lipgloss.NewStyle().Foreground(t.Blue),
 		footerStyle: lipgloss.NewStyle().Background(colors.fainterColor).Foreground(focusedColor).PaddingLeft(1).PaddingRight(1),
 
 		focusedPaneTitleStyle:      baseTitleStyle.Foreground(t.Black),
