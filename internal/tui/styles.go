@@ -93,7 +93,10 @@ func makeStyles() styles {
 	}
 
 	errorBgStyle := lipgloss.NewStyle().Background(tint.Darken(t.Red, 80))
-	bg := tint.Lighten(t.Bg, 10)
+	bg := tint.Darken(t.Bg, 10)
+	unfocusedBg := tint.Darken(focusedColor, 50)
+	unfocusedFg := tint.Darken(focusedColor, 10)
+	headerBg := colors.fainterColor
 
 	baseTitleStyle := lipgloss.NewStyle().Bold(true).Margin(0)
 
@@ -103,9 +106,9 @@ func makeStyles() styles {
 		faintFgStyle: lipgloss.NewStyle().Foreground(colors.faintColor),
 
 		headerStyle: lipgloss.NewStyle().Foreground(focusedColor).PaddingLeft(1).PaddingTop(1).PaddingRight(1).Border(
-			lipgloss.ThickBorder(), false, false, true,
-			false).BorderForeground(colors.faintColor),
-		logoStyle:   lipgloss.NewStyle().Foreground(t.Blue),
+			lipgloss.InnerHalfBlockBorder(), false, false, true,
+			false).BorderForeground(headerBg).Background(headerBg),
+		logoStyle:   lipgloss.NewStyle().Foreground(t.Blue).Background(headerBg),
 		footerStyle: lipgloss.NewStyle().Background(colors.fainterColor).Foreground(focusedColor).PaddingLeft(1).PaddingRight(1),
 
 		focusedPaneTitleStyle:      baseTitleStyle.Foreground(t.Black),
@@ -120,7 +123,7 @@ func makeStyles() styles {
 				Background(bg).
 				BorderBackground(bg).
 				Border(lipgloss.OuterHalfBlockBorder(), false, false, false, true).
-				BorderForeground(t.BrightWhite),
+				BorderForeground(unfocusedBg),
 
 			focusedSelectedStyle: lipgloss.NewStyle().
 				Background(bg).
@@ -130,7 +133,7 @@ func makeStyles() styles {
 
 			selectedTitleStyle: lipgloss.NewStyle().
 				Bold(true).
-				Foreground(t.BrightWhite).
+				Foreground(unfocusedFg).
 				Background(bg),
 
 			focusedTitleStyle:         lipgloss.NewStyle().Bold(true).Foreground(focusedColor),

@@ -350,24 +350,34 @@ func (m model) View() string {
 }
 
 func (m *model) viewHeader() string {
-	pr := m.styles.faintFgStyle.Render("Loading...")
+	s := lipgloss.NewStyle().Background(m.styles.headerStyle.GetBackground())
+	version := s.Height(lipgloss.Height(Logo)).Render(" v0.1.0〓")
+
+	logoWidth := lipgloss.Width(Logo) + lipgloss.Width(version)
+	logo := lipgloss.PlaceHorizontal(
+		logoWidth,
+		lipgloss.Right,
+		s.Width(logoWidth).Render(
+			lipgloss.JoinHorizontal(lipgloss.Bottom,
+				m.styles.logoStyle.Render(Logo),
+				version,
+			)))
+
+	prWidth := m.width - logoWidth - m.styles.headerStyle.GetHorizontalFrameSize()
+	pr := s.Width(prWidth).Render("Loading...")
 	if m.pr.Title != "" {
-		pr = lipgloss.JoinVertical(lipgloss.Left,
-			lipgloss.JoinHorizontal(lipgloss.Top,
-				lipgloss.NewStyle().Foreground(m.styles.colors.lightColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
-				" ",
-				m.styles.faintFgStyle.Render(fmt.Sprintf("#%d", m.pr.Number)),
-			),
-			lipgloss.NewStyle().Bold(true).Render(m.pr.Title),
-		)
+		pr = s.Width(prWidth).Render(lipgloss.JoinVertical(lipgloss.Left,
+			s.Width(prWidth).Render(lipgloss.JoinHorizontal(lipgloss.Top,
+				s.Foreground(m.styles.colors.lightColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
+				s.Render(" "),
+				s.Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
+			)),
+			s.Width(prWidth).Bold(true).Foreground(m.styles.colors.focusedColor).Render(m.pr.Title),
+		))
 	}
-	logo := lipgloss.JoinHorizontal(lipgloss.Bottom,
-		m.styles.logoStyle.Render(Logo),
-		" ",
-		m.styles.faintFgStyle.Render("v0.1.0〓"))
-	w := m.width - lipgloss.Width(logo) - m.styles.headerStyle.GetHorizontalFrameSize()
-	return m.styles.headerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Left,
-		lipgloss.NewStyle().Width(w).Render(pr), logo))
+
+	return m.styles.headerStyle.Width(m.width).Render(
+		lipgloss.JoinHorizontal(lipgloss.Left, s.Render(pr), logo))
 }
 
 func (m *model) viewFooter() string {
