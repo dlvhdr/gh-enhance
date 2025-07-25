@@ -127,6 +127,7 @@ type PR struct {
 				State Conclusion
 			}
 			Nodes []struct {
+				Typename string   `graphql:"__typename"`
 				CheckRun CheckRun `graphql:"... on CheckRun"`
 			}
 		} `graphql:"contexts(first: 100)"`
@@ -158,6 +159,10 @@ func FetchPRCheckRuns(repo string, prNumber string) (PRCheckRunsQuery, error) {
 	if err != nil {
 		return res, err
 	}
+
+	// for _, wow := range res.Resource.PullRequest.StatusCheckRollup.Contexts.Nodes {
+	// 	log.Debug("wow", "node", wow.CheckRun)
+	// }
 
 	return res, nil
 }

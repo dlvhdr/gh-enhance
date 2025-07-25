@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	CanceledIcon = ""
+	CanceledIcon = ""
 	SkippedIcon  = ""
 	WaitingIcon  = ""
 	PendingIcon  = ""
@@ -20,6 +20,14 @@ const (
   (   ╱   ) 
    \ ╱   /  
 		:---:   
+		`
+
+	AsciiStoppedIcon = `
+    .---.   
+   /  │  \  
+  |   │   | 
+   \  .  /  
+		:---:
 		`
 
 	Separator    = "│"

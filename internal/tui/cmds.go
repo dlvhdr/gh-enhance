@@ -35,6 +35,9 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 		checkNodes := response.Resource.PullRequest.StatusCheckRollup.Contexts.Nodes
 		checkRuns := make([]api.CheckRun, 0)
 		for _, node := range checkNodes {
+			if node.Typename != "CheckRun" {
+				continue
+			}
 			checkRuns = append(checkRuns, node.CheckRun)
 		}
 
@@ -93,6 +96,11 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				} else {
 					id = statusCheck.CheckSuite.WorkflowRun.DatabaseId
 				}
+
+				if id == 0 {
+					log.Error("run has no ID", "workflowRun", wfr, "statusCheck", statusCheck)
+				}
+
 				run = data.WorkflowRun{
 					Id:       fmt.Sprintf("%d", id),
 					Name:     wfName,

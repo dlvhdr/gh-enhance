@@ -45,6 +45,9 @@ func (i *jobItem) Description() string {
 	if i.job.Bucket == data.CheckBucketPending {
 		return "Pending"
 	}
+	if i.job.Bucket == data.CheckBucketCancel {
+		return "Cancelled"
+	}
 
 	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
 		return "Running..."

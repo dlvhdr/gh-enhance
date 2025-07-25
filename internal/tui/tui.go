@@ -13,7 +13,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log"
-	"github.com/charmbracelet/x/ansi"
 	tint "github.com/lrstanley/bubbletint/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
@@ -38,6 +37,12 @@ const (
 const (
 	headerHeight = 4
 	footerHeight = 1
+	smallScreen  = 130
+
+	unfocusedLargePaneWidth = 20
+	focusedLargePaneWidth   = 40
+
+	focusedSmallPaneWidth = 25
 )
 
 type model struct {
@@ -61,14 +66,9 @@ type model struct {
 	logsSpinner   spinner.Model
 }
 
-const (
-	unfocusedPaneWidth = 20
-	focusedPaneWidth   = 40
-)
-
 func NewModel(repo string, number string) model {
 	tint.NewDefaultRegistry()
-	tint.SetTint(tint.TintTokyoNight)
+	tint.SetTint(tint.TintTokyoNightStorm)
 
 	s := makeStyles()
 
@@ -76,19 +76,19 @@ func NewModel(repo string, number string) model {
 	runsList.Title = makePill(ListSymbol+" Runs", s.focusedPaneTitleStyle,
 		s.colors.focusedColor)
 	runsList.SetStatusBarItemName("run", "runs")
-	runsList.SetWidth(focusedPaneWidth)
+	runsList.SetWidth(focusedLargePaneWidth)
 
 	jobsList, jobsDelegate := newJobsDefaultList(s)
 	jobsList.Title = makePill(ListSymbol+" Jobs", s.unfocusedPaneTitleStyle,
 		s.colors.unfocusedColor)
 	jobsList.SetStatusBarItemName("job", "jobs")
-	jobsList.SetWidth(unfocusedPaneWidth)
+	jobsList.SetWidth(unfocusedLargePaneWidth)
 
 	stepsList, stepsDelegate := newStepsDefaultList(s)
 	stepsList.Title = makePill(ListSymbol+" Steps", s.unfocusedPaneTitleStyle,
 		s.colors.unfocusedColor)
 	stepsList.SetStatusBarItemName("step", "steps")
-	stepsList.SetWidth(unfocusedPaneWidth)
+	stepsList.SetWidth(unfocusedLargePaneWidth)
 
 	vp := viewport.New()
 	vp.SoftWrap = false
@@ -101,6 +101,7 @@ func NewModel(repo string, number string) model {
 	sb.TrackStyle = sb.TrackStyle.Inherit(s.scrollbarTrackStyle)
 
 	ls := spinner.New(spinner.WithSpinner(LogsFrames))
+	ls.Style = s.faintFgStyle
 
 	m := model{
 		jobsList:      jobsList,
@@ -190,6 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
+		log.Debug("window size changed", "width", msg.Width, "height", msg.Height)
 		m.width = msg.Width
 		m.height = msg.Height
 		lHeight := msg.Height - headerHeight - footerHeight
@@ -199,6 +201,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logsViewport.SetHeight(lHeight - 2)
 		m.logsViewport.SetWidth(m.logsWidth())
 		m.scrollbar, cmd = m.scrollbar.Update(scrollbar.HeightMsg(m.logsViewport.Height()))
+		m.setFocusedPaneStyles()
 	case tea.KeyMsg:
 		log.Debug("key pressed", "key", msg.String())
 		if m.runsList.FilterState() == list.Filtering ||
@@ -300,11 +303,6 @@ func (m model) View() string {
 		return m.err.Error()
 	}
 
-	steps := ""
-	if m.shouldShowSteps() {
-		steps = m.styles.paneStyle.Render(m.stepsList.View())
-	}
-
 	rootStyle := lipgloss.NewStyle().
 		Width(m.width).
 		MaxWidth(m.width).
@@ -314,28 +312,51 @@ func (m model) View() string {
 	header := m.viewHeader()
 	footer := m.viewFooter()
 
+	runsPane := makePointingBorder(m.styles.paneStyle.Render(m.runsList.View()))
+	jobsPane := makePointingBorder(m.styles.paneStyle.Render(m.jobsList.View()))
+	stepsPane := ""
+	if m.shouldShowSteps() {
+		stepsPane = makePointingBorder(m.styles.paneStyle.Render(m.stepsList.View()))
+	}
+
+	panes := make([]string, 0)
+	if m.width != 0 && m.width <= smallScreen {
+		switch m.focusedPane {
+		case PaneRuns:
+			panes = append(panes, runsPane)
+		case PaneJobs:
+			panes = append(panes, jobsPane)
+		case PaneSteps:
+			panes = append(panes, stepsPane)
+		case PaneLogs:
+			break
+		}
+	} else {
+		panes = append(panes, runsPane)
+		panes = append(panes, jobsPane)
+		panes = append(panes, stepsPane)
+	}
+	panes = append(panes, m.viewLogs())
+
 	return rootStyle.Render(lipgloss.JoinVertical(
 		lipgloss.Left,
 		header,
 		lipgloss.JoinHorizontal(
 			lipgloss.Top,
-			m.styles.paneStyle.Render(m.runsList.View()),
-			m.styles.paneStyle.Render(m.jobsList.View()),
-			steps,
-			m.viewLogs(),
+			panes...,
 		),
 		footer,
 	))
 }
 
 func (m *model) viewHeader() string {
-	pr := lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render("Loading...")
+	pr := m.styles.faintFgStyle.Render("Loading...")
 	if m.pr.Title != "" {
 		pr = lipgloss.JoinVertical(lipgloss.Left,
 			lipgloss.JoinHorizontal(lipgloss.Top,
 				lipgloss.NewStyle().Foreground(m.styles.colors.lightColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
 				" ",
-				lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
+				m.styles.faintFgStyle.Render(fmt.Sprintf("#%d", m.pr.Number)),
 			),
 			lipgloss.NewStyle().Bold(true).Render(m.pr.Title),
 		)
@@ -343,7 +364,7 @@ func (m *model) viewHeader() string {
 	logo := lipgloss.JoinHorizontal(lipgloss.Bottom,
 		m.styles.logoStyle.Render(Logo),
 		" ",
-		lipgloss.NewStyle().Foreground(m.styles.colors.faintColor).Render("v0.1.0〓"))
+		m.styles.faintFgStyle.Render("v0.1.0〓"))
 	w := m.width - lipgloss.Width(logo) - m.styles.headerStyle.GetHorizontalFrameSize()
 	return m.styles.headerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Left,
 		lipgloss.NewStyle().Width(w).Render(pr), logo))
@@ -450,27 +471,36 @@ func (m *model) setFocusedPaneStyles() {
 }
 
 func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
-	l.Styles.Title = m.styles.focusedPaneTitleStyle
-	title := ansi.Strip(l.Title)
-	title, _ = strings.CutPrefix(title, "")
-	title, _ = strings.CutSuffix(title, "")
-	l.Title = makePill(title, l.Styles.Title, m.styles.colors.focusedColor)
-	l.Styles.TitleBar = m.styles.focusedPaneTitleBarStyle
-	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1).Width(focusedPaneWidth)
+	if m.width != 0 && m.width <= smallScreen {
+		l.Styles.Title = m.styles.focusedPaneTitleStyle.Bold(false)
+		l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle.Bold(false)
+		l.Title = m.getPaneTitle(l)
+	} else {
+		l.Styles.Title = m.styles.focusedPaneTitleStyle
+		l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle
+		l.Title = makePill(m.getPaneTitle(l), l.Styles.Title, m.styles.colors.focusedColor)
+	}
+
+	w := m.getFocusedPaneWidth()
+	l.SetWidth(w)
+	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1).Width(w)
 	l.SetDelegate(*delegate)
-	l.SetWidth(focusedPaneWidth)
 }
 
 func (m *model) setListUnfocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
-	l.Styles.Title = m.styles.unfocusedPaneTitleStyle
-	title := ansi.Strip(l.Title)
-	title, _ = strings.CutPrefix(title, "")
-	title, _ = strings.CutSuffix(title, "")
-	l.Title = makePill(title, l.Styles.Title, m.styles.colors.unfocusedColor)
-	l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle
-	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1).Width(unfocusedPaneWidth)
+	if m.width > smallScreen {
+		l.Styles.Title = m.styles.unfocusedPaneTitleStyle
+		l.Title = makePill(m.getPaneTitle(l), l.Styles.Title, m.styles.colors.unfocusedColor)
+		l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle
+	} else {
+		l.Styles.Title = m.styles.unfocusedPaneTitleStyle.Bold(false)
+		l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle.Bold(false)
+	}
+
+	w := m.getUnfocusedPaneWidth()
+	l.SetWidth(w)
+	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1).Width(w)
 	l.SetDelegate(*delegate)
-	l.SetWidth(unfocusedPaneWidth)
 }
 
 func newRunsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
@@ -510,17 +540,30 @@ func newList(styles styles, delegate list.ItemDelegate) list.Model {
 func (m *model) updateLists() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 
+	_, rCmds := m.updateRunsList()
+	cmds = append(cmds, rCmds...)
+
+	_, jCmds := m.updateJobsList()
+	cmds = append(cmds, jCmds...)
+
+	cmds = append(cmds, m.updateStepsList()...)
+
+	return cmds
+}
+
+func (m *model) updateRunsList() (*runItem, []tea.Cmd) {
+	cmds := make([]tea.Cmd, 0)
 	if len(m.runsList.VisibleItems()) == 0 {
-		return cmds
+		return nil, cmds
 	}
 
 	run := m.runsList.SelectedItem()
 	if run == nil {
-		return nil
+		return nil, cmds
 	}
 	ri, ok := run.(*runItem)
 	if !ok {
-		return nil
+		return nil, cmds
 	}
 
 	if ri.loading {
@@ -532,6 +575,16 @@ func (m *model) updateLists() []tea.Cmd {
 		m.runsList.SetShowStatusBar(true)
 	} else {
 		m.runsList.SetShowStatusBar(false)
+	}
+
+	return ri, cmds
+}
+
+func (m *model) updateJobsList() (*jobItem, []tea.Cmd) {
+	cmds := make([]tea.Cmd, 0)
+	ri := m.getSelectedRunItem()
+	if ri == nil {
+		return nil, cmds
 	}
 
 	jobs := make([]list.Item, 0)
@@ -546,17 +599,20 @@ func (m *model) updateLists() []tea.Cmd {
 	}
 
 	if m.jobsList.GlobalIndex() >= len(ri.jobsItems) {
-		return cmds
+		return nil, cmds
 	}
 
-	job := m.jobsList.SelectedItem()
+	return m.getSelectedJobItem(), cmds
+}
+
+func (m *model) updateStepsList() []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
 	steps := make([]list.Item, 0)
-	if job != nil {
-		ji, ok := job.(*jobItem)
-		if ok {
-			for _, step := range ji.steps {
-				steps = append(steps, step)
-			}
+
+	ji := m.getSelectedJobItem()
+	if ji != nil {
+		for _, step := range ji.steps {
+			steps = append(steps, step)
 		}
 	}
 
@@ -570,8 +626,39 @@ func (m *model) updateLists() []tea.Cmd {
 	return cmds
 }
 
+func (m *model) getSelectedRunItem() *runItem {
+	run := m.runsList.SelectedItem()
+	if run == nil {
+		return nil
+	}
+	ri, ok := run.(*runItem)
+	if !ok {
+		return nil
+	}
+
+	return ri
+}
+
+func (m *model) getSelectedJobItem() *jobItem {
+	job := m.jobsList.SelectedItem()
+	if job == nil {
+		return nil
+	}
+	ji, ok := job.(*jobItem)
+	if !ok {
+		return nil
+	}
+
+	return ji
+}
+
 func (m *model) logsWidth() int {
-	borders := 2
+	var borders int
+	if m.width != 0 && m.width <= smallScreen {
+		borders = 0
+	} else {
+		borders = 2
+	}
 	sb := 0
 	if m.isScrollbarVisible() {
 		sb = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())
@@ -685,9 +772,12 @@ func (m *model) onRunChanged() []tea.Cmd {
 }
 
 func (m *model) onJobChanged() []tea.Cmd {
+	log.Debug("job changed")
 	cmds := make([]tea.Cmd, 0)
+
 	m.stepsList.ResetSelected()
 	m.stepsList.ResetFilter()
+	cmds = append(cmds, m.updateStepsList()...)
 
 	cmds = append(cmds, m.logsSpinner.Tick)
 
@@ -700,6 +790,7 @@ func (m *model) onJobChanged() []tea.Cmd {
 
 	m.renderJobLogs()
 	m.logsViewport.GotoTop()
+
 	return cmds
 }
 
@@ -763,11 +854,14 @@ func (m *model) logsContentView() string {
 	}
 
 	if ji.job.Bucket == data.CheckBucketCancel {
-		return m.fullScreenMessageView("This job was cancelled")
+		return m.fullScreenMessageView(lipgloss.JoinVertical(lipgloss.Center,
+			m.styles.faintFgStyle.Render(art.StopSign),
+			m.styles.faintFgStyle.Bold(true).Render("This job was cancelled")))
 	}
 
 	if ji.job.Bucket == data.CheckBucketPending {
-		return m.fullScreenMessageView("This job is still running")
+		return m.fullScreenMessageView(lipgloss.NewStyle().Foreground(
+			m.styles.colors.warnColor).Render("This job is still running"))
 	}
 
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "HTTP 410:") {
@@ -806,9 +900,8 @@ func (m *model) renderLogs(ji *jobItem) string {
 		switch log.Kind {
 		case data.LogKindError:
 			rendered = strings.Replace(rendered, parser.ErrorMarker, "", 1)
-			rendered = m.styles.errorBgStyle.Width(w).Render(
-				lipgloss.JoinHorizontal(lipgloss.Top,
-					m.styles.errorTitleStyle.Render("Error: "), m.styles.errorStyle.Render(rendered)))
+			rendered = m.styles.errorBgStyle.Width(w).Render(lipgloss.JoinHorizontal(lipgloss.Top,
+				m.styles.errorTitleStyle.Render("Error: "), m.styles.errorStyle.Render(rendered)))
 		case data.LogKindCommand:
 			rendered = strings.Replace(rendered, parser.CommandMarker, "", 1)
 			rendered = m.styles.commandStyle.Render(rendered)
@@ -835,4 +928,44 @@ func (m *model) renderLogs(ji *jobItem) string {
 		logs.WriteString("\n")
 	}
 	return logs.String()
+}
+
+func (m *model) getFocusedPaneWidth() int {
+	if m.width > smallScreen {
+		return focusedLargePaneWidth
+	}
+
+	return focusedSmallPaneWidth
+}
+
+func (m *model) getPaneTitle(l *list.Model) string {
+	if m.width != 0 && m.width <= smallScreen {
+		s := m.styles.focusedPaneTitleStyle.Bold(false).UnsetBackground()
+		switch m.focusedPane {
+		case PaneRuns:
+			return lipgloss.JoinHorizontal(lipgloss.Top,
+				makePill(s.Bold(true).Render("Runs"), l.Styles.Title,
+					m.styles.colors.focusedColor), s.Render(" > Jobs > Steps"))
+		case PaneJobs:
+			return lipgloss.JoinHorizontal(lipgloss.Top, s.Render("Runs > "),
+				makePill(s.Bold(true).Render("Jobs"), l.Styles.Title,
+					m.styles.colors.focusedColor), s.Render(" > Steps"))
+		case PaneSteps:
+			return lipgloss.JoinHorizontal(lipgloss.Top, s.Render("Runs > Jobs > "),
+				makePill(s.Bold(true).Render("Steps"), l.Styles.Title, m.styles.colors.focusedColor))
+		case PaneLogs:
+			return ""
+		}
+	}
+
+	_, itemsName := l.StatusBarItemName()
+	return strings.ToUpper(string(itemsName[0])) + itemsName[1:]
+}
+
+func (m *model) getUnfocusedPaneWidth() int {
+	if m.width != 0 && m.width <= smallScreen {
+		return 0
+	}
+
+	return unfocusedLargePaneWidth
 }

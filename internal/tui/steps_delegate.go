@@ -60,8 +60,8 @@ func (i *stepItem) viewConclusion() string {
 		return i.meta.styles.pendingGlyph.Render()
 	}
 
-	if i.step.Status == api.StatusCompleted {
-		return i.meta.styles.successGlyph.Render()
+	if i.step.Conclusion == api.ConclusionSkipped {
+		return i.meta.styles.skippedGlyph.Render()
 	}
 
 	return string(i.step.Status)
