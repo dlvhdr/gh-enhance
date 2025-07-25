@@ -52,4 +52,9 @@ var (
 		key.WithKeys("left"),
 		key.WithHelp("←", "move left"),
 	)
+
+	searchLogs = key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search logs"),
+	)
 )

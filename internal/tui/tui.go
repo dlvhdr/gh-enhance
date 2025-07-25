@@ -46,24 +46,25 @@ const (
 )
 
 type model struct {
-	width         int
-	height        int
-	prNumber      string
-	repo          string
-	pr            api.PR
-	runsList      list.Model
-	jobsList      list.Model
-	stepsList     list.Model
-	logsViewport  viewport.Model
-	scrollbar     tea.Model
-	quitting      bool
-	focusedPane   focusedPane
-	err           error
-	runsDelegate  list.ItemDelegate
-	jobsDelegate  list.ItemDelegate
-	stepsDelegate list.ItemDelegate
-	styles        styles
-	logsSpinner   spinner.Model
+	width           int
+	height          int
+	prNumber        string
+	repo            string
+	pr              api.PR
+	runsList        list.Model
+	jobsList        list.Model
+	stepsList       list.Model
+	logsViewport    viewport.Model
+	scrollbar       tea.Model
+	quitting        bool
+	focusedPane     focusedPane
+	err             error
+	runsDelegate    list.ItemDelegate
+	jobsDelegate    list.ItemDelegate
+	stepsDelegate   list.ItemDelegate
+	styles          styles
+	logsSpinner     spinner.Model
+	isFilteringLogs bool
 }
 
 func NewModel(repo string, number string) model {
@@ -209,6 +210,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stepsList.FilterState() == list.Filtering {
 			break
 		}
+
+		// if m.isFilteringLogs {
+		// 	matches := make([][]int, 0)
+		// 	idx := strings.Index(m.logsViewport.GetContent(), "Error")
+		// 	matches = append(matches, []int{idx, idx + len("Error")})
+		// 	m.logsViewport.SetHighlights(matches)
+		// 	break
+		// }
+		//
+		// if key.Matches(msg, searchLogs) {
+		// 	m.isFilteringLogs = true
+		// 	break
+		// }
 
 		if key.Matches(msg, openPR) && m.pr.Url != "" {
 			cmds = append(cmds, makeOpenUrlCmd(m.pr.Url))
