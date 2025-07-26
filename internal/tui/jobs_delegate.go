@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/charmbracelet/log"
+	"github.com/charmbracelet/log/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dlvhdr/gh-enhance/internal/data"
@@ -18,7 +18,9 @@ type jobItem struct {
 	logs               []data.LogsWithTime
 	logsErr            error
 	logsStderr         string
-	renderedLogs       string
+	renderedLogs       []string
+	unstyledLogs       []string
+	errorLine          int
 	renderedText       string
 	title              string
 	initiatedLogsFetch bool

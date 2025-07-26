@@ -10,7 +10,7 @@ var (
 
 	quitKeys = key.NewBinding(
 		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", "press q to quit"),
+		key.WithHelp("ctrl+c", "quit"),
 	)
 
 	nextRowKey = key.NewBinding(
@@ -51,5 +51,30 @@ var (
 	leftKey = key.NewBinding(
 		key.WithKeys("left"),
 		key.WithHelp("←", "move left"),
+	)
+
+	searchLogs = key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search logs"),
+	)
+
+	cancelSearch = key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "cancel search"),
+	)
+
+	applySearch = key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "apply search"),
+	)
+
+	nextSearchMatch = key.NewBinding(
+		key.WithKeys("ctrl+n"),
+		key.WithHelp("ctrl+n", "next match"),
+	)
+
+	prevSearchMatch = key.NewBinding(
+		key.WithKeys("ctrl+p"),
+		key.WithHelp("ctrl+p", "prev match"),
 	)
 )
