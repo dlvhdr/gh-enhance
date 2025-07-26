@@ -1,6 +1,7 @@
 package tui
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"sort"
@@ -8,15 +9,18 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/log"
+	"github.com/charmbracelet/log/v2"
+	"github.com/cli/go-gh"
 	"github.com/cli/go-gh/pkg/browser"
-	"github.com/cli/go-gh/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/data"
 	"github.com/dlvhdr/gh-enhance/internal/parser"
 	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
+
+//go:embed fake-logs.txt
+var fakeLogs string
 
 type workflowRunsFetchedMsg struct {
 	pr   api.PR
@@ -226,6 +230,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		}
 		jobLogs := jobLogsRes.String()
 		log.Debug("success fetching job logs", "link", ji.job.Link, "bytes", len(jobLogsRes.Bytes()))
+		// jobLogs := fakeLogs
 
 		return jobLogsFetchedMsg{
 			jobId: ji.job.Id,

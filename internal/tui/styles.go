@@ -77,6 +77,9 @@ type styles struct {
 
 func makeStyles() styles {
 	t := tint.Current()
+	if t.ID == tint.TintTokyoNightStorm.ID {
+		t.BrightGreen = tint.FromHex("#9ece6a")
+	}
 
 	defaultItemStyles := list.NewDefaultItemStyles(true)
 	focusedColor := t.Blue
@@ -87,7 +90,7 @@ func makeStyles() styles {
 		lightColor:     tint.Lighten(focusedColor, 20),
 		errorColor:     t.BrightRed,
 		warnColor:      t.Yellow,
-		successColor:   t.Green,
+		successColor:   t.BrightGreen,
 		faintColor:     tint.Darken(focusedColor, 50),
 		fainterColor:   tint.Darken(focusedColor, 80),
 	}

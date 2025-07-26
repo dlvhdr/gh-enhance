@@ -7,8 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/log"
-	"github.com/muesli/termenv"
+	"github.com/charmbracelet/log/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/dlvhdr/gh-enhance/internal/tui"
@@ -30,7 +29,7 @@ func init() {
 		newConfigFile, fileErr := os.OpenFile("debug.log",
 			os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 		if fileErr == nil {
-			log.SetColorProfile(termenv.TrueColor)
+			// log.SetColorProfile(term.TrueColor)
 			log.SetOutput(newConfigFile)
 			log.SetTimeFormat(time.Kitchen)
 			log.SetReportCaller(true)

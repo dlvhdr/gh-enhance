@@ -2,17 +2,22 @@ package tui
 
 import (
 	"fmt"
+	"math"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	"github.com/charmbracelet/bubbles/v2/paginator"
 	"github.com/charmbracelet/bubbles/v2/spinner"
+	"github.com/charmbracelet/bubbles/v2/textinput"
 	"github.com/charmbracelet/bubbles/v2/viewport"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/charmbracelet/log"
+	"github.com/charmbracelet/log/v2"
+	"github.com/charmbracelet/x/ansi"
 	tint "github.com/lrstanley/bubbletint/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
@@ -46,25 +51,25 @@ const (
 )
 
 type model struct {
-	width           int
-	height          int
-	prNumber        string
-	repo            string
-	pr              api.PR
-	runsList        list.Model
-	jobsList        list.Model
-	stepsList       list.Model
-	logsViewport    viewport.Model
-	scrollbar       tea.Model
-	quitting        bool
-	focusedPane     focusedPane
-	err             error
-	runsDelegate    list.ItemDelegate
-	jobsDelegate    list.ItemDelegate
-	stepsDelegate   list.ItemDelegate
-	styles          styles
-	logsSpinner     spinner.Model
-	isFilteringLogs bool
+	width         int
+	height        int
+	prNumber      string
+	repo          string
+	pr            api.PR
+	runsList      list.Model
+	jobsList      list.Model
+	stepsList     list.Model
+	logsViewport  viewport.Model
+	numHighlights int
+	scrollbar     tea.Model
+	focusedPane   focusedPane
+	err           error
+	runsDelegate  list.ItemDelegate
+	jobsDelegate  list.ItemDelegate
+	stepsDelegate list.ItemDelegate
+	styles        styles
+	logsSpinner   spinner.Model
+	logsInput     textinput.Model
 }
 
 func NewModel(repo string, number string) model {
@@ -92,9 +97,16 @@ func NewModel(repo string, number string) model {
 	stepsList.SetWidth(unfocusedLargePaneWidth)
 
 	vp := viewport.New()
-	vp.SoftWrap = false
+	vp.LeftGutterFunc = func(info viewport.GutterContext) string {
+		return lipgloss.NewStyle().Foreground(s.colors.faintColor).Render(
+			fmt.Sprintf(" %*d %s ", 5, info.Index+1,
+				lipgloss.NewStyle().Foreground(s.colors.fainterColor).Render("│")))
+	}
 	vp.KeyMap.Right = rightKey
 	vp.KeyMap.Left = leftKey
+
+	vp.HighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("34"))
+	vp.SelectedHighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("47"))
 
 	sb := scrollbar.NewVertical()
 	sb.Style = sb.Style.Inherit(s.scrollbarStyle)
@@ -103,6 +115,28 @@ func NewModel(repo string, number string) model {
 
 	ls := spinner.New(spinner.WithSpinner(LogsFrames))
 	ls.Style = s.faintFgStyle
+
+	li := textinput.New()
+	li.SetWidth(20)
+	li.Styles.Cursor = textinput.CursorStyle{
+		Color: s.colors.faintColor,
+		Shape: tea.CursorBar,
+		Blink: false,
+	}
+	li.VirtualCursor = true
+	li.Prompt = " "
+	li.Placeholder = "Search..."
+	li.Styles.Focused = textinput.StyleState{
+		Text:        lipgloss.NewStyle(),
+		Placeholder: s.faintFgStyle,
+		Prompt:      s.faintFgStyle,
+	}
+
+	li.Styles.Blurred = textinput.StyleState{
+		Text:        lipgloss.NewStyle(),
+		Placeholder: s.faintFgStyle,
+		Prompt:      s.faintFgStyle,
+	}
 
 	m := model{
 		jobsList:      jobsList,
@@ -117,22 +151,27 @@ func NewModel(repo string, number string) model {
 		scrollbar:     sb,
 		styles:        s,
 		logsSpinner:   ls,
+		logsInput:     li,
 	}
 	m.setFocusedPaneStyles()
 	return m
 }
 
 func (m model) Init() tea.Cmd {
-	// return nil
+	// return textinput.Blink
 	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// m.logsViewport.SoftWrap = false
 	var cmd tea.Cmd
 	cmds := make([]tea.Cmd, 0)
 
 	log.Debug("got msg", "type", fmt.Sprintf("%T", msg))
 	switch msg := msg.(type) {
+	case cursor.BlinkMsg:
+		m.logsInput, cmd = m.logsInput.Update(msg)
+		cmds = append(cmds, cmd)
 
 	case workflowRunsFetchedMsg:
 		m.pr = msg.pr
@@ -170,6 +209,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			currJob := m.jobsList.SelectedItem()
 			if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
 				m.renderJobLogs()
+				m.goToErrorInLogs()
 			}
 
 			cmds = append(cmds, m.updateLists()...)
@@ -199,30 +239,48 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.runsList.SetHeight(lHeight)
 		m.jobsList.SetHeight(lHeight)
 		m.stepsList.SetHeight(lHeight)
-		m.logsViewport.SetHeight(lHeight - 2)
-		m.logsViewport.SetWidth(m.logsWidth())
+		m.logsViewport.SetHeight(lHeight - 2 - lipgloss.Height(m.logsInput.View()) - 2) // TODO: take borders from logsInput view
+		w := m.logsWidth()
+		m.logsViewport.SetWidth(w)
+		m.logsInput.SetWidth(w - 10)
 		m.scrollbar, cmd = m.scrollbar.Update(scrollbar.HeightMsg(m.logsViewport.Height()))
 		m.setFocusedPaneStyles()
-	case tea.KeyMsg:
-		log.Debug("key pressed", "key", msg.String())
+	case tea.KeyPressMsg:
+		if key.Matches(msg, quitKeys) {
+			log.Debug("quitting", "msg", msg)
+			return m, tea.Quit
+		}
+
+		log.Debug("👤 key pressed", "key", msg.String())
 		if m.runsList.FilterState() == list.Filtering ||
 			m.jobsList.FilterState() == list.Filtering ||
 			m.stepsList.FilterState() == list.Filtering {
 			break
 		}
 
-		// if m.isFilteringLogs {
-		// 	matches := make([][]int, 0)
-		// 	idx := strings.Index(m.logsViewport.GetContent(), "Error")
-		// 	matches = append(matches, []int{idx, idx + len("Error")})
-		// 	m.logsViewport.SetHighlights(matches)
-		// 	break
-		// }
-		//
-		// if key.Matches(msg, searchLogs) {
-		// 	m.isFilteringLogs = true
-		// 	break
-		// }
+		if m.logsInput.Focused() {
+			if key.Matches(msg, applySearch) {
+				ji := m.getSelectedJobItem()
+				if ji != nil {
+					m.logsViewport.SetContentLines(ji.unstyledLogs)
+					highlights := regexp.MustCompile(
+						m.logsInput.Value()).FindAllStringIndex(
+						strings.Join(ji.unstyledLogs, "\n"), -1)
+					m.numHighlights = len(highlights)
+					m.logsViewport.SetHighlights(highlights)
+					m.logsViewport.HighlightNext()
+					m.logsInput.Blur()
+				}
+			} else {
+				m.logsInput, cmd = m.logsInput.Update(msg)
+				cmds = append(cmds, cmd)
+				break
+			}
+		}
+
+		if m.focusedPane == PaneLogs && key.Matches(msg, searchLogs) {
+			cmds = append(cmds, m.logsInput.Focus())
+		}
 
 		if key.Matches(msg, openPR) && m.pr.Url != "" {
 			cmds = append(cmds, makeOpenUrlCmd(m.pr.Url))
@@ -236,11 +294,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key.Matches(msg, prevPaneKey) {
 			m.focusedPane = max(PaneRuns, m.focusedPane-1)
 			m.setFocusedPaneStyles()
-		}
-
-		if key.Matches(msg, quitKeys) {
-			m.quitting = true
-			return m, tea.Quit
 		}
 
 	case spinner.TickMsg:
@@ -291,7 +344,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case PaneLogs:
-		if msg, ok := msg.(tea.KeyMsg); ok {
+		if msg, ok := msg.(tea.KeyPressMsg); ok {
 			if key.Matches(msg, gotoBottomKey) {
 				m.logsViewport.GotoBottom()
 			}
@@ -299,8 +352,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if key.Matches(msg, gotoTopKey) {
 				m.logsViewport.GotoTop()
 			}
+
+			if key.Matches(msg, nextSearchMatch) {
+				m.logsViewport.HighlightNext()
+			}
+
+			if key.Matches(msg, prevSearchMatch) {
+				m.logsViewport.HighlightPrevious()
+			}
+
+			if key.Matches(msg, cancelSearch) {
+				m.logsInput.Blur()
+				m.logsInput.Reset()
+				m.numHighlights = 0
+				m.logsViewport.ClearHighlights()
+				ji := m.getSelectedJobItem()
+				if ji != nil {
+					m.logsViewport.SetContentLines(ji.renderedLogs)
+				}
+			}
 		}
 		m.logsViewport, cmd = m.logsViewport.Update(msg)
+
+		cmds = append(cmds, cmd)
+
+	}
+
+	cmds = append(cmds, cmd)
+	if _, ok := msg.(tea.KeyPressMsg); !ok && m.logsInput.Focused() {
+		log.Debug("updating logsInput with msg", "msg", fmt.Sprintf("%+v", msg), "focused", m.logsInput.Focused())
+		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -365,7 +446,7 @@ func (m model) View() string {
 
 func (m *model) viewHeader() string {
 	s := lipgloss.NewStyle().Background(m.styles.headerStyle.GetBackground())
-	version := s.Height(lipgloss.Height(Logo)).Render(" v0.1.0〓")
+	version := s.Height(lipgloss.Height(Logo)).Render(" \n v0.1.0〓")
 
 	logoWidth := lipgloss.Width(Logo) + lipgloss.Width(version)
 	logo := lipgloss.PlaceHorizontal(
@@ -445,18 +526,33 @@ func (m *model) shouldShowSteps() bool {
 
 func (m *model) viewLogs() string {
 	title := "Job Logs"
-	w := m.logsWidth() - 1
+	w := m.logsWidth()
 	if m.focusedPane == PaneLogs {
 		title = makePill(title, m.styles.focusedPaneTitleStyle, m.styles.colors.focusedColor)
-		s := m.styles.focusedPaneTitleBarStyle.Width(w)
+		s := m.styles.focusedPaneTitleBarStyle.MarginBottom(0)
 		title = s.Render(title)
 	} else {
 		title = makePill(title, m.styles.unfocusedPaneTitleStyle, m.styles.colors.unfocusedColor)
-		s := m.styles.unfocusedPaneTitleBarStyle.Width(w)
+		s := m.styles.unfocusedPaneTitleBarStyle.MarginBottom(0)
 		title = s.Render(title)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, m.logsContentView())
+	if m.logsInput.Value() != "" && !m.logsInput.Focused() {
+		matches := fmt.Sprintf("%d matches", m.numHighlights)
+		if m.numHighlights == 0 {
+			matches = "no matches"
+		}
+		title = lipgloss.JoinHorizontal(lipgloss.Top, title, " ",
+			m.styles.faintFgStyle.Render(matches))
+	}
+
+	inputView := ""
+	if m.logsViewport.GetContent() != "" {
+		inputView = lipgloss.NewStyle().Width(w).Border(lipgloss.RoundedBorder(), true).BorderForeground(
+			m.styles.colors.fainterColor).Render(m.logsInput.View())
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, title, inputView, m.logsContentView())
 }
 
 func (m *model) setFocusedPaneStyles() {
@@ -491,7 +587,10 @@ func (m *model) setFocusedPaneStyles() {
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	}
 
-	m.logsViewport.SetWidth(m.logsWidth())
+	w := m.logsWidth()
+	m.logsViewport.SetWidth(w)
+	m.logsInput.SetWidth(int(math.Max(float64(0), float64(
+		w-lipgloss.Width(m.logsInput.Prompt)-2))))
 }
 
 func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
@@ -544,6 +643,7 @@ func newStepsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 
 func newList(styles styles, delegate list.ItemDelegate) list.Model {
 	l := list.New([]list.Item{}, delegate, 0, 0)
+	l.KeyMap.Quit = quitKeys
 	l.Paginator.Type = paginator.Arabic
 	l.Styles.StatusBar = l.Styles.StatusBar.Foreground(styles.colors.faintColor)
 	l.Styles.StatusEmpty = l.Styles.StatusEmpty.Foreground(styles.colors.faintColor)
@@ -677,9 +777,13 @@ func (m *model) getSelectedJobItem() *jobItem {
 }
 
 func (m *model) logsWidth() int {
+	if m.width == 0 {
+		return 0
+	}
+
 	var borders int
 	if m.width != 0 && m.width <= smallScreen {
-		borders = 0
+		borders = 1
 	} else {
 		borders = 2
 	}
@@ -796,24 +900,26 @@ func (m *model) onRunChanged() []tea.Cmd {
 }
 
 func (m *model) onJobChanged() []tea.Cmd {
-	log.Debug("job changed")
 	cmds := make([]tea.Cmd, 0)
 
+	m.logsViewport.ClearHighlights()
+	m.numHighlights = 0
+	m.logsInput.Reset()
 	m.stepsList.ResetSelected()
 	m.stepsList.ResetFilter()
 	cmds = append(cmds, m.updateStepsList()...)
 
 	cmds = append(cmds, m.logsSpinner.Tick)
 
-	currJob := m.jobsList.SelectedItem()
-	if currJob != nil && !currJob.(*jobItem).initiatedLogsFetch {
+	currJob := m.getSelectedJobItem()
+	if currJob != nil && !currJob.initiatedLogsFetch {
 		cmds = append(cmds, m.makeFetchJobLogsCmd())
 	} else {
 		log.Error("job changed but current job is nil", "currJob", currJob)
 	}
 
 	m.renderJobLogs()
-	m.logsViewport.GotoTop()
+	m.goToErrorInLogs()
 
 	return cmds
 }
@@ -848,8 +954,8 @@ func (m *model) renderJobLogs() {
 		return
 	}
 
-	if ji.renderedLogs != "" {
-		m.logsViewport.SetContent(ji.renderedLogs)
+	if len(ji.renderedLogs) != 0 {
+		m.logsViewport.SetContentLines(ji.renderedLogs)
 		return
 	}
 
@@ -858,8 +964,8 @@ func (m *model) renderJobLogs() {
 		return
 	}
 
-	ji.renderedLogs = m.renderLogs(ji)
-	m.logsViewport.SetContent(ji.renderedLogs)
+	ji.renderedLogs, ji.unstyledLogs = m.renderLogs(ji)
+	m.logsViewport.SetContentLines(ji.renderedLogs)
 }
 
 func (m *model) logsContentView() string {
@@ -913,45 +1019,60 @@ func (m *model) getJobItemById(jobId string) *jobItem {
 	return nil
 }
 
-func (m *model) renderLogs(ji *jobItem) string {
+func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
 	defer utils.TimeTrack(time.Now(), "rendering logs")
-	logs := strings.Builder{}
 	totalLines := fmt.Sprintf("%d", len(ji.logs))
 	w := m.logsViewport.Width() - m.styles.scrollbarStyle.GetWidth()
 	expand := ExpandSymbol + " "
+	lines := make([]string, 0)
+	unstyledLines := make([]string, 0)
 	for i, log := range ji.logs {
 		rendered := log.Log
+		unstyled := ansi.Strip(log.Log)
 		switch log.Kind {
 		case data.LogKindError:
+			ji.errorLine = i
 			rendered = strings.Replace(rendered, parser.ErrorMarker, "", 1)
+			unstyled = rendered
 			rendered = m.styles.errorBgStyle.Width(w).Render(lipgloss.JoinHorizontal(lipgloss.Top,
 				m.styles.errorTitleStyle.Render("Error: "), m.styles.errorStyle.Render(rendered)))
 		case data.LogKindCommand:
 			rendered = strings.Replace(rendered, parser.CommandMarker, "", 1)
+			unstyled = rendered
 			rendered = m.styles.commandStyle.Render(rendered)
 		case data.LogKindGroupStart:
 			rendered = strings.Replace(rendered, parser.GroupStartMarker, expand, 1)
+			unstyled = rendered
 			rendered = m.styles.groupStartMarkerStyle.Render(rendered)
 		case data.LogKindJobCleanup:
 			rendered = m.styles.stepStartMarkerStyle.Render(rendered)
 		case data.LogKindStepStart:
 			rendered = strings.Replace(rendered, parser.GroupStartMarker, expand, 1)
+			unstyled = rendered
 			rendered = m.styles.stepStartMarkerStyle.Render(rendered)
 		case data.LogKindStepNone:
 			sep := ""
+			unstyledSep := ""
 			if log.Depth > 0 {
-				sep = m.styles.separatorStyle.Render(strings.Repeat(
-					fmt.Sprintf("%s  ", Separator), log.Depth))
+				dm := strings.Repeat(
+					fmt.Sprintf("%s  ", Separator), log.Depth)
+				unstyledSep = dm
+				sep = m.styles.separatorStyle.Render(dm)
 			}
+			unstyled = unstyledSep + unstyled
 			rendered = sep + rendered
 		}
 		ln := fmt.Sprintf("%d", i+1)
 		ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
-		logs.WriteString(m.styles.lineNumbersStyle.Render(ln))
-		logs.WriteString(rendered)
-		logs.WriteString("\n")
+		// lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Top,
+		// m.styles.lineNumbersStyle.Render(ln), rendered))
+		lines = append(lines, rendered)
+		unstyledLines = append(unstyledLines, unstyled)
+		// logs.WriteString()
+		// logs.WriteString()
+		// logs.WriteString("\n")
 	}
-	return logs.String()
+	return lines, unstyledLines
 }
 
 func (m *model) getFocusedPaneWidth() int {
@@ -992,4 +1113,17 @@ func (m *model) getUnfocusedPaneWidth() int {
 	}
 
 	return unfocusedLargePaneWidth
+}
+
+func (m *model) goToErrorInLogs() {
+	currJob := m.getSelectedJobItem()
+	if currJob == nil {
+		return
+	}
+
+	if currJob.errorLine > 0 {
+		m.logsViewport.SetYOffset(currJob.errorLine)
+	} else {
+		m.logsViewport.GotoTop()
+	}
 }

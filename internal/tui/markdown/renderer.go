@@ -1,9 +1,9 @@
 package markdown
 
 import (
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/ansi"
-	"github.com/charmbracelet/glamour/styles"
+	"github.com/charmbracelet/glamour/v2"
+	"github.com/charmbracelet/glamour/v2/ansi"
+	"github.com/charmbracelet/glamour/v2/styles"
 )
 
 var markdownStyle *ansi.StyleConfig
