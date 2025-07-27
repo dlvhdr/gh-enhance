@@ -3,6 +3,7 @@ package tui
 import (
 	"io"
 
+	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
@@ -108,8 +109,8 @@ func (d *jobsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		log.Debug("key pressed on job", "key", msg.Text)
-		switch msg.Text {
-		case "o":
+		switch {
+		case key.Matches(msg, openUrlKey):
 			return makeOpenUrlCmd(job.job.Link)
 		}
 	}

@@ -19,9 +19,6 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
-//go:embed fake-logs.txt
-var fakeLogs string
-
 type workflowRunsFetchedMsg struct {
 	pr   api.PR
 	runs []data.WorkflowRun
@@ -72,6 +69,7 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 
 			job := data.WorkflowJob{
 				Id:          fmt.Sprintf("%d", statusCheck.DatabaseId),
+				Title:       statusCheck.Title,
 				State:       statusCheck.Status,
 				Conclusion:  statusCheck.Conclusion,
 				Name:        statusCheck.Name,
@@ -191,7 +189,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	ji.initiatedLogsFetch = true
 	return func() tea.Msg {
 		defer utils.TimeTrack(time.Now(), "fetching job logs")
-		if ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
+		if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
 			output, err := api.FetchCheckRunOutput(m.repo, ji.job.Id)
 			if err != nil {
 				log.Error("error fetching check run output", "link", ji.job.Link, "err", err)
@@ -221,7 +219,8 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		// Kind is JobKindGithubActions
 		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", ji.job.Id)
 		if err != nil {
-			log.Error("error fetching job logs", "link", ji.job.Link, "err", err, "stderr", stderr.String())
+			log.Error("error fetching job logs", "kind", ji.job.Kind, "link",
+				ji.job.Link, "err", err, "stderr", stderr.String())
 			return jobLogsFetchedMsg{
 				jobId:  ji.job.Id,
 				err:    err,

@@ -21,6 +21,7 @@ type WorkflowJob struct {
 	State       api.Status
 	Conclusion  api.Conclusion
 	Name        string
+	Title       string
 	Workflow    string
 	Event       string
 	Logs        []LogsWithTime

@@ -4,7 +4,6 @@ import (
 	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/v2/list"
 	"github.com/charmbracelet/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
@@ -25,6 +24,7 @@ type paneItemStyles struct {
 
 type colors struct {
 	darkColor      color.Color
+	darkerColor    color.Color
 	lightColor     color.Color
 	errorColor     color.Color
 	warnColor      color.Color
@@ -36,6 +36,7 @@ type colors struct {
 }
 
 type styles struct {
+	tint   *tint.Tint
 	colors colors
 
 	defaultListStyles          lipgloss.Style
@@ -70,9 +71,11 @@ type styles struct {
 	scrollbarTrackStyle        lipgloss.Style
 	faintFgStyle               lipgloss.Style
 
-	headerStyle lipgloss.Style
-	logoStyle   lipgloss.Style
-	footerStyle lipgloss.Style
+	headerStyle     lipgloss.Style
+	logoStyle       lipgloss.Style
+	footerStyle     lipgloss.Style
+	helpButtonStyle lipgloss.Style
+	helpPaneStyle   lipgloss.Style
 }
 
 func makeStyles() styles {
@@ -81,17 +84,17 @@ func makeStyles() styles {
 		t.BrightGreen = tint.FromHex("#9ece6a")
 	}
 
-	defaultItemStyles := list.NewDefaultItemStyles(true)
 	focusedColor := t.Blue
 	colors := colors{
 		focusedColor:   focusedColor,
 		unfocusedColor: tint.Darken(t.BrightBlue, 70),
 		darkColor:      tint.Darken(focusedColor, 20),
+		darkerColor:    tint.Darken(focusedColor, 70),
 		lightColor:     tint.Lighten(focusedColor, 20),
 		errorColor:     t.BrightRed,
 		warnColor:      t.Yellow,
 		successColor:   t.BrightGreen,
-		faintColor:     tint.Darken(focusedColor, 50),
+		faintColor:     tint.Darken(focusedColor, 40),
 		fainterColor:   tint.Darken(focusedColor, 80),
 	}
 
@@ -104,6 +107,7 @@ func makeStyles() styles {
 	baseTitleStyle := lipgloss.NewStyle().Bold(true).Margin(0)
 
 	return styles{
+		tint:   t,
 		colors: colors,
 
 		faintFgStyle: lipgloss.NewStyle().Foreground(colors.faintColor),
@@ -112,14 +116,18 @@ func makeStyles() styles {
 			lipgloss.InnerHalfBlockBorder(), false, false, true,
 			false).BorderForeground(headerBg).Background(headerBg),
 		logoStyle:   lipgloss.NewStyle().Foreground(t.Blue).Background(headerBg),
-		footerStyle: lipgloss.NewStyle().Background(colors.fainterColor).Foreground(focusedColor).PaddingLeft(1).PaddingRight(1),
+		footerStyle: lipgloss.NewStyle().Background(colors.fainterColor).PaddingLeft(1),
+		helpButtonStyle: lipgloss.NewStyle().Background(colors.darkerColor).Foreground(
+			t.BrightWhite).PaddingLeft(1).PaddingRight(1),
+		helpPaneStyle: lipgloss.NewStyle().PaddingLeft(1).PaddingRight(1).PaddingBottom(1).Border(
+			lipgloss.NormalBorder(), true, false, false, false).BorderForeground(colors.fainterColor),
 
 		focusedPaneTitleStyle:      baseTitleStyle.Foreground(t.Black),
 		unfocusedPaneTitleStyle:    baseTitleStyle.Foreground(t.Fg),
 		focusedPaneTitleBarStyle:   lipgloss.NewStyle().Bold(true).PaddingRight(0).MarginBottom(1),
 		unfocusedPaneTitleBarStyle: lipgloss.NewStyle().Bold(true).PaddingRight(0).MarginBottom(1),
 
-		normalItemDescStyle: defaultItemStyles.DimmedDesc.PaddingLeft(4),
+		normalItemDescStyle: lipgloss.NewStyle().Foreground(colors.faintColor).PaddingLeft(4),
 
 		paneItem: paneItemStyles{
 			selectedStyle: lipgloss.NewStyle().
@@ -139,10 +147,10 @@ func makeStyles() styles {
 				Foreground(unfocusedFg).
 				Background(bg),
 
-			focusedTitleStyle:         lipgloss.NewStyle().Bold(true).Foreground(focusedColor),
+			focusedTitleStyle:         lipgloss.NewStyle().Bold(true).Foreground(t.BrightWhite),
 			focusedSelectedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(focusedColor).Background(bg),
 
-			unfocusedTitleStyle: lipgloss.NewStyle().Bold(true),
+			unfocusedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(t.White),
 
 			selectedDescStyle: lipgloss.NewStyle().Foreground(t.White).PaddingLeft(2).Background(bg),
 			descStyle:         lipgloss.NewStyle().Foreground(colors.faintColor).PaddingLeft(2),

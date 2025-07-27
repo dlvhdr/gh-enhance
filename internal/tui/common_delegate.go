@@ -35,6 +35,8 @@ func (i itemMeta) TitleStyle() lipgloss.Style {
 		return i.styles.paneItem.focusedSelectedTitleStyle
 	} else if i.selected {
 		return i.styles.paneItem.selectedTitleStyle
+	} else if i.focused {
+		return i.styles.paneItem.focusedTitleStyle
 	}
 
 	return i.styles.paneItem.unfocusedTitleStyle

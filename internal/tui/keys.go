@@ -3,12 +3,17 @@ package tui
 import "github.com/charmbracelet/bubbles/v2/key"
 
 var (
-	openPR = key.NewBinding(
+	openUrlKey = key.NewBinding(
+		key.WithKeys("o"),
+		key.WithHelp("o", "open in browser"),
+	)
+
+	openPRKey = key.NewBinding(
 		key.WithKeys("O"),
 		key.WithHelp("O", "open PR"),
 	)
 
-	quitKeys = key.NewBinding(
+	quitKey = key.NewBinding(
 		key.WithKeys("ctrl+c"),
 		key.WithHelp("ctrl+c", "quit"),
 	)
@@ -53,28 +58,33 @@ var (
 		key.WithHelp("←", "move left"),
 	)
 
-	searchLogs = key.NewBinding(
+	searchKey = key.NewBinding(
 		key.WithKeys("/"),
-		key.WithHelp("/", "search logs"),
+		key.WithHelp("/", "search in pane"),
 	)
 
-	cancelSearch = key.NewBinding(
+	cancelSearchKey = key.NewBinding(
 		key.WithKeys("esc"),
 		key.WithHelp("esc", "cancel search"),
 	)
 
-	applySearch = key.NewBinding(
+	applySearchKey = key.NewBinding(
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "apply search"),
 	)
 
-	nextSearchMatch = key.NewBinding(
-		key.WithKeys("ctrl+n"),
+	nextSearchMatchKey = key.NewBinding(
+		key.WithKeys("n", "ctrl+n"),
 		key.WithHelp("ctrl+n", "next match"),
 	)
 
-	prevSearchMatch = key.NewBinding(
-		key.WithKeys("ctrl+p"),
+	prevSearchMatchKey = key.NewBinding(
+		key.WithKeys("N", "ctrl+p"),
 		key.WithHelp("ctrl+p", "prev match"),
+	)
+
+	helpKey = key.NewBinding(
+		key.WithKeys("?"),
+		key.WithHelp("?", "toggle help"),
 	)
 )

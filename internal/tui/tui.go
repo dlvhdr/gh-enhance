@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/cursor"
+	"github.com/charmbracelet/bubbles/v2/help"
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	"github.com/charmbracelet/bubbles/v2/paginator"
@@ -70,6 +71,7 @@ type model struct {
 	styles        styles
 	logsSpinner   spinner.Model
 	logsInput     textinput.Model
+	help          help.Model
 }
 
 func NewModel(repo string, number string) model {
@@ -105,8 +107,8 @@ func NewModel(repo string, number string) model {
 	vp.KeyMap.Right = rightKey
 	vp.KeyMap.Left = leftKey
 
-	vp.HighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("34"))
-	vp.SelectedHighlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Background(lipgloss.Color("47"))
+	vp.HighlightStyle = lipgloss.NewStyle().Foreground(s.tint.Black).Background(s.tint.Blue)
+	vp.SelectedHighlightStyle = lipgloss.NewStyle().Foreground(s.tint.Black).Background(s.tint.BrightGreen)
 
 	sb := scrollbar.NewVertical()
 	sb.Style = sb.Style.Inherit(s.scrollbarStyle)
@@ -138,6 +140,12 @@ func NewModel(repo string, number string) model {
 		Prompt:      s.faintFgStyle,
 	}
 
+	h := help.New()
+	h.Styles.FullKey = lipgloss.NewStyle().Foreground(s.colors.lightColor)
+	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(s.tint.BrightWhite)
+	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(lipgloss.Blue)
+	h.Styles.Ellipsis = lipgloss.NewStyle().Foreground(lipgloss.Blue)
+
 	m := model{
 		jobsList:      jobsList,
 		runsList:      runsList,
@@ -152,6 +160,7 @@ func NewModel(repo string, number string) model {
 		styles:        s,
 		logsSpinner:   ls,
 		logsInput:     li,
+		help:          h,
 	}
 	m.setFocusedPaneStyles()
 	return m
@@ -235,18 +244,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Debug("window size changed", "width", msg.Width, "height", msg.Height)
 		m.width = msg.Width
 		m.height = msg.Height
-		lHeight := msg.Height - headerHeight - footerHeight
-		m.runsList.SetHeight(lHeight)
-		m.jobsList.SetHeight(lHeight)
-		m.stepsList.SetHeight(lHeight)
-		m.logsViewport.SetHeight(lHeight - 2 - lipgloss.Height(m.logsInput.View()) - 2) // TODO: take borders from logsInput view
+		m.setHeights()
+
+		m.help.Width = m.width
 		w := m.logsWidth()
 		m.logsViewport.SetWidth(w)
 		m.logsInput.SetWidth(w - 10)
-		m.scrollbar, cmd = m.scrollbar.Update(scrollbar.HeightMsg(m.logsViewport.Height()))
+
 		m.setFocusedPaneStyles()
 	case tea.KeyPressMsg:
-		if key.Matches(msg, quitKeys) {
+		if key.Matches(msg, quitKey) {
 			log.Debug("quitting", "msg", msg)
 			return m, tea.Quit
 		}
@@ -259,7 +266,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.logsInput.Focused() {
-			if key.Matches(msg, applySearch) {
+			if key.Matches(msg, applySearchKey) {
 				ji := m.getSelectedJobItem()
 				if ji != nil {
 					m.logsViewport.SetContentLines(ji.unstyledLogs)
@@ -278,21 +285,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		if m.focusedPane == PaneLogs && key.Matches(msg, searchLogs) {
+		if key.Matches(msg, helpKey) {
+			m.help.ShowAll = !m.help.ShowAll
+			m.setHeights()
+		}
+
+		if m.focusedPane == PaneLogs && key.Matches(msg, searchKey) {
 			cmds = append(cmds, m.logsInput.Focus())
 		}
 
-		if key.Matches(msg, openPR) && m.pr.Url != "" {
+		if key.Matches(msg, openPRKey) && m.pr.Url != "" {
 			cmds = append(cmds, makeOpenUrlCmd(m.pr.Url))
 		}
 
 		if key.Matches(msg, nextPaneKey) {
-			m.focusedPane = min(PaneLogs, m.focusedPane+1)
+			pane := m.focusedPane + 1
+			if pane == PaneSteps && !m.shouldShowSteps() {
+				pane = pane + 1
+			}
+			m.focusedPane = min(PaneLogs, pane)
 			m.setFocusedPaneStyles()
 		}
 
 		if key.Matches(msg, prevPaneKey) {
-			m.focusedPane = max(PaneRuns, m.focusedPane-1)
+			pane := m.focusedPane - 1
+			if pane == PaneSteps && !m.shouldShowSteps() {
+				pane = pane - 1
+			}
+			m.focusedPane = max(PaneRuns, pane)
 			m.setFocusedPaneStyles()
 		}
 
@@ -353,15 +373,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logsViewport.GotoTop()
 			}
 
-			if key.Matches(msg, nextSearchMatch) {
+			if key.Matches(msg, nextSearchMatchKey) {
 				m.logsViewport.HighlightNext()
 			}
 
-			if key.Matches(msg, prevSearchMatch) {
+			if key.Matches(msg, prevSearchMatchKey) {
 				m.logsViewport.HighlightPrevious()
 			}
 
-			if key.Matches(msg, cancelSearch) {
+			if key.Matches(msg, cancelSearchKey) {
 				m.logsInput.Blur()
 				m.logsInput.Reset()
 				m.numHighlights = 0
@@ -433,6 +453,11 @@ func (m model) View() string {
 	}
 	panes = append(panes, m.viewLogs())
 
+	if m.help.ShowAll {
+		help := m.styles.helpPaneStyle.Width(m.width).Render(m.help.View(keys))
+		footer = lipgloss.JoinVertical(lipgloss.Left, help, footer)
+	}
+
 	return rootStyle.Render(lipgloss.JoinVertical(
 		lipgloss.Left,
 		header,
@@ -476,6 +501,10 @@ func (m *model) viewHeader() string {
 }
 
 func (m *model) viewFooter() string {
+	if m.width == 0 {
+		return ""
+	}
+
 	failing, successful, skipped := 0, 0, 0
 	for _, count := range m.pr.StatusCheckRollup.Contexts.CheckRunCountsByState {
 		switch count.State {
@@ -510,7 +539,14 @@ func (m *model) viewFooter() string {
 		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("%d skipped", skipped)))
 	}
 
-	return m.styles.footerStyle.Width(m.width).Render(strings.Join(texts, bg.Render(", ")))
+	checks := bg.Render(strings.Join(texts, bg.Render(", ")))
+
+	help := m.styles.helpButtonStyle.Render("? help")
+
+	return m.styles.footerStyle.Width(m.width).Render(
+		lipgloss.JoinHorizontal(lipgloss.Top, checks, bg.Render(
+			strings.Repeat(" ", m.width-lipgloss.Width(checks)-lipgloss.Width(help)-
+				m.styles.footerStyle.GetHorizontalFrameSize())), help))
 }
 
 func (m *model) shouldShowSteps() bool {
@@ -643,7 +679,7 @@ func newStepsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 
 func newList(styles styles, delegate list.ItemDelegate) list.Model {
 	l := list.New([]list.Item{}, delegate, 0, 0)
-	l.KeyMap.Quit = quitKeys
+	l.KeyMap.Quit = quitKey
 	l.Paginator.Type = paginator.Arabic
 	l.Styles.StatusBar = l.Styles.StatusBar.Foreground(styles.colors.faintColor)
 	l.Styles.StatusEmpty = l.Styles.StatusEmpty.Foreground(styles.colors.faintColor)
@@ -805,9 +841,10 @@ func (m *model) loadingLogsView() string {
 }
 
 func (m *model) fullScreenMessageView(message string) string {
+	h := m.getMainContentHeight()
 	return lipgloss.Place(
 		m.logsWidth(),
-		m.height-headerHeight-footerHeight-2, // -2 for logs title
+		h-2,
 		lipgloss.Center,
 		0.75,
 		message,
@@ -818,7 +855,7 @@ func (m *model) noLogsView(message string) string {
 	emptySetArt := ""
 	for _, char := range art.EmptySet {
 		if char == '╱' {
-			emptySetArt += lipgloss.NewStyle().Foreground(lipgloss.Red).Render("╱")
+			emptySetArt += lipgloss.NewStyle().Foreground(m.styles.colors.errorColor).Render("╱")
 		} else {
 			emptySetArt += m.styles.watermarkIllustrationStyle.Render(string(char))
 		}
@@ -914,8 +951,8 @@ func (m *model) onJobChanged() []tea.Cmd {
 	currJob := m.getSelectedJobItem()
 	if currJob != nil && !currJob.initiatedLogsFetch {
 		cmds = append(cmds, m.makeFetchJobLogsCmd())
-	} else {
-		log.Error("job changed but current job is nil", "currJob", currJob)
+	} else if currJob == nil {
+		log.Error("job changed but current job is nil")
 	}
 
 	m.renderJobLogs()
@@ -959,7 +996,7 @@ func (m *model) renderJobLogs() {
 		return
 	}
 
-	if ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
+	if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
 		m.logsViewport.SetContent(ji.renderedText)
 		return
 	}
@@ -971,7 +1008,7 @@ func (m *model) renderJobLogs() {
 func (m *model) logsContentView() string {
 	job := m.jobsList.SelectedItem()
 	if job == nil {
-		return "Nothing selected..."
+		return m.styles.faintFgStyle.PaddingLeft(1).Render("Nothing selected...")
 	}
 
 	ji := job.(*jobItem)
@@ -1126,4 +1163,25 @@ func (m *model) goToErrorInLogs() {
 	} else {
 		m.logsViewport.GotoTop()
 	}
+}
+
+func (m *model) getMainContentHeight() int {
+	h := m.height - headerHeight - footerHeight
+	if m.help.ShowAll {
+		h -= lipgloss.Height(m.help.View(keys)) + m.styles.helpPaneStyle.GetVerticalFrameSize()
+	}
+	return h
+}
+
+func (m *model) setHeights() {
+	h := m.getMainContentHeight()
+
+	m.runsList.SetHeight(h)
+	m.jobsList.SetHeight(h)
+	m.stepsList.SetHeight(h)
+
+	// TODO: take borders from logsInput view
+	vph := h - 2 - lipgloss.Height(m.logsInput.View()) - 2
+	m.logsViewport.SetHeight(vph)
+	m.scrollbar, _ = m.scrollbar.Update(scrollbar.HeightMsg(vph))
 }

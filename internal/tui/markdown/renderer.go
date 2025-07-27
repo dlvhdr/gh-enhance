@@ -10,7 +10,7 @@ var markdownStyle *ansi.StyleConfig
 
 func GetMarkdownRenderer(width int) glamour.TermRenderer {
 	markdownRenderer, _ := glamour.NewTermRenderer(
-		glamour.WithStyles(styles.DarkStyleConfig),
+		glamour.WithStyles(styles.TokyoNightStyleConfig),
 		glamour.WithWordWrap(width),
 		glamour.WithEmoji(),
 		glamour.WithPreservedNewLines(),
