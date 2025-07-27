@@ -167,8 +167,7 @@ func NewModel(repo string, number string) model {
 }
 
 func (m model) Init() tea.Cmd {
-	// return textinput.Blink
-	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
+	return m.makeInitCmd()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -283,6 +282,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmd)
 				break
 			}
+		}
+
+		if key.Matches(msg, refreshAllKey) {
+			newModel := NewModel(m.repo, m.prNumber)
+			newModel.width = m.width
+			newModel.height = m.height
+			newModel.setHeights()
+
+			newModel.help.Width = newModel.width
+			w := newModel.logsWidth()
+			newModel.logsViewport.SetWidth(w)
+			newModel.logsInput.SetWidth(w - 10)
+
+			newModel.setFocusedPaneStyles()
+
+			return newModel, newModel.makeInitCmd()
 		}
 
 		if key.Matches(msg, helpKey) {

@@ -83,6 +83,11 @@ var (
 		key.WithHelp("ctrl+p", "prev match"),
 	)
 
+	refreshAllKey = key.NewBinding(
+		key.WithKeys("R"),
+		key.WithHelp("R", "refresh all"),
+	)
+
 	helpKey = key.NewBinding(
 		key.WithKeys("?"),
 		key.WithHelp("?", "toggle help"),

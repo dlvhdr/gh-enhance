@@ -268,3 +268,7 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 		return nil
 	}
 }
+
+func (m *model) makeInitCmd() tea.Cmd {
+	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
+}
