@@ -171,7 +171,6 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// m.logsViewport.SoftWrap = false
 	var cmd tea.Cmd
 	cmds := make([]tea.Cmd, 0)
 
@@ -244,11 +243,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.setHeights()
-
-		m.help.Width = m.width
-		w := m.logsWidth()
-		m.logsViewport.SetWidth(w)
-		m.logsInput.SetWidth(w - 10)
+		m.setWidths()
 
 		m.setFocusedPaneStyles()
 	case tea.KeyPressMsg:
@@ -289,11 +284,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel.width = m.width
 			newModel.height = m.height
 			newModel.setHeights()
-
-			newModel.help.Width = newModel.width
-			w := newModel.logsWidth()
-			newModel.logsViewport.SetWidth(w)
-			newModel.logsInput.SetWidth(w - 10)
+			newModel.setWidths()
 
 			newModel.setFocusedPaneStyles()
 
@@ -1199,4 +1190,11 @@ func (m *model) setHeights() {
 	vph := h - 2 - lipgloss.Height(m.logsInput.View()) - 2
 	m.logsViewport.SetHeight(vph)
 	m.scrollbar, _ = m.scrollbar.Update(scrollbar.HeightMsg(vph))
+}
+
+func (m *model) setWidths() {
+	m.help.Width = m.width
+	w := m.logsWidth()
+	m.logsViewport.SetWidth(w)
+	m.logsInput.SetWidth(w - 10)
 }
