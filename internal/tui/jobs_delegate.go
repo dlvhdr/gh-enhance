@@ -45,15 +45,14 @@ func (i *jobItem) Description() string {
 	if i.job.Bucket == data.CheckBucketSkipping {
 		return "Skipped"
 	}
-	if i.job.Bucket == data.CheckBucketPending {
-		return "Pending"
-	}
 	if i.job.Bucket == data.CheckBucketCancel {
 		return "Cancelled"
 	}
-
 	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
 		return "Running..."
+	}
+	if i.job.Bucket == data.CheckBucketPending {
+		return "Pending"
 	}
 
 	return i.job.CompletedAt.Sub(i.job.StartedAt).String()
@@ -66,6 +65,9 @@ func (i *jobItem) FilterValue() string {
 
 func (i *jobItem) viewStatus() string {
 	s := i.meta.TitleStyle()
+	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
+		return i.meta.styles.waitingGlyph.Inherit(s).Render()
+	}
 	switch i.job.Bucket {
 	case data.CheckBucketPass:
 		return i.meta.styles.successGlyph.Inherit(s).Render()

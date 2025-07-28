@@ -162,7 +162,7 @@ func makeStyles() styles {
 		canceledGlyph:              lipgloss.NewStyle().Foreground(colors.faintColor).SetString(CanceledIcon),
 		skippedGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(SkippedIcon),
 		waitingGlyph:               lipgloss.NewStyle().Foreground(t.Yellow).SetString(WaitingIcon),
-		pendingGlyph:               lipgloss.NewStyle().Foreground(t.Yellow).SetString(PendingIcon),
+		pendingGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(PendingIcon),
 		failureGlyph:               lipgloss.NewStyle().Foreground(t.Red).SetString(FailureIcon),
 		successGlyph:               lipgloss.NewStyle().Foreground(colors.successColor).SetString(SuccessIcon),
 		noLogsStyle:                lipgloss.NewStyle().Foreground(colors.faintColor).Bold(true),
