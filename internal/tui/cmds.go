@@ -229,7 +229,6 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		}
 		jobLogs := jobLogsRes.String()
 		log.Debug("success fetching job logs", "link", ji.job.Link, "bytes", len(jobLogsRes.Bytes()))
-		// jobLogs := fakeLogs
 
 		return jobLogsFetchedMsg{
 			jobId: ji.job.Id,

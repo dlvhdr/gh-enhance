@@ -27,6 +27,9 @@ func (km keyMap) FullHelp() [][]key.Binding {
 		{
 			openUrlKey,
 			openPRKey,
+			refreshAllKey,
+		},
+		{
 			quitKey,
 			helpKey,
 		},

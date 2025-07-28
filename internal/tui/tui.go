@@ -1034,11 +1034,15 @@ func (m *model) logsContentView() string {
 
 	if ji.job.Bucket == data.CheckBucketPending {
 		return m.fullScreenMessageView(lipgloss.NewStyle().Foreground(
-			m.styles.colors.warnColor).Render("This job is still running"))
+			m.styles.colors.warnColor).Render("This job is still running.\nPress `o` to view the job in the web."))
 	}
 
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "HTTP 410:") {
 		return m.fullScreenMessageView("The logs for this run have expired and are no longer available.")
+	}
+
+	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "is still in progress;") {
+		return m.fullScreenMessageView("The run is still in progress.\nPress `o` to view the job in the web.")
 	}
 
 	if m.isScrollbarVisible() {
