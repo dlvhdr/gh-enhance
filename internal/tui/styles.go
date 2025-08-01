@@ -175,9 +175,11 @@ func makeStyles() styles {
 		commandStyle:               lipgloss.NewStyle().Foreground(t.Blue).Inline(true),
 		stepStartMarkerStyle:       lipgloss.NewStyle().Bold(true).Inline(true),
 		groupStartMarkerStyle:      lipgloss.NewStyle().Inline(true),
-		scrollbarStyle:             lipgloss.NewStyle(),
-		scrollbarThumbStyle:        lipgloss.NewStyle().Foreground(colors.faintColor),
-		scrollbarTrackStyle:        lipgloss.NewStyle().Foreground(colors.fainterColor),
+		scrollbarStyle: lipgloss.NewStyle().Border(lipgloss.Border{
+			Top: "▲", Bottom: "▼",
+		}, true, false, true, false).BorderForeground(colors.darkColor),
+		scrollbarThumbStyle: lipgloss.NewStyle().Foreground(colors.darkColor),
+		scrollbarTrackStyle: lipgloss.NewStyle().Foreground(colors.faintColor),
 	}
 }
 

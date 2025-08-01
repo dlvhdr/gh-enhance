@@ -343,7 +343,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if ji == nil || ji.loadingLogs {
 			m.logsSpinner, cmd = m.logsSpinner.Update(msg)
 			cmds = append(cmds, cmd)
-		} else if ji.job.State == api.StatusInProgress {
+		} else if ji.isStatusInProgress() {
 			m.inProgressSpinner, cmd = m.inProgressSpinner.Update(msg)
 			cmds = append(cmds, cmd)
 		}
@@ -877,7 +877,7 @@ func (m *model) logsWidth() int {
 	}
 	sb := 0
 	ji := m.getSelectedJobItem()
-	if ji != nil && len(ji.renderedLogs) > 0 && m.isScrollbarVisible() {
+	if ji != nil && (len(ji.renderedLogs) > 0 || len(ji.renderedText) > 0) && m.isScrollbarVisible() {
 		sb = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())
 	}
 	steps := 0
@@ -1038,7 +1038,7 @@ func (m *model) renderJobLogs() tea.Cmd {
 		return nil
 	}
 
-	if ji.job.State == api.StatusInProgress {
+	if ji.isStatusInProgress() {
 		return m.inProgressSpinner.Tick
 	}
 
@@ -1058,6 +1058,7 @@ func (m *model) renderJobLogs() tea.Cmd {
 
 	if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
 		m.logsViewport.SetContent(ji.renderedText)
+		m.logsViewport.SetWidth(5)
 		m.setHeights()
 
 		return nil

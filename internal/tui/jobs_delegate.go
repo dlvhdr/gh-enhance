@@ -125,6 +125,10 @@ func (d *jobsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	return nil
 }
 
+func (ji *jobItem) isStatusInProgress() bool {
+	return ji.job.State == api.StatusInProgress || ji.job.State == api.StatusPending || ji.job.State == api.StatusQueued
+}
+
 func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
 	loadingSteps := true
 	if job.Kind != data.JobKindGithubActions {
