@@ -31,6 +31,7 @@ type colors struct {
 	successColor   color.Color
 	focusedColor   color.Color
 	unfocusedColor color.Color
+	subtleWhite    color.Color
 	faintColor     color.Color
 	fainterColor   color.Color
 }
@@ -84,7 +85,7 @@ func makeStyles() styles {
 		t.BrightGreen = tint.FromHex("#9ece6a")
 	}
 
-	focusedColor := t.Blue
+	focusedColor := t.BrightBlue
 	colors := colors{
 		focusedColor:   focusedColor,
 		unfocusedColor: tint.Darken(t.BrightBlue, 70),
@@ -96,6 +97,7 @@ func makeStyles() styles {
 		successColor:   t.BrightGreen,
 		faintColor:     tint.Darken(focusedColor, 40),
 		fainterColor:   tint.Darken(focusedColor, 80),
+		subtleWhite:    tint.Darken(t.White, 20),
 	}
 
 	errorBgStyle := lipgloss.NewStyle().Background(tint.Darken(t.Red, 80))
@@ -115,7 +117,7 @@ func makeStyles() styles {
 		headerStyle: lipgloss.NewStyle().Foreground(focusedColor).PaddingLeft(1).PaddingTop(1).PaddingRight(1).Border(
 			lipgloss.InnerHalfBlockBorder(), false, false, true,
 			false).BorderForeground(headerBg).Background(headerBg),
-		logoStyle:   lipgloss.NewStyle().Foreground(t.Blue).Background(headerBg),
+		logoStyle:   lipgloss.NewStyle().Foreground(t.BrightBlue).Background(headerBg),
 		footerStyle: lipgloss.NewStyle().Background(colors.fainterColor).PaddingLeft(1),
 		helpButtonStyle: lipgloss.NewStyle().Background(colors.darkerColor).Foreground(
 			t.BrightWhite).PaddingLeft(1).PaddingRight(1),
@@ -147,10 +149,10 @@ func makeStyles() styles {
 				Foreground(unfocusedFg).
 				Background(bg),
 
-			focusedTitleStyle:         lipgloss.NewStyle().Bold(true).Foreground(t.BrightWhite),
+			focusedTitleStyle:         lipgloss.NewStyle().Bold(true).Foreground(t.White),
 			focusedSelectedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(focusedColor).Background(bg),
 
-			unfocusedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(t.White),
+			unfocusedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(colors.subtleWhite),
 
 			selectedDescStyle: lipgloss.NewStyle().Foreground(t.White).PaddingLeft(2).Background(bg),
 			descStyle:         lipgloss.NewStyle().Foreground(colors.faintColor).PaddingLeft(2),

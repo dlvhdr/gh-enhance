@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"math"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -79,6 +80,10 @@ type model struct {
 func NewModel(repo string, number string) model {
 	tint.NewDefaultRegistry()
 	tint.SetTint(tint.TintTokyoNightStorm)
+	theme := os.Getenv("ENHANCE_THEME")
+	if theme != "" {
+		tint.SetTintID(theme)
+	}
 
 	s := makeStyles()
 
@@ -1016,13 +1021,21 @@ func (m *model) onJobChanged() []tea.Cmd {
 func (m *model) onStepChanged() {
 	job := m.jobsList.SelectedItem()
 	step := m.stepsList.SelectedItem()
+	cursor := m.stepsList.Cursor()
 
-	if step != nil {
-		for i, log := range job.(*jobItem).logs {
-			if log.Time.After(step.(*stepItem).step.StartedAt) {
-				m.logsViewport.SetYOffset(i - 1)
-				break
-			}
+	if step == nil {
+		return
+	}
+
+	if cursor == len(m.stepsList.Items())-1 {
+		m.logsViewport.GotoBottom()
+		return
+	}
+
+	for i, log := range job.(*jobItem).logs {
+		if log.Time.After(step.(*stepItem).step.StartedAt) {
+			m.logsViewport.SetYOffset(i - 1)
+			return
 		}
 	}
 }
