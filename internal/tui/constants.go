@@ -172,3 +172,70 @@ var LogsFrames = spinner.Spinner{
 	},
 	FPS: time.Second / 10,
 }
+
+var InProgressFrames = spinner.Spinner{
+	Frames: []string{
+		`
+  ▀▀ 
+     
+     
+`,
+
+		`
+   ▀▜
+     
+     
+`,
+		`
+    ▜
+    ▐
+     
+`,
+		`
+     
+    ▐
+    ▟
+`,
+		`
+     
+     
+   ▄▟
+`,
+		`
+     
+     
+  ▄▄ 
+`,
+		`
+     
+     
+ ▄▄  
+`,
+		`
+     
+     
+▙▄   
+`,
+		`
+     
+▌    
+▙    
+`,
+		`
+▛    
+▌    
+     
+`,
+		`
+▛▀   
+     
+     
+`,
+		`
+ ▀▀  
+     
+     
+`,
+	},
+	FPS: time.Second / 12,
+}

@@ -2,6 +2,7 @@ package tui
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -31,6 +32,10 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 		if err != nil {
 			log.Error("error fetching pr checks", "err", err)
 			return workflowRunsFetchedMsg{err: err}
+		}
+
+		if response.Resource.PullRequest.Number == 0 {
+			return workflowRunsFetchedMsg{err: errors.New("pull request not found")}
 		}
 
 		checkNodes := response.Resource.PullRequest.StatusCheckRollup.Contexts.Nodes
@@ -67,6 +72,10 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				kind = data.JobKindCheckRun
 			}
 
+			pendingEnv := ""
+			if len(wfr.PendingDeploymentRequests.Nodes) > 0 {
+				pendingEnv = wfr.PendingDeploymentRequests.Nodes[0].Environment.Name
+			}
 			job := data.WorkflowJob{
 				Id:          fmt.Sprintf("%d", statusCheck.DatabaseId),
 				Title:       statusCheck.Title,
@@ -74,6 +83,7 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				Conclusion:  statusCheck.Conclusion,
 				Name:        statusCheck.Name,
 				Workflow:    wfr.Workflow.Name,
+				PendingEnv:  pendingEnv,
 				Event:       wfr.Event,
 				Logs:        []data.LogsWithTime{},
 				Link:        statusCheck.Url,
@@ -219,6 +229,13 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		// Kind is JobKindGithubActions
 		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", ji.job.Id)
 		if err != nil {
+			// TODO: fetch with gh api
+			// if run is still in progress, gh CLI will not fetch the logs (why???)
+			// e.g.
+			// gh api \
+			//   -H "Accept: application/vnd.github+json" \
+			//   -H "X-GitHub-Api-Version: 2022-11-28" \
+			//   /repos/rapidsai/cuml/actions/jobs/46882393014/logs
 			log.Error("error fetching job logs", "kind", ji.job.Kind, "link",
 				ji.job.Link, "err", err, "stderr", stderr.String())
 			return jobLogsFetchedMsg{

@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/log/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/data"
 )
 
@@ -44,6 +45,18 @@ func (i *runItem) FilterValue() string { return i.run.Name }
 
 func (i *runItem) viewStatus() string {
 	s := i.meta.TitleStyle()
+
+	numPending := 0
+	for _, job := range i.run.Jobs {
+		if job.State == api.StatusInProgress {
+			numPending++
+		}
+	}
+
+	if numPending > 0 {
+		return i.meta.styles.waitingGlyph.Inherit(s).Render()
+	}
+
 	switch i.run.Bucket {
 	case data.CheckBucketPass:
 		return i.meta.styles.successGlyph.Inherit(s).Render()

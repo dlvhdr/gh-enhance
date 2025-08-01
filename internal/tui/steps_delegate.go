@@ -36,6 +36,11 @@ func (i *stepItem) Description() string {
 		if i.step.Status == api.StatusInProgress {
 			return "Running..."
 		}
+
+		if i.step.Status == api.StatusPending {
+			return "Pending"
+		}
+
 		return strings.ToTitle(string(i.step.Status))
 	}
 	return i.step.CompletedAt.Sub(i.step.StartedAt).String()

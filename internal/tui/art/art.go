@@ -7,3 +7,6 @@ var EmptySet string
 
 //go:embed stop-sign.txt
 var StopSign string
+
+//go:embed checkmark-sign.txt
+var CheckmarkSign string

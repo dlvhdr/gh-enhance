@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/log/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/data"
 )
 
@@ -52,6 +53,10 @@ func (i *jobItem) Description() string {
 		return "Running..."
 	}
 	if i.job.Bucket == data.CheckBucketPending {
+		if i.job.State == api.StatusWaiting {
+			return "Waiting"
+		}
+
 		return "Pending"
 	}
 

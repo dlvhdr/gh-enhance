@@ -41,9 +41,10 @@ const (
 )
 
 const (
-	headerHeight = 4
-	footerHeight = 1
-	smallScreen  = 130
+	headerHeight    = 4
+	footerHeight    = 1
+	smallScreen     = 130
+	paneTitleHeight = 1
 
 	unfocusedLargePaneWidth = 20
 	focusedLargePaneWidth   = 40
@@ -52,26 +53,27 @@ const (
 )
 
 type model struct {
-	width         int
-	height        int
-	prNumber      string
-	repo          string
-	pr            api.PR
-	runsList      list.Model
-	jobsList      list.Model
-	stepsList     list.Model
-	logsViewport  viewport.Model
-	numHighlights int
-	scrollbar     tea.Model
-	focusedPane   focusedPane
-	err           error
-	runsDelegate  list.ItemDelegate
-	jobsDelegate  list.ItemDelegate
-	stepsDelegate list.ItemDelegate
-	styles        styles
-	logsSpinner   spinner.Model
-	logsInput     textinput.Model
-	help          help.Model
+	width             int
+	height            int
+	prNumber          string
+	repo              string
+	pr                api.PR
+	runsList          list.Model
+	jobsList          list.Model
+	stepsList         list.Model
+	logsViewport      viewport.Model
+	numHighlights     int
+	scrollbar         tea.Model
+	focusedPane       focusedPane
+	err               error
+	runsDelegate      list.ItemDelegate
+	jobsDelegate      list.ItemDelegate
+	stepsDelegate     list.ItemDelegate
+	styles            styles
+	logsSpinner       spinner.Model
+	logsInput         textinput.Model
+	inProgressSpinner spinner.Model
+	help              help.Model
 }
 
 func NewModel(repo string, number string) model {
@@ -140,6 +142,9 @@ func NewModel(repo string, number string) model {
 		Prompt:      s.faintFgStyle,
 	}
 
+	ips := spinner.New(spinner.WithSpinner(InProgressFrames))
+	ips.Style = lipgloss.NewStyle().Foreground(s.colors.warnColor)
+
 	h := help.New()
 	h.Styles.FullKey = lipgloss.NewStyle().Foreground(s.colors.lightColor)
 	h.Styles.FullDesc = lipgloss.NewStyle().Foreground(s.tint.BrightWhite)
@@ -147,20 +152,21 @@ func NewModel(repo string, number string) model {
 	h.Styles.Ellipsis = lipgloss.NewStyle().Foreground(lipgloss.Blue)
 
 	m := model{
-		jobsList:      jobsList,
-		runsList:      runsList,
-		stepsList:     stepsList,
-		prNumber:      number,
-		repo:          repo,
-		runsDelegate:  runsDelegate,
-		jobsDelegate:  jobsDelegate,
-		stepsDelegate: stepsDelegate,
-		logsViewport:  vp,
-		scrollbar:     sb,
-		styles:        s,
-		logsSpinner:   ls,
-		logsInput:     li,
-		help:          h,
+		jobsList:          jobsList,
+		runsList:          runsList,
+		stepsList:         stepsList,
+		prNumber:          number,
+		repo:              repo,
+		runsDelegate:      runsDelegate,
+		jobsDelegate:      jobsDelegate,
+		stepsDelegate:     stepsDelegate,
+		logsViewport:      vp,
+		scrollbar:         sb,
+		styles:            s,
+		logsSpinner:       ls,
+		logsInput:         li,
+		help:              h,
+		inProgressSpinner: ips,
 	}
 	m.setFocusedPaneStyles()
 	return m
@@ -184,6 +190,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pr = msg.pr
 		m.runsList.StopSpinner()
 		m.jobsList.StopSpinner()
+		if msg.err != nil {
+			log.Debug("error when fetching workflow runs", "err", msg.err)
+			m.err = msg.err
+			msgCmd := tea.Printf("%s\nrepo=%s, number=%s\n",
+				lipgloss.NewStyle().Foreground(m.styles.colors.errorColor).Bold(true).Render(
+					"❌ Pull request not found."), m.repo, m.prNumber)
+			return m, tea.Sequence(tea.ExitAltScreen, msgCmd, tea.Quit)
+
+		}
+
 		runItems := make([]list.Item, 0)
 		for _, run := range msg.runs {
 			ri := NewRunItem(run, m.styles)
@@ -215,7 +231,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ji.loadingLogs = false
 			currJob := m.jobsList.SelectedItem()
 			if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
-				m.renderJobLogs()
+				cmds = append(cmds, m.renderJobLogs())
 				m.goToErrorInLogs()
 			}
 
@@ -230,7 +246,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ji.loadingLogs = false
 				currJob := m.jobsList.SelectedItem()
 				if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
-					m.renderJobLogs()
+					cmds = append(cmds, m.renderJobLogs())
 				}
 
 				cmds = append(cmds, m.updateLists()...)
@@ -323,9 +339,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case spinner.TickMsg:
-		currJob := m.jobsList.SelectedItem()
-		if currJob == nil || currJob.(*jobItem).loadingLogs {
+		ji := m.getSelectedJobItem()
+		if ji == nil || ji.loadingLogs {
 			m.logsSpinner, cmd = m.logsSpinner.Update(msg)
+			cmds = append(cmds, cmd)
+		} else if ji.job.State == api.StatusInProgress {
+			m.inProgressSpinner, cmd = m.inProgressSpinner.Update(msg)
 			cmds = append(cmds, cmd)
 		}
 		m.runsList, cmd = m.runsList.Update(msg)
@@ -406,7 +425,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	cmds = append(cmds, cmd)
 	if _, ok := msg.(tea.KeyPressMsg); !ok && m.logsInput.Focused() {
-		log.Debug("updating logsInput with msg", "msg", fmt.Sprintf("%+v", msg), "focused", m.logsInput.Focused())
 		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
 	}
@@ -511,38 +529,65 @@ func (m *model) viewFooter() string {
 		return ""
 	}
 
-	failing, successful, skipped := 0, 0, 0
+	failingChecks, successfulChecks, skippedChecks, inProgressChecks := 0, 0, 0, 0
+	failingContext := 0
 	for _, count := range m.pr.StatusCheckRollup.Contexts.CheckRunCountsByState {
 		switch count.State {
+		case api.CheckRunStateFailure:
+			failingChecks += count.Count
+		case api.CheckRunStateActionRequired:
+		case api.CheckRunStateCancelled:
+		case api.CheckRunStateNeutral:
+		case api.CheckRunStateSkipped:
+			skippedChecks += count.Count
+		case api.CheckRunStateStale:
+			skippedChecks += count.Count
+		case api.CheckRunStateStartupFailure:
+			failingChecks += count.Count
+		case api.CheckRunStateSuccess:
+			successfulChecks += count.Count
+		case api.CheckRunStateTimedOut:
+			failingChecks += count.Count
+		case api.CheckRunStateInProgress:
+			inProgressChecks += count.Count
+		}
+	}
+
+	for _, count := range m.pr.StatusCheckRollup.Contexts.StatusContextCountsByState {
+		switch count.State {
 		case api.ConclusionFailure:
-			failing += count.Count
+			failingContext += count.Count
 		case api.ConclusionActionRequired:
 		case api.ConclusionCancelled:
 		case api.ConclusionNeutral:
-		case api.ConclusionSkipped:
-			skipped += count.Count
-		case api.ConclusionStale:
-			skipped += count.Count
 		case api.ConclusionStartupFailure:
-			failing += count.Count
-		case api.ConclusionSuccess:
-			successful += count.Count
 		case api.ConclusionTimedOut:
-			failing += count.Count
+			failingContext += count.Count
 		}
 	}
 
 	texts := make([]string, 0)
 	bg := lipgloss.NewStyle().Background(m.styles.footerStyle.GetBackground())
-	if failing > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(fmt.Sprintf("%d failing", failing)))
+	if failingChecks > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(
+			fmt.Sprintf("%d failing", failingChecks)))
 	}
-	if successful > 0 {
+	if inProgressChecks > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.warnColor).Render(
+			fmt.Sprintf("%d in progress", inProgressChecks)))
+	}
+	if successfulChecks > 0 {
 		texts = append(texts, bg.Foreground(m.styles.colors.successColor).Render(
-			fmt.Sprintf("%d successful", successful)))
+			fmt.Sprintf("%d successful", successfulChecks)))
 	}
-	if skipped > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("%d skipped", skipped)))
+	if skippedChecks > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(
+			fmt.Sprintf("%d skipped", skippedChecks)))
+	}
+
+	if failingContext > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(
+			fmt.Sprintf("%d failing contexts", failingContext)))
 	}
 
 	checks := bg.Render(strings.Join(texts, bg.Render(", ")))
@@ -589,7 +634,8 @@ func (m *model) viewLogs() string {
 	}
 
 	inputView := ""
-	if m.logsViewport.GetContent() != "" {
+	ji := m.getSelectedJobItem()
+	if m.logsViewport.GetContent() != "" && ji.logsStderr == "" {
 		inputView = lipgloss.NewStyle().Width(w).Border(lipgloss.RoundedBorder(), true).BorderForeground(
 			m.styles.colors.fainterColor).Render(m.logsInput.View())
 	}
@@ -646,7 +692,7 @@ func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate)
 		l.Title = makePill(m.getPaneTitle(l), l.Styles.Title, m.styles.colors.focusedColor)
 	}
 
-	w := m.getFocusedPaneWidth()
+	w := m.getFocusedPaneWidth(l)
 	l.SetWidth(w)
 	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1).Width(w)
 	l.SetDelegate(*delegate)
@@ -691,7 +737,7 @@ func newList(styles styles, delegate list.ItemDelegate) list.Model {
 	l.Styles.StatusEmpty = l.Styles.StatusEmpty.Foreground(styles.colors.faintColor)
 	l.Styles.StatusBarActiveFilter = l.Styles.StatusBarActiveFilter.Foreground(styles.colors.faintColor)
 	l.Styles.StatusBarFilterCount = l.Styles.StatusBarFilterCount.Foreground(styles.colors.faintColor)
-	l.Styles.NoItems = l.Styles.NoItems.Foreground(styles.colors.faintColor)
+	l.Styles.NoItems = l.Styles.NoItems.Width(unfocusedLargePaneWidth).Foreground(styles.colors.faintColor)
 	l.Styles.PaginationStyle = lipgloss.NewStyle().Foreground(styles.colors.faintColor).MarginLeft(1).MarginBottom(1)
 	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1)
 	l.SetSpinner(spinner.Dot)
@@ -830,7 +876,8 @@ func (m *model) logsWidth() int {
 		borders = 2
 	}
 	sb := 0
-	if m.isScrollbarVisible() {
+	ji := m.getSelectedJobItem()
+	if ji != nil && len(ji.renderedLogs) > 0 && m.isScrollbarVisible() {
 		sb = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())
 	}
 	steps := 0
@@ -847,10 +894,9 @@ func (m *model) loadingLogsView() string {
 }
 
 func (m *model) fullScreenMessageView(message string) string {
-	h := m.getMainContentHeight()
 	return lipgloss.Place(
 		m.logsWidth(),
-		h-2,
+		m.getLogsViewportHeight()-1,
 		lipgloss.Center,
 		0.75,
 		message,
@@ -961,7 +1007,7 @@ func (m *model) onJobChanged() []tea.Cmd {
 		log.Error("job changed but current job is nil")
 	}
 
-	m.renderJobLogs()
+	cmds = append(cmds, m.renderJobLogs())
 	m.goToErrorInLogs()
 
 	return cmds
@@ -981,7 +1027,7 @@ func (m *model) onStepChanged() {
 	}
 }
 
-func (m *model) renderJobLogs() {
+func (m *model) renderJobLogs() tea.Cmd {
 	currJob := m.jobsList.SelectedItem()
 	if currJob == nil || currJob.(*jobItem).loadingLogs {
 		m.logsViewport.SetContent("")
@@ -989,32 +1035,54 @@ func (m *model) renderJobLogs() {
 
 	ji, ok := currJob.(*jobItem)
 	if !ok {
-		return
+		return nil
+	}
+
+	if ji.job.State == api.StatusInProgress {
+		return m.inProgressSpinner.Tick
 	}
 
 	if ji.logsErr != nil {
 		m.logsViewport.SetContent(ji.logsStderr)
-		return
+		m.setHeights()
+
+		return nil
 	}
 
 	if len(ji.renderedLogs) != 0 {
 		m.logsViewport.SetContentLines(ji.renderedLogs)
-		return
+		m.setHeights()
+
+		return nil
 	}
 
 	if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
 		m.logsViewport.SetContent(ji.renderedText)
-		return
+		m.setHeights()
+
+		return nil
 	}
 
 	ji.renderedLogs, ji.unstyledLogs = m.renderLogs(ji)
 	m.logsViewport.SetContentLines(ji.renderedLogs)
+	m.setHeights()
+
+	return nil
 }
 
 func (m *model) logsContentView() string {
+	if m.pr.Number != 0 && m.pr.StatusCheckRollup.Contexts.CheckRunCount == 0 {
+		return m.fullScreenMessageView(
+			lipgloss.JoinVertical(lipgloss.Center,
+				lipgloss.NewStyle().Foreground(m.styles.tint.BrightWhite).Render(art.CheckmarkSign),
+				"",
+				m.styles.faintFgStyle.Bold(true).Render("Workflow runs completed with no jobs"),
+			))
+	}
+
 	job := m.jobsList.SelectedItem()
 	if job == nil {
-		return m.styles.faintFgStyle.PaddingLeft(1).Render("Nothing selected...")
+		return m.fullScreenMessageView(m.styles.faintFgStyle.Bold(true).Render("Nothing selected..."))
 	}
 
 	ji := job.(*jobItem)
@@ -1033,8 +1101,27 @@ func (m *model) logsContentView() string {
 	}
 
 	if ji.job.Bucket == data.CheckBucketPending {
-		return m.fullScreenMessageView(lipgloss.NewStyle().Foreground(
-			m.styles.colors.warnColor).Render("This job is still running.\nPress `o` to view the job in the web."))
+		text := ""
+		if ji.job.State == api.StatusWaiting && ji.job.PendingEnv != "" {
+			text = lipgloss.NewStyle().Foreground(
+				m.styles.colors.warnColor).Render("Waiting for review: " + ji.job.PendingEnv +
+				" needs approval to start deploying changes.")
+		} else {
+			text = lipgloss.JoinVertical(
+				lipgloss.Center,
+
+				"",
+				lipgloss.JoinHorizontal(lipgloss.Center, m.inProgressSpinner.View(), " ",
+					lipgloss.NewStyle().Foreground(m.styles.colors.warnColor).Render("This job is still running")),
+				m.styles.faintFgStyle.Render("Logs will be available when it is complete"))
+		}
+
+		return m.fullScreenMessageView((lipgloss.JoinVertical(lipgloss.Center,
+			text,
+			"",
+			lipgloss.NewStyle().Foreground(
+				m.styles.colors.lightColor).Render(lipgloss.JoinHorizontal(lipgloss.Top, "Press ",
+				lipgloss.NewStyle().Background(m.styles.colors.fainterColor).Render(" o "), " to view the job on github.com")))))
 	}
 
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "HTTP 410:") {
@@ -1042,7 +1129,13 @@ func (m *model) logsContentView() string {
 	}
 
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "is still in progress;") {
-		return m.fullScreenMessageView("The run is still in progress.\nPress `o` to view the job in the web.")
+		return m.fullScreenMessageView(lipgloss.NewStyle().Foreground(
+			m.styles.colors.warnColor).Render(lipgloss.JoinVertical(lipgloss.Center,
+			"This run is still in progress; logs will be available when it is complete",
+			"",
+			lipgloss.NewStyle().Foreground(
+				m.styles.colors.lightColor).Render(lipgloss.JoinHorizontal(lipgloss.Top, "Press ",
+				lipgloss.NewStyle().Background(m.styles.colors.fainterColor).Render(" o "), " to view the run on github.com")))))
 	}
 
 	if m.isScrollbarVisible() {
@@ -1111,19 +1204,17 @@ func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
 		}
 		ln := fmt.Sprintf("%d", i+1)
 		ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
-		// lines = append(lines, lipgloss.JoinHorizontal(lipgloss.Top,
-		// m.styles.lineNumbersStyle.Render(ln), rendered))
 		lines = append(lines, rendered)
 		unstyledLines = append(unstyledLines, unstyled)
-		// logs.WriteString()
-		// logs.WriteString()
-		// logs.WriteString("\n")
 	}
 	return lines, unstyledLines
 }
 
-func (m *model) getFocusedPaneWidth() int {
+func (m *model) getFocusedPaneWidth(l *list.Model) int {
 	if m.width > smallScreen {
+		if len(l.Items()) == 0 {
+			return unfocusedLargePaneWidth
+		}
 		return focusedLargePaneWidth
 	}
 
@@ -1175,6 +1266,20 @@ func (m *model) goToErrorInLogs() {
 	}
 }
 
+func (m *model) getLogsViewportHeight() int {
+	h := m.getMainContentHeight()
+
+	// TODO: take borders from logsInput view
+	vph := h - paneTitleHeight
+	if m.logsViewport.GetContent() != "" {
+		vph -= lipgloss.Height(m.logsInput.View()) + 2 // borders
+	}
+	m.logsViewport.SetHeight(vph)
+	m.scrollbar, _ = m.scrollbar.Update(scrollbar.HeightMsg(vph))
+
+	return vph
+}
+
 func (m *model) getMainContentHeight() int {
 	h := m.height - headerHeight - footerHeight
 	if m.help.ShowAll {
@@ -1190,10 +1295,9 @@ func (m *model) setHeights() {
 	m.jobsList.SetHeight(h)
 	m.stepsList.SetHeight(h)
 
-	// TODO: take borders from logsInput view
-	vph := h - 2 - lipgloss.Height(m.logsInput.View()) - 2
-	m.logsViewport.SetHeight(vph)
-	m.scrollbar, _ = m.scrollbar.Update(scrollbar.HeightMsg(vph))
+	lh := m.getLogsViewportHeight()
+	m.logsViewport.SetHeight(lh)
+	m.scrollbar, _ = m.scrollbar.Update(scrollbar.HeightMsg(lh))
 }
 
 func (m *model) setWidths() {

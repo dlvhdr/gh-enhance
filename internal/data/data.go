@@ -23,6 +23,7 @@ type WorkflowJob struct {
 	Name        string
 	Title       string
 	Workflow    string
+	PendingEnv  string
 	Event       string
 	Logs        []LogsWithTime
 	Link        string

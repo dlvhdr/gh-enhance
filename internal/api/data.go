@@ -30,12 +30,31 @@ const (
 	ConclusionSuccess        Conclusion = "SUCCESS"
 	ConclusionTimedOut       Conclusion = "TIMED_OUT"
 
+	// Check run states
+	CheckRunStateQueued         CheckRunState = "QUEUED"
+	CheckRunStateCompleted      CheckRunState = "COMPLETED"
+	CheckRunStateInProgress     CheckRunState = "IN_PROGRESS"
+	CheckRunStateRequested      CheckRunState = "REQUESTED"
+	CheckRunStateWaiting        CheckRunState = "WAITING"
+	CheckRunStatePending        CheckRunState = "PENDING"
+	CheckRunStateActionRequired CheckRunState = "ACTION_REQUIRED"
+	CheckRunStateCancelled      CheckRunState = "CANCELLED"
+	CheckRunStateFailure        CheckRunState = "FAILURE"
+	CheckRunStateNeutral        CheckRunState = "NEUTRAL"
+	CheckRunStateSkipped        CheckRunState = "SKIPPED"
+	CheckRunStateStale          CheckRunState = "STALE"
+	CheckRunStateStartupFailure CheckRunState = "STARTUP_FAILURE"
+	CheckRunStateSuccess        CheckRunState = "SUCCESS"
+	CheckRunStateTimedOut       CheckRunState = "TIMED_OUT"
+
 	GithubActionsAppName = "GitHub Actions"
 )
 
 type Status string
 
 type Conclusion string
+
+type CheckRunState string
 
 func IsFailureConclusion(c Conclusion) bool {
 	switch c {
@@ -56,16 +75,31 @@ type CheckSuite struct {
 		Name string
 	}
 
-	// A WorkflowRun has one CheckSuite and is defined by a GitHub Actions file
+	// A WorkflowRun has one CheckSuite and is defined by a GitHub Action's file
 	WorkflowRun struct {
-		Url        string
-		DatabaseId int
-		Event      string
-		RunNumber  int
-		Workflow   struct {
+		Url                       string
+		DatabaseId                int
+		Event                     string
+		RunNumber                 int
+		PendingDeploymentRequests struct {
+			Nodes []struct {
+				Environment struct {
+					Name string
+				}
+			}
+		} `graphql:"pendingDeploymentRequests(first: 1)"`
+		Workflow struct {
 			Name string
 		}
 	}
+}
+
+// Represents an individual commit status context
+// E.g. a Vercel deployment preview
+type StatusContext struct {
+	Context     string
+	Description string
+	State       Conclusion
 }
 
 // CheckRun is a job running in CI on a specific commit. It is part of a CheckSuite.
@@ -122,13 +156,19 @@ type PR struct {
 	StatusCheckRollup struct {
 		State    CommitState
 		Contexts struct {
+			CheckRunCount         int
 			CheckRunCountsByState []struct {
+				Count int
+				State CheckRunState
+			}
+			StatusContextCountsByState []struct {
 				Count int
 				State Conclusion
 			}
 			Nodes []struct {
-				Typename string   `graphql:"__typename"`
-				CheckRun CheckRun `graphql:"... on CheckRun"`
+				Typename      string        `graphql:"__typename"`
+				CheckRun      CheckRun      `graphql:"... on CheckRun"`
+				StatusContext StatusContext `graphql:"... on StatusContext"`
 			}
 		} `graphql:"contexts(first: 100)"`
 	}
@@ -157,12 +197,9 @@ func FetchPRCheckRuns(repo string, prNumber string) (PRCheckRunsQuery, error) {
 
 	err = client.Query("FetchCheckRuns", &res, variables)
 	if err != nil {
+		log.Error("ERRORRRRRRRRRRRRRRRRRRRRRRRR")
 		return res, err
 	}
-
-	// for _, wow := range res.Resource.PullRequest.StatusCheckRollup.Contexts.Nodes {
-	// 	log.Debug("wow", "node", wow.CheckRun)
-	// }
 
 	return res, nil
 }

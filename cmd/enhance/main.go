@@ -3,21 +3,24 @@ package main
 import (
 	"fmt"
 	slog "log"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log/v2"
+	"github.com/cli/go-gh"
 	"github.com/spf13/cobra"
 
 	"github.com/dlvhdr/gh-enhance/internal/tui"
 )
 
 var rootCmd = &cobra.Command{
-	Use:     "gh enhance",
-	Short:   "In search of a better name",
+	Use:     "gh enhance [<url> | <number>] [flags]",
+	Short:   "",
 	Version: "0.0.1",
-	Args:    cobra.MaximumNArgs(1),
+	Args:    cobra.ExactArgs(1),
 }
 
 func init() {
@@ -49,6 +52,7 @@ func init() {
 	}
 
 	var repo string
+	var number string
 
 	rootCmd.PersistentFlags().StringVarP(
 		&repo,
@@ -74,18 +78,40 @@ func init() {
 	)
 
 	rootCmd.Run = func(_ *cobra.Command, args []string) {
-		if len(args) > 0 {
-			p := tea.NewProgram(tui.NewModel(repo, args[0]), tea.WithAltScreen())
-			if _, err := p.Run(); err != nil {
-				log.Error("failed starting program", "err", err)
-				fmt.Println(err)
-				os.Exit(1)
+		url, err := url.Parse(args[0])
+		if err == nil && url.Hostname() == "github.com" {
+			parts := strings.Split(url.Path, "/")
+			if len(parts) < 5 {
+				exitWithUsage()
 			}
-		} else {
-			fmt.Println("Usage: -R owner/repo 15623", "args", args)
+
+			repo = parts[1] + "/" + parts[2]
+			number = parts[4]
+		}
+
+		if repo == "" {
+			r, err := gh.CurrentRepository()
+			if err == nil {
+				repo = r.Owner() + "/" + r.Name()
+			}
+		}
+
+		if number == "" {
+			number = args[0]
+		}
+
+		p := tea.NewProgram(tui.NewModel(repo, number), tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			log.Error("failed starting program", "err", err)
+			fmt.Println(err)
 			os.Exit(1)
 		}
 	}
+}
+
+func exitWithUsage() {
+	fmt.Println("Usage: -R owner/repo 15623 or URL to a PR")
+	os.Exit(1)
 }
 
 func main() {
