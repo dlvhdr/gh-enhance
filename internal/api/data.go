@@ -153,25 +153,31 @@ type PR struct {
 	Repository struct {
 		NameWithOwner string
 	}
-	StatusCheckRollup struct {
-		State    CommitState
-		Contexts struct {
-			CheckRunCount         int
-			CheckRunCountsByState []struct {
-				Count int
-				State CheckRunState
+	Commits struct {
+		Nodes []struct {
+			Commit struct {
+				StatusCheckRollup struct {
+					State    CommitState
+					Contexts struct {
+						CheckRunCount         int
+						CheckRunCountsByState []struct {
+							Count int
+							State CheckRunState
+						}
+						StatusContextCountsByState []struct {
+							Count int
+							State Conclusion
+						}
+						Nodes []struct {
+							Typename      string        `graphql:"__typename"`
+							CheckRun      CheckRun      `graphql:"... on CheckRun"`
+							StatusContext StatusContext `graphql:"... on StatusContext"`
+						}
+					} `graphql:"contexts(first: 100)"`
+				}
 			}
-			StatusContextCountsByState []struct {
-				Count int
-				State Conclusion
-			}
-			Nodes []struct {
-				Typename      string        `graphql:"__typename"`
-				CheckRun      CheckRun      `graphql:"... on CheckRun"`
-				StatusContext StatusContext `graphql:"... on StatusContext"`
-			}
-		} `graphql:"contexts(first: 100)"`
-	}
+		}
+	} `graphql:"commits(last: 1)"`
 }
 
 type PRCheckRunsQuery struct {

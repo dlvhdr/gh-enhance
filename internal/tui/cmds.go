@@ -38,7 +38,7 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 			return workflowRunsFetchedMsg{err: errors.New("pull request not found")}
 		}
 
-		checkNodes := response.Resource.PullRequest.StatusCheckRollup.Contexts.Nodes
+		checkNodes := response.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 		checkRuns := make([]api.CheckRun, 0)
 		for _, node := range checkNodes {
 			if node.Typename != "CheckRun" {
@@ -50,7 +50,10 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(checkRuns))
 		runsMap := make(map[string]data.WorkflowRun)
 
-		for _, statusCheck := range checkRuns {
+		latestRuns := takeOnlyLatest(checkRuns)
+		log.Debug("removed old runs", "len(checkRuns)", len(checkRuns), "len(latestRuns)", len(latestRuns))
+
+		for _, statusCheck := range latestRuns {
 			wfr := statusCheck.CheckSuite.WorkflowRun
 			wfName := ""
 			isGHA := statusCheck.CheckSuite.App.Name == api.GithubActionsAppName
@@ -123,6 +126,24 @@ func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 				}
 				run.Jobs = []data.WorkflowJob{job}
 			}
+			sort.Slice(run.Jobs, func(i, j int) bool {
+				if run.Jobs[i].Bucket == data.CheckBucketFail &&
+					run.Jobs[j].Bucket != data.CheckBucketFail {
+					return true
+				}
+				if run.Jobs[j].Bucket == data.CheckBucketFail &&
+					run.Jobs[i].Bucket != data.CheckBucketFail {
+					return false
+				}
+				if run.Jobs[i].StartedAt.IsZero() {
+					return false
+				}
+				if run.Jobs[j].StartedAt.IsZero() {
+					return true
+				}
+
+				return run.Jobs[i].StartedAt.Before(run.Jobs[j].StartedAt)
+			})
 			runsMap[wfName] = run
 		}
 
@@ -287,4 +308,35 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 
 func (m *model) makeInitCmd() tea.Cmd {
 	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
+}
+
+func takeOnlyLatest(checkRuns []api.CheckRun) []api.CheckRun {
+	// clean duplicate check runs because of old attempts
+	type latestMap struct {
+		runs   []api.CheckRun
+		number int
+	}
+	latestRuns := map[string]latestMap{}
+	for _, statusCheck := range checkRuns {
+		wfName := statusCheck.CheckSuite.WorkflowRun.Workflow.Name
+		existing, ok := latestRuns[wfName]
+		if !ok || existing.number <
+			statusCheck.CheckSuite.WorkflowRun.RunNumber {
+			r := make([]api.CheckRun, 0)
+			r = append(r, statusCheck)
+			latestRuns[wfName] = latestMap{
+				runs:   r,
+				number: statusCheck.CheckSuite.WorkflowRun.RunNumber,
+			}
+		} else if ok {
+			existing.runs = append(existing.runs, statusCheck)
+			latestRuns[wfName] = latestMap{runs: existing.runs, number: existing.number}
+		}
+	}
+
+	flat := make([]api.CheckRun, 0)
+	for _, checkRun := range latestRuns {
+		flat = append(flat, checkRun.runs...)
+	}
+	return flat
 }

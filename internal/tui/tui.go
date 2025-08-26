@@ -513,10 +513,16 @@ func (m *model) viewHeader() string {
 			)))
 
 	prWidth := m.width - logoWidth - m.styles.headerStyle.GetHorizontalFrameSize()
-	pr := s.Width(prWidth).Render("Loading...")
+	pr := s.Width(prWidth).Render(fmt.Sprintf("Loading %s PR #%s...", m.repo, m.prNumber))
 	if m.pr.Title != "" {
+		commit := ""
+		// TODO: get status after dedup
+		// if len(m.pr.Commits.Nodes) > 0 {
+		// 	commit = string(m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.State)
+		// }
 		pr = s.Width(prWidth).Render(lipgloss.JoinVertical(lipgloss.Left,
 			s.Width(prWidth).Render(lipgloss.JoinHorizontal(lipgloss.Top,
+				s.Foreground(m.styles.colors.lightColor).Bold(true).Render(commit),
 				s.Foreground(m.styles.colors.lightColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
 				s.Render(" "),
 				s.Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
@@ -536,40 +542,39 @@ func (m *model) viewFooter() string {
 
 	failingChecks, successfulChecks, skippedChecks, inProgressChecks := 0, 0, 0, 0
 	failingContext := 0
-	for _, count := range m.pr.StatusCheckRollup.Contexts.CheckRunCountsByState {
-		switch count.State {
-		case api.CheckRunStateFailure:
-			failingChecks += count.Count
-		case api.CheckRunStateActionRequired:
-		case api.CheckRunStateCancelled:
-		case api.CheckRunStateNeutral:
-		case api.CheckRunStateSkipped:
-			skippedChecks += count.Count
-		case api.CheckRunStateStale:
-			skippedChecks += count.Count
-		case api.CheckRunStateStartupFailure:
-			failingChecks += count.Count
-		case api.CheckRunStateSuccess:
-			successfulChecks += count.Count
-		case api.CheckRunStateTimedOut:
-			failingChecks += count.Count
-		case api.CheckRunStateInProgress:
-			inProgressChecks += count.Count
+	if len(m.pr.Commits.Nodes) == 0 {
+		return ""
+	}
+	for _, item := range m.runsList.Items() {
+		ri := item.(*runItem)
+		for _, ji := range ri.jobsItems {
+			switch ji.job.Bucket {
+			case data.CheckBucketPass:
+				successfulChecks += 1
+			case data.CheckBucketFail:
+				failingChecks += 1
+			case data.CheckBucketSkipping:
+				skippedChecks += 1
+			case data.CheckBucketCancel:
+				skippedChecks += 1
+			default:
+				inProgressChecks += 1
+			}
 		}
 	}
 
-	for _, count := range m.pr.StatusCheckRollup.Contexts.StatusContextCountsByState {
-		switch count.State {
-		case api.ConclusionFailure:
-			failingContext += count.Count
-		case api.ConclusionActionRequired:
-		case api.ConclusionCancelled:
-		case api.ConclusionNeutral:
-		case api.ConclusionStartupFailure:
-		case api.ConclusionTimedOut:
-			failingContext += count.Count
-		}
-	}
+	// for _, count := range m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.StatusContextCountsByState {
+	// 	switch count.State {
+	// 	case api.ConclusionFailure:
+	// 		failingContext += count.Count
+	// 	case api.ConclusionActionRequired:
+	// 	case api.ConclusionCancelled:
+	// 	case api.ConclusionNeutral:
+	// 	case api.ConclusionStartupFailure:
+	// 	case api.ConclusionTimedOut:
+	// 		failingContext += count.Count
+	// 	}
+	// }
 
 	texts := make([]string, 0)
 	bg := lipgloss.NewStyle().Background(m.styles.footerStyle.GetBackground())
@@ -1085,7 +1090,8 @@ func (m *model) renderJobLogs() tea.Cmd {
 }
 
 func (m *model) logsContentView() string {
-	if m.pr.Number != 0 && m.pr.StatusCheckRollup.Contexts.CheckRunCount == 0 {
+	if m.pr.Number != 0 && len(m.pr.Commits.Nodes) > 0 &&
+		m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.CheckRunCount == 0 {
 		return m.fullScreenMessageView(
 			lipgloss.JoinVertical(lipgloss.Center,
 				lipgloss.NewStyle().Foreground(m.styles.tint.BrightWhite).Render(art.CheckmarkSign),
@@ -1121,21 +1127,10 @@ func (m *model) logsContentView() string {
 				m.styles.colors.warnColor).Render("Waiting for review: " + ji.job.PendingEnv +
 				" needs approval to start deploying changes.")
 		} else {
-			text = lipgloss.JoinVertical(
-				lipgloss.Center,
-
-				"",
-				lipgloss.JoinHorizontal(lipgloss.Center, m.inProgressSpinner.View(), " ",
-					lipgloss.NewStyle().Foreground(m.styles.colors.warnColor).Render("This job is still running")),
-				m.styles.faintFgStyle.Render("Logs will be available when it is complete"))
+			text = "This job is still in progress"
 		}
 
-		return m.fullScreenMessageView((lipgloss.JoinVertical(lipgloss.Center,
-			text,
-			"",
-			lipgloss.NewStyle().Foreground(
-				m.styles.colors.lightColor).Render(lipgloss.JoinHorizontal(lipgloss.Top, "Press ",
-				lipgloss.NewStyle().Background(m.styles.colors.fainterColor).Render(" o "), " to view the job on github.com")))))
+		return m.fullScreenMessageView(m.renderFullScreenLogsSpinner(text, "view the job on github.com"))
 	}
 
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "HTTP 410:") {
@@ -1143,13 +1138,8 @@ func (m *model) logsContentView() string {
 	}
 
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "is still in progress;") {
-		return m.fullScreenMessageView(lipgloss.NewStyle().Foreground(
-			m.styles.colors.warnColor).Render(lipgloss.JoinVertical(lipgloss.Center,
-			"This run is still in progress; logs will be available when it is complete",
-			"",
-			lipgloss.NewStyle().Foreground(
-				m.styles.colors.lightColor).Render(lipgloss.JoinHorizontal(lipgloss.Top, "Press ",
-				lipgloss.NewStyle().Background(m.styles.colors.fainterColor).Render(" o "), " to view the run on github.com")))))
+		return m.fullScreenMessageView(m.renderFullScreenLogsSpinner(
+			"This run is still in progress", "view the run on github.com"))
 	}
 
 	if m.isScrollbarVisible() {
@@ -1274,6 +1264,12 @@ func (m *model) goToErrorInLogs() {
 	}
 
 	if currJob.errorLine > 0 {
+		for i, step := range m.stepsList.VisibleItems() {
+			if api.IsFailureConclusion(step.(*stepItem).step.Conclusion) {
+				m.stepsList.Select(i)
+				break
+			}
+		}
 		m.logsViewport.SetYOffset(currJob.errorLine)
 	} else {
 		m.logsViewport.GotoTop()
@@ -1319,4 +1315,18 @@ func (m *model) setWidths() {
 	w := m.logsWidth()
 	m.logsViewport.SetWidth(w)
 	m.logsInput.SetWidth(w - 10)
+}
+
+func (m *model) renderFullScreenLogsSpinner(message string, cta string) string {
+	return lipgloss.JoinVertical(
+		lipgloss.Center,
+		lipgloss.JoinHorizontal(lipgloss.Center,
+			m.inProgressSpinner.View(),
+			" ",
+			lipgloss.NewStyle().Foreground(m.styles.colors.warnColor).Render(message)),
+		"",
+		m.styles.faintFgStyle.Render("Logs will be available when it is complete"),
+		lipgloss.NewStyle().Foreground(
+			m.styles.colors.lightColor).Render(lipgloss.JoinHorizontal(lipgloss.Top, "Press ",
+			lipgloss.NewStyle().Background(m.styles.colors.fainterColor).Render(" o "), " to ", cta)))
 }
