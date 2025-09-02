@@ -2,6 +2,7 @@ package tui
 
 import (
 	"io"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
@@ -126,7 +127,9 @@ func (d *jobsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 }
 
 func (ji *jobItem) isStatusInProgress() bool {
-	return ji.job.State == api.StatusInProgress || ji.job.State == api.StatusPending || ji.job.State == api.StatusQueued
+	return ji.job.State == api.StatusInProgress || ji.job.State == api.StatusPending ||
+		ji.job.State == api.StatusQueued || (ji.logsErr != nil &&
+		strings.Contains(ji.logsStderr, "is still in progress;"))
 }
 
 func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
