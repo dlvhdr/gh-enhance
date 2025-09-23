@@ -1,0 +1,29 @@
+query FetchCheckRunSteps($url: URI!) {
+  resource(url: $url) {
+    ... on WorkflowRun {
+      id
+      file {
+        path
+      }
+      checkSuite {
+        checkRuns(first: 100) {
+          nodes {
+            id
+            databaseId
+            url
+            steps(first: 100) {
+              nodes {
+                conclusion
+                name
+                number
+                startedAt
+                completedAt
+                status
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -444,6 +444,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	if m.err != nil {
+		log.Error("fatal error", "err", m.err)
 		return m.err.Error()
 	}
 

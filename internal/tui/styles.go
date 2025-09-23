@@ -93,7 +93,7 @@ func makeStyles() styles {
 		darkerColor:    tint.Darken(focusedColor, 70),
 		lightColor:     tint.Lighten(focusedColor, 20),
 		errorColor:     t.BrightRed,
-		warnColor:      t.Yellow,
+		warnColor:      t.BrightYellow,
 		successColor:   t.BrightGreen,
 		faintColor:     tint.Darken(focusedColor, 40),
 		fainterColor:   tint.Darken(focusedColor, 80),
@@ -161,7 +161,7 @@ func makeStyles() styles {
 		paneStyle: lipgloss.NewStyle().BorderRight(true).BorderStyle(
 			lipgloss.NormalBorder()).BorderForeground(colors.faintColor),
 		lineNumbersStyle:           lipgloss.NewStyle().Foreground(colors.faintColor).Align(lipgloss.Right),
-		canceledGlyph:              lipgloss.NewStyle().Foreground(colors.faintColor).SetString(CanceledIcon),
+		canceledGlyph:              lipgloss.NewStyle().Foreground(colors.warnColor).SetString(CanceledIcon),
 		skippedGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(SkippedIcon),
 		waitingGlyph:               lipgloss.NewStyle().Foreground(t.Yellow).SetString(WaitingIcon),
 		pendingGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(PendingIcon),
