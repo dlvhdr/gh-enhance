@@ -133,10 +133,7 @@ func (ji *jobItem) isStatusInProgress() bool {
 }
 
 func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
-	loadingSteps := true
-	if job.Kind != data.JobKindGithubActions {
-		loadingSteps = false
-	}
+	loadingSteps := job.Kind == data.JobKindGithubActions
 	return jobItem{
 		meta:         itemMeta{styles: styles},
 		job:          &job,
