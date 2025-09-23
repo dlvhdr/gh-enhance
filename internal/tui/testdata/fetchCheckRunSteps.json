@@ -1,0 +1,89 @@
+{
+  "data": {
+    "resource": {
+      "id": "WFR_kwLOAPphoM8AAAADtWwBIw",
+      "file": {
+        "path": ".github/workflows/lintcommit.yml"
+      },
+      "checkSuite": {
+        "checkRuns": {
+          "nodes": [
+            {
+              "id": "CR_kwDOAPphoM8AAAAKdilagw",
+              "databaseId": 44932094595,
+              "url": "https://github.com/neovim/neovim/runs/44932094595",
+              "steps": {
+                "nodes": [
+                  {
+                    "conclusion": "SUCCESS",
+                    "name": "Set up job",
+                    "number": 1,
+                    "startedAt": "2025-06-27T14:28:27Z",
+                    "completedAt": "2025-06-27T14:28:28Z",
+                    "status": "COMPLETED"
+                  },
+                  {
+                    "conclusion": "SUCCESS",
+                    "name": "Run actions/checkout@v4",
+                    "number": 2,
+                    "startedAt": "2025-06-27T14:28:28Z",
+                    "completedAt": "2025-06-27T14:28:50Z",
+                    "status": "COMPLETED"
+                  },
+                  {
+                    "conclusion": "SUCCESS",
+                    "name": "Run /./.github/actions/setup",
+                    "number": 3,
+                    "startedAt": "2025-06-27T14:28:50Z",
+                    "completedAt": "2025-06-27T14:29:08Z",
+                    "status": "COMPLETED"
+                  },
+                  {
+                    "conclusion": "SUCCESS",
+                    "name": "Build",
+                    "number": 4,
+                    "startedAt": "2025-06-27T14:29:08Z",
+                    "completedAt": "2025-06-27T14:29:36Z",
+                    "status": "COMPLETED"
+                  },
+                  {
+                    "conclusion": "FAILURE",
+                    "name": "lintcommit",
+                    "number": 5,
+                    "startedAt": "2025-06-27T14:29:36Z",
+                    "completedAt": "2025-06-27T14:29:36Z",
+                    "status": "COMPLETED"
+                  },
+                  {
+                    "conclusion": "SUCCESS",
+                    "name": "Post Run /./.github/actions/setup",
+                    "number": 9,
+                    "startedAt": "2025-06-27T14:29:36Z",
+                    "completedAt": "2025-06-27T14:29:36Z",
+                    "status": "COMPLETED"
+                  },
+                  {
+                    "conclusion": "SUCCESS",
+                    "name": "Post Run actions/checkout@v4",
+                    "number": 10,
+                    "startedAt": "2025-06-27T14:29:36Z",
+                    "completedAt": "2025-06-27T14:29:36Z",
+                    "status": "COMPLETED"
+                  },
+                  {
+                    "conclusion": "SUCCESS",
+                    "name": "Complete job",
+                    "number": 11,
+                    "startedAt": "2025-06-27T14:29:36Z",
+                    "completedAt": "2025-06-27T14:29:36Z",
+                    "status": "COMPLETED"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

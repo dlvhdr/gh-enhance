@@ -186,9 +186,25 @@ type PRCheckRunsQuery struct {
 	} `graphql:"resource(url: $url)"`
 }
 
+var client *gh.GraphQLClient
+
+func SetClient(c *gh.GraphQLClient) {
+	client = c
+}
+
+func getClient() (*gh.GraphQLClient, error) {
+	var err error
+	if client != nil {
+		return client, nil
+	}
+	client, err = gh.DefaultGraphQLClient()
+	return client, err
+}
+
 func FetchPRCheckRuns(repo string, prNumber string) (PRCheckRunsQuery, error) {
-	client, err := gh.DefaultGraphQLClient()
-	res := PRCheckRunsQuery{}
+	var err error
+	var res PRCheckRunsQuery
+	c, err := getClient()
 	if err != nil {
 		return res, err
 	}
@@ -201,9 +217,9 @@ func FetchPRCheckRuns(repo string, prNumber string) (PRCheckRunsQuery, error) {
 		"url": githubv4.URI{URL: parsedUrl},
 	}
 
-	err = client.Query("FetchCheckRuns", &res, variables)
+	err = c.Query("FetchCheckRuns", &res, variables)
 	if err != nil {
-		log.Error("ERRORRRRRRRRRRRRRRRRRRRRRRRR")
+		log.Error("error fetching check runs", "err", err)
 		return res, err
 	}
 
@@ -227,8 +243,8 @@ type WorkflowRunStepsQuery struct {
 }
 
 func FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunStepsQuery, error) {
-	client, err := gh.DefaultGraphQLClient()
 	res := WorkflowRunStepsQuery{}
+	c, err := getClient()
 	if err != nil {
 		return res, err
 	}
@@ -242,8 +258,9 @@ func FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunStepsQuery, er
 	}
 
 	log.Debug("fetching check run steps", "url", runUrl)
-	err = client.Query("FetchCheckRunSteps", &res, variables)
+	err = c.Query("FetchCheckRunSteps", &res, variables)
 	if err != nil {
+		log.Error("error fetching check run steps", "err", err)
 		return res, err
 	}
 

@@ -202,7 +202,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				lipgloss.NewStyle().Foreground(m.styles.colors.errorColor).Bold(true).Render(
 					"❌ Pull request not found."), m.repo, m.prNumber)
 			return m, tea.Sequence(tea.ExitAltScreen, msgCmd, tea.Quit)
-
 		}
 
 		runItems := make([]list.Item, 0)
@@ -363,7 +362,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		m.err = msg
 		return m, nil
-
 	}
 
 	switch m.focusedPane {
@@ -425,7 +423,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logsViewport, cmd = m.logsViewport.Update(msg)
 
 		cmds = append(cmds, cmd)
-
 	}
 
 	cmds = append(cmds, cmd)
@@ -444,6 +441,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	if m.err != nil {
+		log.Error("fatal error", "err", m.err)
 		return m.err.Error()
 	}
 
@@ -972,7 +970,6 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) {
 			si := NewStepItem(step, jobWithSteps.Url, m.styles)
 			ri.jobsItems[jobIdx].steps = append(ri.jobsItems[jobIdx].steps, &si)
 		}
-
 	}
 }
 
@@ -1165,7 +1162,6 @@ func (m *model) getJobItemById(jobId string) *jobItem {
 
 func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
 	defer utils.TimeTrack(time.Now(), "rendering logs")
-	totalLines := fmt.Sprintf("%d", len(ji.logs))
 	w := m.logsViewport.Width() - m.styles.scrollbarStyle.GetWidth()
 	expand := ExpandSymbol + " "
 	lines := make([]string, 0)
@@ -1206,8 +1202,6 @@ func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
 			unstyled = unstyledSep + unstyled
 			rendered = sep + rendered
 		}
-		ln := fmt.Sprintf("%d", i+1)
-		ln = strings.Repeat(" ", len(totalLines)-len(ln)) + ln + "  "
 		lines = append(lines, rendered)
 		unstyledLines = append(unstyledLines, unstyled)
 	}

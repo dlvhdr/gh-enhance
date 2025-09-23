@@ -1,0 +1,76 @@
+query FetchCheckRuns {
+  resource(url:"https://github.com/neovim/neovim/pull/34671") {
+    ... on PullRequest {
+      title      
+      number     
+      url        
+      repository {
+        nameWithOwner
+      }
+      commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              state
+              contexts(first: 100)  {
+                checkRunCount         
+                checkRunCountsByState  {
+                  count
+                  state
+                }
+                statusContextCountsByState  {
+                  count
+                  state
+                }
+                nodes {
+                  __typename
+                  ... on CheckRun {
+                    id          
+                    name        
+                    status      
+                    title       
+                    url         
+                    detailsUrl  
+                    conclusion  
+                    databaseId  
+                    startedAt   
+                    completedAt 
+                    checkSuite {
+                      conclusion
+                      databaseId
+                      app {
+                        id  
+                        name
+                      }
+                      workflowRun {
+                        url                       
+                        databaseId                
+                        event                     
+                        runNumber                 
+                        pendingDeploymentRequests(first: 1) {
+                          nodes {
+                            environment {
+                              name
+                            }
+                          }
+                        }
+                        workflow {
+                          name
+                        }
+                      }
+                    }
+                  }
+                  ... on StatusContext {
+                    context     
+                    description 
+                    state       
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

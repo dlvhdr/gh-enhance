@@ -8,31 +8,60 @@ tasks:
     cmds:
       - DEBUG=true go run ./cmd/enhance {{.CLI_ARGS}}
     interactive: true
+    desc: Run
+
   debug:
     cmds:
       - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
       - DEBUG=true go run ./cmd/enhance {{.CLI_ARGS}}
     interactive: true
-  mock:
-    cmds:
-      - task: start-mock-server
-      - defer: { task: stop-mock-server }
-      - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
-      - cmd: DEBUG=true FF_MOCK_DATA=true go run ./cmd/enhance -R neovim/neovim 34454
-  start-mock-server:
-    cmds:
-      - killgrave --config ./imposters/config.yml &> ./.killgrave.log  &
+    desc: Run in debug mode. Run `task logs` to watch the logs.
+
   local-gh:
     cmds:
       - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
       - GH_PATH=/usr/local/bin/gh DEBUG=true go run ./cmd/enhance {{.CLI_ARGS}}
     interactive: true
+    desc: Run in debug mode with a local gh install. Run `task logs` to watch the logs.
+
   logs:
     cmds:
       - rm -f ./debug.log
       - touch ./debug.log
       - tail -f ./debug.log
     interactive: true
-  stop-mock-server:
+    desc: Tail the debug logs
+
+  lint:
+    desc: Run base linters
     cmds:
-      - pkill killgrave
+      - golangci-lint run --path-mode=abs --config=".golangci.yml" --timeout=5m
+    env:
+      GOEXPERIMENT: null
+
+  lint-fix:
+    desc: Run base linters and fix issues
+    cmds:
+      - golangci-lint run --path-mode=abs --config=".golangci.yml" --timeout=5m --fix
+    env:
+      GOEXPERIMENT: null
+
+  test:
+    cmds:
+      - go test -v ./...
+    desc: Run tests
+
+  fmt:
+    desc: Run gofumpt
+    cmds:
+      - gofumpt -w $(git ls-files '*.go')
+
+  check-nerd-font:
+    cmds:
+      - nerdfix check $(fd --extension go)
+    desc: Find broken nerdfont characters
+
+  fix-nerd-font:
+    cmds:
+      - nerdfix fix --format=json $(fd --extension go)
+    desc: Fix broken nerdfont icons
