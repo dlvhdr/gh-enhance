@@ -7,18 +7,21 @@ import (
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
+	"github.com/charmbracelet/bubbles/v2/spinner"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
+	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
 type stepItem struct {
-	meta   itemMeta
-	step   *api.Step
-	jobUrl string
+	meta    itemMeta
+	step    *api.Step
+	spinner spinner.Model
+	jobUrl  string
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -33,8 +36,9 @@ func (i *stepItem) Title() string {
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *stepItem) Description() string {
 	if i.step.CompletedAt.IsZero() || i.step.StartedAt.IsZero() {
-		if i.step.Status == api.StatusInProgress {
-			return "Running..."
+		if i.IsInProgress() {
+			return fmt.Sprintf("Running for %s%s",
+				utils.FormatTimeSince(i.step.StartedAt), Ellipsis)
 		}
 
 		if i.step.Status == api.StatusPending {
@@ -58,8 +62,8 @@ func (i *stepItem) viewConclusion() string {
 		return i.meta.styles.failureGlyph.Render()
 	}
 
-	if i.step.Status == api.StatusInProgress {
-		return i.meta.styles.waitingGlyph.Render()
+	if i.IsInProgress() {
+		return i.spinner.View()
 	}
 
 	if i.step.Status == api.StatusPending {
@@ -71,6 +75,14 @@ func (i *stepItem) viewConclusion() string {
 	}
 
 	return string(i.step.Status)
+}
+
+func (si *stepItem) Tick() tea.Cmd {
+	if si.IsInProgress() {
+		return si.spinner.Tick
+	}
+
+	return nil
 }
 
 // stepsDelegate implements list.ItemDelegate
@@ -115,10 +127,15 @@ func (si *stepItem) Link() string {
 	return fmt.Sprintf("%s#step:%d:1", si.jobUrl, si.step.Number)
 }
 
+func (si *stepItem) IsInProgress() bool {
+	return si.step.Status == api.StatusInProgress
+}
+
 func NewStepItem(step api.Step, url string, styles styles) stepItem {
 	return stepItem{
-		meta:   itemMeta{styles: styles},
-		jobUrl: url,
-		step:   &step,
+		meta:    itemMeta{styles: styles},
+		jobUrl:  url,
+		step:    &step,
+		spinner: NewClockSpinner(styles),
 	}
 }

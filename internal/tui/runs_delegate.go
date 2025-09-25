@@ -6,12 +6,12 @@ import (
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
+	"github.com/charmbracelet/bubbles/v2/spinner"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/data"
 )
 
@@ -20,6 +20,7 @@ type runItem struct {
 	run       *data.WorkflowRun
 	jobsItems []*jobItem
 	loading   bool
+	spinner   spinner.Model
 }
 
 // Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -43,18 +44,21 @@ func (i *runItem) Description() string {
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
 func (i *runItem) FilterValue() string { return i.run.Name }
 
-func (i *runItem) viewStatus() string {
-	s := i.meta.TitleStyle()
-
+func (i *runItem) IsInProgress() bool {
 	numPending := 0
-	for _, job := range i.run.Jobs {
-		if job.State == api.StatusInProgress {
+	for _, ji := range i.jobsItems {
+		if ji.isStatusInProgress() {
 			numPending++
 		}
 	}
+	return numPending > 0
+}
 
-	if numPending > 0 {
-		return i.meta.styles.waitingGlyph.Inherit(s).Render()
+func (i *runItem) viewStatus() string {
+	s := i.meta.TitleStyle()
+
+	if i.IsInProgress() {
+		return i.spinner.View()
 	}
 
 	switch i.run.Bucket {
@@ -69,6 +73,14 @@ func (i *runItem) viewStatus() string {
 	default:
 		return i.meta.styles.pendingGlyph.Inherit(s).Render()
 	}
+}
+
+func (ri *runItem) Tick() tea.Cmd {
+	if ri.IsInProgress() {
+		return ri.spinner.Tick
+	}
+
+	return nil
 }
 
 // runsDelegate implements list.ItemDelegate
@@ -138,5 +150,6 @@ func NewRunItem(run data.WorkflowRun, styles styles) runItem {
 		run:       &run,
 		jobsItems: jobs,
 		loading:   true,
+		spinner:   NewClockSpinner(styles),
 	}
 }

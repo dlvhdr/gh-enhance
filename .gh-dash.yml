@@ -1,12 +1,10 @@
-# yaml-language-server: $schema=https://dlvhdr.github.io/gh-dash/configuration/gh-dash/schema.json
+# yaml-language-server: $schema=https://gh-dash.dev/schema.json
 prSections:
   - title: Mine
-    filters: is:open author:@me updated:>={{ nowModify "-3w" }}
+    filters: repo:dlvhdr/gh-enhance is:open author:@me updated:>={{ nowModify "-3w" }}
     layout:
       author:
         hidden: true
-  - title: All Open
-    filters: is:open
 
 pager:
   diff: diffnav

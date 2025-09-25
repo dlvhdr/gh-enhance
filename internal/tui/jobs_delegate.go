@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
+	"github.com/charmbracelet/bubbles/v2/spinner"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log/v2"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 	"github.com/dlvhdr/gh-enhance/internal/data"
+	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
 type jobItem struct {
@@ -30,10 +33,11 @@ type jobItem struct {
 	loadingLogs        bool
 	loadingSteps       bool
 	steps              []*stepItem
+	spinner            spinner.Model
 	styles             styles
 }
 
-// Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
+// Title implements github.com/charmbracelet/bubbles.list.DefaultItem.Title
 func (i *jobItem) Title() string {
 	status := i.viewStatus()
 	s := i.meta.TitleStyle()
@@ -42,7 +46,7 @@ func (i *jobItem) Title() string {
 		s.Width(w).Render(ansi.Truncate(s.Render(i.job.Name), w, Ellipsis)))
 }
 
-// Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
+// Description implements github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *jobItem) Description() string {
 	if i.job.Bucket == data.CheckBucketSkipping {
 		return "Skipped"
@@ -51,7 +55,7 @@ func (i *jobItem) Description() string {
 		return "Cancelled"
 	}
 	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
-		return "Running..."
+		return fmt.Sprintf("Running for %v%s", utils.FormatTimeSince(i.job.StartedAt), Ellipsis)
 	}
 	if i.job.Bucket == data.CheckBucketPending {
 		if i.job.State == api.StatusWaiting {
@@ -64,7 +68,7 @@ func (i *jobItem) Description() string {
 	return i.job.CompletedAt.Sub(i.job.StartedAt).String()
 }
 
-// FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
+// FilterValue implements github.com/charmbracelet/bubbles.list.Item.FilterValue
 func (i *jobItem) FilterValue() string {
 	return i.job.Name
 }
@@ -72,7 +76,7 @@ func (i *jobItem) FilterValue() string {
 func (i *jobItem) viewStatus() string {
 	s := i.meta.TitleStyle()
 	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
-		return i.meta.styles.waitingGlyph.Inherit(s).Render()
+		return i.spinner.View()
 	}
 	switch i.job.Bucket {
 	case data.CheckBucketPass:
@@ -88,7 +92,7 @@ func (i *jobItem) viewStatus() string {
 	}
 }
 
-// jobsDelegate implements list.ItemDelegate
+// jobsDelegate implements github.com/charmbracelet/bubbles.list.ItemDelegate
 type jobsDelegate struct {
 	commonDelegate
 }
@@ -132,14 +136,23 @@ func (ji *jobItem) isStatusInProgress() bool {
 		strings.Contains(ji.logsStderr, "is still in progress;"))
 }
 
+func (ji *jobItem) Tick() tea.Cmd {
+	if ji.isStatusInProgress() {
+		return ji.spinner.Tick
+	}
+
+	return nil
+}
+
 func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
 	loadingSteps := job.Kind == data.JobKindGithubActions
 	return jobItem{
 		meta:         itemMeta{styles: styles},
 		job:          &job,
 		logs:         make([]data.LogsWithTime, 0),
-		loadingLogs:  true,
+		loadingLogs:  false,
 		loadingSteps: loadingSteps,
 		steps:        make([]*stepItem, 0),
+		spinner:      NewClockSpinner(styles),
 	}
 }

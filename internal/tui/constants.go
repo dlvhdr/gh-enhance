@@ -239,3 +239,8 @@ var InProgressFrames = spinner.Spinner{
 	},
 	FPS: time.Second / 12,
 }
+
+var ClockFrames = spinner.Spinner{
+	Frames: []string{"󱑌", "󱑍", "󱑎", "󱑏", "󱑐", "󱑑", "󱑒", "󱑓", "󱑔", "󱑕", "󱑖", "󱑋"},
+	FPS:    time.Second / 6,
+}

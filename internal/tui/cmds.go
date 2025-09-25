@@ -28,160 +28,164 @@ type workflowRunsFetchedMsg struct {
 
 func (m model) makeGetPRChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
-		response, err := api.FetchPRCheckRuns(m.repo, prNumber)
-		if err != nil {
-			log.Error("error fetching pr checks", "err", err)
-			return workflowRunsFetchedMsg{err: err}
+		return m.fetchPRChecks(prNumber)
+	}
+}
+
+func (m model) fetchPRChecks(prNumber string) tea.Msg {
+	response, err := api.FetchPRCheckRuns(m.repo, prNumber)
+	if err != nil {
+		log.Error("error fetching pr checks", "err", err)
+		return workflowRunsFetchedMsg{err: err}
+	}
+
+	if response.Resource.PullRequest.Number == 0 {
+		return workflowRunsFetchedMsg{err: errors.New("pull request not found")}
+	}
+
+	checkNodes := response.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
+	checkRuns := make([]api.CheckRun, 0)
+	for _, node := range checkNodes {
+		if node.Typename != "CheckRun" {
+			continue
+		}
+		checkRuns = append(checkRuns, node.CheckRun)
+	}
+
+	log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(checkRuns))
+	runsMap := make(map[string]data.WorkflowRun)
+
+	latestRuns := takeOnlyLatest(checkRuns)
+	log.Debug("removed old runs", "len(checkRuns)", len(checkRuns), "len(latestRuns)", len(latestRuns))
+
+	for _, statusCheck := range latestRuns {
+		wfr := statusCheck.CheckSuite.WorkflowRun
+		wfName := ""
+		isGHA := statusCheck.CheckSuite.App.Name == api.GithubActionsAppName
+		if !isGHA {
+			wfName = statusCheck.CheckSuite.App.Name
+		} else {
+			wfName = wfr.Workflow.Name
+		}
+		if wfName == "" {
+			wfName = statusCheck.Name
 		}
 
-		if response.Resource.PullRequest.Number == 0 {
-			return workflowRunsFetchedMsg{err: errors.New("pull request not found")}
+		var kind data.JobKind
+		if isGHA {
+			kind = data.JobKindGithubActions
+		} else if !strings.HasPrefix(statusCheck.DetailsUrl, "https://github.com/") {
+			kind = data.JobKindExternal
+		} else {
+			kind = data.JobKindCheckRun
 		}
 
-		checkNodes := response.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
-		checkRuns := make([]api.CheckRun, 0)
-		for _, node := range checkNodes {
-			if node.Typename != "CheckRun" {
-				continue
+		pendingEnv := ""
+		if len(wfr.PendingDeploymentRequests.Nodes) > 0 {
+			pendingEnv = wfr.PendingDeploymentRequests.Nodes[0].Environment.Name
+		}
+		job := data.WorkflowJob{
+			Id:          fmt.Sprintf("%d", statusCheck.DatabaseId),
+			Title:       statusCheck.Title,
+			State:       statusCheck.Status,
+			Conclusion:  statusCheck.Conclusion,
+			Name:        statusCheck.Name,
+			Workflow:    wfr.Workflow.Name,
+			PendingEnv:  pendingEnv,
+			Event:       wfr.Event,
+			Logs:        []data.LogsWithTime{},
+			Link:        statusCheck.Url,
+			Steps:       []api.Step{},
+			StartedAt:   statusCheck.StartedAt,
+			CompletedAt: statusCheck.CompletedAt,
+			Bucket:      data.GetConclusionBucket(statusCheck.Conclusion),
+			Kind:        kind,
+		}
+
+		run, ok := runsMap[wfName]
+		if ok {
+			run.Jobs = append(run.Jobs, job)
+		} else {
+			link := statusCheck.CheckSuite.WorkflowRun.Url
+			if link == "" {
+				link = statusCheck.Url
 			}
-			checkRuns = append(checkRuns, node.CheckRun)
-		}
-
-		log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(checkRuns))
-		runsMap := make(map[string]data.WorkflowRun)
-
-		latestRuns := takeOnlyLatest(checkRuns)
-		log.Debug("removed old runs", "len(checkRuns)", len(checkRuns), "len(latestRuns)", len(latestRuns))
-
-		for _, statusCheck := range latestRuns {
-			wfr := statusCheck.CheckSuite.WorkflowRun
-			wfName := ""
-			isGHA := statusCheck.CheckSuite.App.Name == api.GithubActionsAppName
-			if !isGHA {
-				wfName = statusCheck.CheckSuite.App.Name
+			var id int
+			if statusCheck.CheckSuite.WorkflowRun.DatabaseId == 0 {
+				id = statusCheck.CheckSuite.DatabaseId
 			} else {
-				wfName = wfr.Workflow.Name
-			}
-			if wfName == "" {
-				wfName = statusCheck.Name
+				id = statusCheck.CheckSuite.WorkflowRun.DatabaseId
 			}
 
-			var kind data.JobKind
-			if isGHA {
-				kind = data.JobKindGithubActions
-			} else if !strings.HasPrefix(statusCheck.DetailsUrl, "https://github.com/") {
-				kind = data.JobKindExternal
-			} else {
-				kind = data.JobKindCheckRun
+			if id == 0 {
+				log.Error("run has no ID", "workflowRun", wfr, "statusCheck", statusCheck)
 			}
 
-			pendingEnv := ""
-			if len(wfr.PendingDeploymentRequests.Nodes) > 0 {
-				pendingEnv = wfr.PendingDeploymentRequests.Nodes[0].Environment.Name
+			run = data.WorkflowRun{
+				Id:       fmt.Sprintf("%d", id),
+				Name:     wfName,
+				Link:     link,
+				Workflow: wfr.Workflow.Name,
+				Event:    statusCheck.CheckSuite.WorkflowRun.Event,
+				Bucket:   data.GetConclusionBucket(statusCheck.CheckSuite.Conclusion),
 			}
-			job := data.WorkflowJob{
-				Id:          fmt.Sprintf("%d", statusCheck.DatabaseId),
-				Title:       statusCheck.Title,
-				State:       statusCheck.Status,
-				Conclusion:  statusCheck.Conclusion,
-				Name:        statusCheck.Name,
-				Workflow:    wfr.Workflow.Name,
-				PendingEnv:  pendingEnv,
-				Event:       wfr.Event,
-				Logs:        []data.LogsWithTime{},
-				Link:        statusCheck.Url,
-				Steps:       []api.Step{},
-				StartedAt:   statusCheck.StartedAt,
-				CompletedAt: statusCheck.CompletedAt,
-				Bucket:      data.GetConclusionBucket(statusCheck.Conclusion),
-				Kind:        kind,
-			}
-
-			run, ok := runsMap[wfName]
-			if ok {
-				run.Jobs = append(run.Jobs, job)
-			} else {
-				link := statusCheck.CheckSuite.WorkflowRun.Url
-				if link == "" {
-					link = statusCheck.Url
-				}
-				var id int
-				if statusCheck.CheckSuite.WorkflowRun.DatabaseId == 0 {
-					id = statusCheck.CheckSuite.DatabaseId
-				} else {
-					id = statusCheck.CheckSuite.WorkflowRun.DatabaseId
-				}
-
-				if id == 0 {
-					log.Error("run has no ID", "workflowRun", wfr, "statusCheck", statusCheck)
-				}
-
-				run = data.WorkflowRun{
-					Id:       fmt.Sprintf("%d", id),
-					Name:     wfName,
-					Link:     link,
-					Workflow: wfr.Workflow.Name,
-					Event:    statusCheck.CheckSuite.WorkflowRun.Event,
-					Bucket:   data.GetConclusionBucket(statusCheck.CheckSuite.Conclusion),
-				}
-				run.Jobs = []data.WorkflowJob{job}
-			}
-			sort.Slice(run.Jobs, func(i, j int) bool {
-				if run.Jobs[i].Bucket == data.CheckBucketFail &&
-					run.Jobs[j].Bucket != data.CheckBucketFail {
-					return true
-				}
-				if run.Jobs[j].Bucket == data.CheckBucketFail &&
-					run.Jobs[i].Bucket != data.CheckBucketFail {
-					return false
-				}
-				if run.Jobs[i].StartedAt.IsZero() {
-					return false
-				}
-				if run.Jobs[j].StartedAt.IsZero() {
-					return true
-				}
-
-				return run.Jobs[i].StartedAt.Before(run.Jobs[j].StartedAt)
-			})
-			runsMap[wfName] = run
+			run.Jobs = []data.WorkflowJob{job}
 		}
-
-		runs := make([]data.WorkflowRun, 0)
-		for _, run := range runsMap {
-			runs = append(runs, run)
-		}
-
-		sort.Slice(runs, func(i, j int) bool {
-			nameA := runs[i].Workflow
-			if nameA == "" {
-				nameA = runs[i].Name
+		sort.Slice(run.Jobs, func(i, j int) bool {
+			if run.Jobs[i].Bucket == data.CheckBucketFail &&
+				run.Jobs[j].Bucket != data.CheckBucketFail {
+				return true
 			}
-
-			nameB := runs[j].Workflow
-			if nameB == "" {
-				nameB = runs[j].Name
+			if run.Jobs[j].Bucket == data.CheckBucketFail &&
+				run.Jobs[i].Bucket != data.CheckBucketFail {
+				return false
 			}
-
-			if runs[i].Bucket == runs[j].Bucket {
-				return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
+			if run.Jobs[i].StartedAt.IsZero() {
+				return false
 			}
-
-			if runs[i].Bucket == data.CheckBucketFail {
+			if run.Jobs[j].StartedAt.IsZero() {
 				return true
 			}
 
-			if runs[j].Bucket == data.CheckBucketFail {
-				return false
-			}
-
-			return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
+			return run.Jobs[i].StartedAt.Before(run.Jobs[j].StartedAt)
 		})
+		runsMap[wfName] = run
+	}
 
-		return workflowRunsFetchedMsg{
-			pr:   response.Resource.PullRequest,
-			runs: runs,
+	runs := make([]data.WorkflowRun, 0)
+	for _, run := range runsMap {
+		runs = append(runs, run)
+	}
+
+	sort.Slice(runs, func(i, j int) bool {
+		nameA := runs[i].Workflow
+		if nameA == "" {
+			nameA = runs[i].Name
 		}
+
+		nameB := runs[j].Workflow
+		if nameB == "" {
+			nameB = runs[j].Name
+		}
+
+		if runs[i].Bucket == runs[j].Bucket {
+			return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
+		}
+
+		if runs[i].Bucket == data.CheckBucketFail {
+			return true
+		}
+
+		if runs[j].Bucket == data.CheckBucketFail {
+			return false
+		}
+
+		return strings.Compare(strings.ToLower(nameA), strings.ToLower(nameB)) == -1
+	})
+
+	return workflowRunsFetchedMsg{
+		pr:   response.Resource.PullRequest,
+		runs: runs,
 	}
 }
 
@@ -216,7 +220,12 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	if !ok {
 		return nil
 	}
+	if ji.isStatusInProgress() {
+		return nil
+	}
 
+	log.Debug("fetching job logs", "job", ji.job.Name)
+	ji.loadingLogs = true
 	ji.initiatedLogsFetch = true
 	return func() tea.Msg {
 		defer utils.TimeTrack(time.Now(), "fetching job logs")
@@ -339,4 +348,14 @@ func takeOnlyLatest(checkRuns []api.CheckRun) []api.CheckRun {
 		flat = append(flat, checkRun.runs...)
 	}
 	return flat
+}
+
+type watchChecksTickMsg struct {
+	t time.Time
+}
+
+func (m *model) makeWatchChecksCmd() tea.Cmd {
+	return tea.Every(time.Second, func(t time.Time) tea.Msg {
+		return watchChecksTickMsg{t}
+	})
 }

@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/log/v2"
 	"github.com/cli/go-gh"
 	"github.com/spf13/cobra"
@@ -32,9 +32,9 @@ func init() {
 		newConfigFile, fileErr := os.OpenFile("debug.log",
 			os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o666)
 		if fileErr == nil {
-			// log.SetColorProfile(term.TrueColor)
+			log.SetColorProfile(colorprofile.TrueColor)
 			log.SetOutput(newConfigFile)
-			log.SetTimeFormat(time.Kitchen)
+			log.SetTimeFormat("15:04:05.000")
 			log.SetReportCaller(true)
 			log.SetLevel(log.DebugLevel)
 			log.Debug("Logging to debug.log")

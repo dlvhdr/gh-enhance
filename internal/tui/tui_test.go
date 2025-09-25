@@ -43,13 +43,14 @@ func TestFullOutput(t *testing.T) {
 	fv := fm.View()
 
 	if !strings.Contains(fv, "lintcommit") {
-		t.Errorf("couldn't Ind lintcommit run")
+		t.Errorf(`couldn't find "lintcommit" run`)
 	}
 	if !strings.Contains(fv, "lint-commits") {
-		t.Errorf("couldn't Ind lint-commits job")
+		t.Errorf(`couldn't find "lint-commits" job`)
 	}
 	if !strings.Contains(fv, "Set up job") {
-		t.Errorf("couldn't Ind Set up job step")
+		t.Errorf(`couldn't find "Set up job" step`)
+		fmt.Print(fv)
 	}
 }
 

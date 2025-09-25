@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/v2/spinner"
 	"github.com/charmbracelet/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
@@ -71,6 +72,7 @@ type styles struct {
 	scrollbarThumbStyle        lipgloss.Style
 	scrollbarTrackStyle        lipgloss.Style
 	faintFgStyle               lipgloss.Style
+	keyStyle                   lipgloss.Style
 
 	headerStyle     lipgloss.Style
 	logoStyle       lipgloss.Style
@@ -182,6 +184,7 @@ func makeStyles() styles {
 		}, true, false, true, false).BorderForeground(colors.darkColor),
 		scrollbarThumbStyle: lipgloss.NewStyle().Foreground(colors.darkColor),
 		scrollbarTrackStyle: lipgloss.NewStyle().Foreground(colors.faintColor),
+		keyStyle:            lipgloss.NewStyle().Background(colors.fainterColor).Background(colors.darkerColor).Padding(0, 1),
 	}
 }
 
@@ -193,4 +196,9 @@ func makePill(text string, textStyle lipgloss.Style, bg color.Color) string {
 
 func makePointingBorder(old string) string {
 	return strings.Replace(old, lipgloss.NormalBorder().Right, lipgloss.RoundedBorder().TopLeft, 1)
+}
+
+func NewClockSpinner(styles styles) spinner.Model {
+	return spinner.New(spinner.WithSpinner(ClockFrames),
+		spinner.WithStyle(lipgloss.NewStyle().Width(1).Margin(0).Padding(0).Foreground(styles.colors.warnColor)))
 }

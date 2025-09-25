@@ -70,7 +70,10 @@ func IsFailureConclusion(c Conclusion) bool {
 type CheckSuite struct {
 	Conclusion Conclusion
 	DatabaseId int
-	App        struct {
+	Branch     struct {
+		Name string
+	}
+	App struct {
 		Id   string
 		Name string
 	}
@@ -153,7 +156,8 @@ type PR struct {
 	Repository struct {
 		NameWithOwner string
 	}
-	Commits struct {
+	HeadRefName string
+	Commits     struct {
 		Nodes []struct {
 			Commit struct {
 				StatusCheckRollup struct {
@@ -234,6 +238,9 @@ type WorkflowRunStepsQuery struct {
 				Path string
 			}
 			CheckSuite struct {
+				Branch struct {
+					Name string
+				}
 				CheckRuns struct {
 					Nodes []CheckRunWithSteps
 				} `graphql:"checkRuns(first: 100)"`
@@ -294,4 +301,9 @@ func FetchCheckRunOutput(repo string, runID string) (CheckRunOutputResponse, err
 	}
 
 	return res, nil
+}
+
+func (pr *PR) IsStatusCheckInProgress() bool {
+	return (pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "" ||
+		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING")
 }

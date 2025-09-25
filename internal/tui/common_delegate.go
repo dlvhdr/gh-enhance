@@ -4,24 +4,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/charmbracelet/bubbles/v2/key"
 	"github.com/charmbracelet/bubbles/v2/list"
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
-
-type delegateKeyMap struct {
-	openInBrowser key.Binding
-}
-
-func newDelegateKeyMap() *delegateKeyMap {
-	return &delegateKeyMap{
-		openInBrowser: key.NewBinding(
-			key.WithKeys("o"),
-			key.WithHelp("o", "open in browser"),
-		),
-	}
-}
 
 type itemMeta struct {
 	focused  bool
@@ -51,7 +37,7 @@ func (i itemMeta) DescStyle() lipgloss.Style {
 	return i.styles.paneItem.descStyle
 }
 
-// commonDelegate partially implements list.ItemDelegate
+// commonDelegate partially implements github.com/charmbracelet/bubbles.list.ItemDelegate
 type commonDelegate struct {
 	focused bool
 	styles  styles
