@@ -49,8 +49,7 @@ func TestFullOutput(t *testing.T) {
 		t.Errorf(`couldn't find "lint-commits" job`)
 	}
 	if !strings.Contains(fv, "Set up job") {
-		t.Errorf(`couldn't find "Set up job" step`)
-		fmt.Print(fv)
+		t.Errorf(`couldn't find "Set up job" step: %s`, fv)
 	}
 }
 

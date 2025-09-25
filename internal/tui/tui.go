@@ -41,18 +41,6 @@ const (
 	PaneLogs
 )
 
-const (
-	headerHeight    = 4
-	footerHeight    = 1
-	smallScreen     = 130
-	paneTitleHeight = 1
-
-	unfocusedLargePaneWidth = 20
-	focusedLargePaneWidth   = 40
-
-	focusedSmallPaneWidth = 25
-)
-
 type model struct {
 	width             int
 	height            int
