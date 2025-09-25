@@ -502,7 +502,7 @@ func (m model) View() string {
 
 func (m *model) viewHeader() string {
 	s := lipgloss.NewStyle().Background(m.styles.headerStyle.GetBackground())
-	version := s.Height(lipgloss.Height(Logo)).Render(" \n v0.1.0〓")
+	version := s.Height(lipgloss.Height(Logo)).Render(" \n v0.1.0")
 
 	logoWidth := lipgloss.Width(Logo) + lipgloss.Width(version)
 	logo := lipgloss.PlaceHorizontal(
@@ -514,27 +514,48 @@ func (m *model) viewHeader() string {
 				version,
 			)))
 
-	prWidth := m.width - logoWidth - m.styles.headerStyle.GetHorizontalFrameSize()
+	status := s.Render(m.viewCommitStatus(s))
+	prWidth := m.width - lipgloss.Width(status) - logoWidth -
+		m.styles.headerStyle.GetHorizontalFrameSize()
 	pr := s.Width(prWidth).Render(fmt.Sprintf("Loading %s PR #%s...", m.repo, m.prNumber))
 	if m.pr.Title != "" {
-		commit := ""
-		// TODO: get status after dedup
-		// if len(m.pr.Commits.Nodes) > 0 {
-		// 	commit = string(m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.State)
-		// }
 		pr = s.Width(prWidth).Render(lipgloss.JoinVertical(lipgloss.Left,
-			s.Width(prWidth).Render(lipgloss.JoinHorizontal(lipgloss.Top,
-				s.Foreground(m.styles.colors.lightColor).Bold(true).Render(commit),
-				s.Foreground(m.styles.colors.lightColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
-				s.Render(" "),
-				s.Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
-			)),
-			s.Width(prWidth).Bold(true).Foreground(m.styles.colors.focusedColor).Render(m.pr.Title),
+			m.viewRepo(prWidth, s),
+			m.viewPRName(prWidth, s),
 		))
 	}
 
 	return m.styles.headerStyle.Width(m.width).Render(
-		lipgloss.JoinHorizontal(lipgloss.Left, s.Render(pr), logo))
+		lipgloss.JoinHorizontal(lipgloss.Left, status, s.Render(pr), logo))
+}
+
+func (m *model) viewRepo(width int, bgStyle lipgloss.Style) string {
+	return bgStyle.Width(width).Render(lipgloss.JoinHorizontal(lipgloss.Top,
+		bgStyle.Render(" "),
+		bgStyle.Foreground(m.styles.colors.darkColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
+		bgStyle.Render(" "),
+		bgStyle.Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
+	))
+}
+
+func (m *model) viewPRName(width int, bgStyle lipgloss.Style) string {
+	mergeStatus := ""
+	if m.pr.Merged {
+		mergeStatus = m.styles.mergedGlyph.Render()
+	} else if m.pr.IsDraft {
+		mergeStatus = m.styles.draftGlyph.Render()
+	} else if m.pr.Closed {
+		mergeStatus = m.styles.closedGlyph.Render()
+	} else {
+		mergeStatus = m.styles.openGlyph.Render()
+	}
+
+	return bgStyle.Width(width).Render(lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		bgStyle.Render(mergeStatus),
+		bgStyle.Render(" "),
+		bgStyle.Bold(true).Render(m.pr.Title)),
+	)
 }
 
 func (m *model) viewFooter() string {
@@ -1419,4 +1440,28 @@ func (m *model) onWorkflowRunsFetched(msg workflowRunsFetchedMsg) []tea.Cmd {
 	}
 
 	return cmds
+}
+
+func (m *model) viewCommitStatus(bgStyle lipgloss.Style) string {
+	if len(m.pr.Commits.Nodes) == 0 {
+		return ""
+	}
+
+	s := bgStyle.MaxHeight(2)
+	status := m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.State
+	res := ""
+	switch status {
+	case api.CommitStateSuccess:
+		res = s.Foreground(m.styles.colors.successColor).Render(art.SmallCheckmarkSign)
+	case api.CommitStateError, api.CommitStateFailure:
+		res = s.Foreground(m.styles.colors.errorColor).Render(art.SmallCrossSign)
+	case api.CommitStateExpected, api.CommitStatePending:
+		res = s.Foreground(m.styles.colors.warnColor).Render(art.SmallMinusSign)
+	}
+
+	if res != "" {
+		return bgStyle.Padding(0, 1).MaxHeight(2).Render(res)
+	}
+
+	return string(status)
 }

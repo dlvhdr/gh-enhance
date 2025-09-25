@@ -30,9 +30,12 @@ type colors struct {
 	errorColor     color.Color
 	warnColor      color.Color
 	successColor   color.Color
+	mergedColor    color.Color
 	focusedColor   color.Color
 	unfocusedColor color.Color
 	subtleWhite    color.Color
+	grayColor      color.Color
+	whiteColor     color.Color
 	faintColor     color.Color
 	fainterColor   color.Color
 }
@@ -58,6 +61,10 @@ type styles struct {
 	pendingGlyph               lipgloss.Style
 	failureGlyph               lipgloss.Style
 	successGlyph               lipgloss.Style
+	mergedGlyph                lipgloss.Style
+	draftGlyph                 lipgloss.Style
+	closedGlyph                lipgloss.Style
+	openGlyph                  lipgloss.Style
 	noLogsStyle                lipgloss.Style
 	watermarkIllustrationStyle lipgloss.Style
 	debugStyle                 lipgloss.Style
@@ -97,9 +104,12 @@ func makeStyles() styles {
 		errorColor:     t.BrightRed,
 		warnColor:      t.BrightYellow,
 		successColor:   t.BrightGreen,
+		mergedColor:    t.Purple,
 		faintColor:     tint.Darken(focusedColor, 40),
 		fainterColor:   tint.Darken(focusedColor, 80),
+		whiteColor:     t.White,
 		subtleWhite:    tint.Darken(t.White, 20),
+		grayColor:      tint.Darken(t.White, 40),
 	}
 
 	errorBgStyle := lipgloss.NewStyle().Background(tint.Darken(t.Red, 80))
@@ -169,6 +179,10 @@ func makeStyles() styles {
 		pendingGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(PendingIcon),
 		failureGlyph:               lipgloss.NewStyle().Foreground(t.Red).SetString(FailureIcon),
 		successGlyph:               lipgloss.NewStyle().Foreground(colors.successColor).SetString(SuccessIcon),
+		mergedGlyph:                lipgloss.NewStyle().Foreground(colors.mergedColor).SetString(MergedIcon),
+		draftGlyph:                 lipgloss.NewStyle().Foreground(colors.grayColor).SetString(DraftIcon),
+		closedGlyph:                lipgloss.NewStyle().Foreground(colors.errorColor).SetString(ClosedIcon),
+		openGlyph:                  lipgloss.NewStyle().Foreground(t.Blue).SetString(OpenIcon),
 		noLogsStyle:                lipgloss.NewStyle().Foreground(colors.faintColor).Bold(true),
 		watermarkIllustrationStyle: lipgloss.NewStyle().Foreground(t.White),
 		debugStyle:                 lipgloss.NewStyle().Background(lipgloss.Color("1")),

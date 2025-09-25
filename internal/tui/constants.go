@@ -25,6 +25,10 @@ const (
 	PendingIcon  = ""
 	FailureIcon  = "󰅙"
 	SuccessIcon  = ""
+	MergedIcon   = ""
+	DraftIcon    = ""
+	OpenIcon     = ""
+	ClosedIcon   = ""
 
 	AsciiSkippedIcon = `
     ,---_   

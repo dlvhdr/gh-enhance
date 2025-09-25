@@ -142,11 +142,11 @@ type Step struct {
 type CommitState string
 
 const (
-	CommitStatusExpected = "EXPECTED"
-	CommitStatusError    = "ERROR"
-	CommitStatusFailure  = "FAILURE"
-	CommitStatusPending  = "PENDING"
-	CommitStatusSuccess  = "SUCCESS"
+	CommitStateExpected CommitState = "EXPECTED"
+	CommitStateError    CommitState = "ERROR"
+	CommitStateFailure  CommitState = "FAILURE"
+	CommitStatePending  CommitState = "PENDING"
+	CommitStateSuccess  CommitState = "SUCCESS"
 )
 
 type PR struct {
@@ -156,6 +156,9 @@ type PR struct {
 	Repository struct {
 		NameWithOwner string
 	}
+	Merged      bool
+	IsDraft     bool
+	Closed      bool
 	HeadRefName string
 	Commits     struct {
 		Nodes []struct {
