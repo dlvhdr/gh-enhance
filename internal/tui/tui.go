@@ -247,6 +247,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.fetchPRChecks(m.prNumber)
 		}))
 
+	case reRunRunMsg:
+		if msg.err != nil {
+			log.Error("error rerunning run", "jobId", msg.runId, "err", msg.err)
+		}
+		ri := m.getRunItemById(msg.runId)
+		if ri == nil {
+			break
+		}
+
+		cmds = append(cmds, tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
+			return m.fetchPRChecks(m.prNumber)
+		}))
+
 	case tea.WindowSizeMsg:
 		log.Info("window size changed", "width", msg.Width, "height", msg.Height)
 		m.width = msg.Width
@@ -301,17 +314,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, rerunKey) {
-			if m.focusedPane != PaneJobs {
+			if m.focusedPane != PaneRuns && m.focusedPane != PaneJobs {
 				break
 			}
 
 			ri := m.getSelectedRunItem()
-			ji := m.getSelectedJobItem()
-			if ri == nil || ji == nil {
-				break
+			if m.focusedPane == PaneRuns && ri != nil {
+				cmds = append(cmds, m.rerunRun(ri.run.Id)...)
+			} else {
+				ji := m.getSelectedJobItem()
+				if ri == nil || ji == nil {
+					break
+				}
+				cmds = append(cmds, m.rerunJob(ri.run.Id, ji.job.Id)...)
 			}
-
-			cmds = append(cmds, m.rerunJob(ri.run.Id, ji.job.Id)...)
 		}
 
 		if key.Matches(msg, helpKey) {
@@ -485,11 +501,11 @@ func (m model) View() string {
 	header := m.viewHeader()
 	footer := m.viewFooter()
 
-	runsPane := makePointingBorder(m.styles.paneStyle.Render(m.runsList.View()))
-	jobsPane := makePointingBorder(m.styles.paneStyle.Render(m.jobsList.View()))
+	runsPane := makePointingBorder(m.paneStyle(PaneRuns).Render(m.runsList.View()))
+	jobsPane := makePointingBorder(m.paneStyle(PaneJobs).Render(m.jobsList.View()))
 	stepsPane := ""
 	if m.shouldShowSteps() {
-		stepsPane = makePointingBorder(m.styles.paneStyle.Render(m.stepsList.View()))
+		stepsPane = makePointingBorder(m.paneStyle(PaneSteps).Render(m.stepsList.View()))
 	}
 
 	panes := make([]string, 0)
@@ -695,7 +711,7 @@ func (m *model) viewLogs() string {
 
 	inputView := ""
 	ji := m.getSelectedJobItem()
-	if m.logsViewport.GetContent() != "" && ji.logsStderr == "" {
+	if ji != nil && m.logsViewport.GetContent() != "" && ji.logsStderr == "" {
 		inputView = lipgloss.NewStyle().Width(w).Border(lipgloss.RoundedBorder(), true).BorderForeground(
 			m.styles.colors.fainterColor).Render(m.logsInput.View())
 	}
@@ -1492,4 +1508,13 @@ func (m *model) viewCommitStatus(bgStyle lipgloss.Style) string {
 	}
 
 	return string(status)
+}
+
+func (m *model) paneStyle(pane focusedPane) lipgloss.Style {
+	// the border of the pane is the actually rendered by the previous pane
+	if m.focusedPane-1 == pane {
+		return m.styles.focusedPaneStyle
+	}
+
+	return m.styles.paneStyle
 }

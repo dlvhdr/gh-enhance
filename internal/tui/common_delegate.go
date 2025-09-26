@@ -29,12 +29,15 @@ func (i itemMeta) TitleStyle() lipgloss.Style {
 }
 
 func (i itemMeta) DescStyle() lipgloss.Style {
-	if i.selected {
+	if i.selected && i.focused {
+		w := i.width - i.styles.paneItem.focusedSelectedDescStyle.GetPaddingLeft() + 1
+		return i.styles.paneItem.focusedSelectedDescStyle.Width(w).MaxHeight(1)
+	} else if i.selected {
 		w := i.width - i.styles.paneItem.selectedDescStyle.GetPaddingLeft() + 1
 		return i.styles.paneItem.selectedDescStyle.Width(w).MaxHeight(1)
 	}
 
-	return i.styles.paneItem.descStyle
+	return i.styles.paneItem.descStyle.MaxHeight(1)
 }
 
 // commonDelegate partially implements github.com/charmbracelet/bubbles.list.ItemDelegate

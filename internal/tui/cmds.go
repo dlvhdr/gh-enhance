@@ -364,6 +364,10 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 		return cmds
 	}
 
+	commits := m.pr.Commits.Nodes
+	if len(commits) > 0 {
+		commits[0].Commit.StatusCheckRollup.State = api.CommitStatePending
+	}
 	ji.job.Bucket = data.CheckBucketPending
 	ji.job.State = api.StatusPending
 	ji.job.StartedAt = time.Now()
@@ -378,5 +382,31 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 	return cmds
 }
 
-// func (m *model) rerunWorkflow() {
-// }
+type reRunRunMsg struct {
+	runId string
+	err   error
+}
+
+func (m *model) rerunRun(runId string) []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
+	ri := m.getRunItemById(runId)
+	if ri == nil {
+		return cmds
+	}
+
+	commits := m.pr.Commits.Nodes
+	if len(commits) > 0 {
+		commits[0].Commit.StatusCheckRollup.State = api.CommitStatePending
+	}
+	ri.run.Event = "manual rerun"
+	ri.run.Bucket = data.CheckBucketPending
+	ri.run.Jobs = make([]data.WorkflowJob, 0)
+	ri.jobsItems = make([]*jobItem, 0)
+	m.jobsList.SetItems(make([]list.Item, 0))
+	m.stepsList.SetItems(make([]list.Item, 0))
+
+	cmds = append(cmds, ri.Tick(), func() tea.Msg {
+		return reRunRunMsg{runId: runId, err: api.ReRunRun(m.repo, runId)}
+	})
+	return cmds
+}

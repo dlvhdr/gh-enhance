@@ -13,8 +13,9 @@ type paneItemStyles struct {
 	focusedTitleStyle   lipgloss.Style
 	unfocusedTitleStyle lipgloss.Style
 
-	selectedDescStyle lipgloss.Style
-	descStyle         lipgloss.Style
+	selectedDescStyle        lipgloss.Style
+	descStyle                lipgloss.Style
+	focusedSelectedDescStyle lipgloss.Style
 
 	selectedStyle             lipgloss.Style
 	selectedTitleStyle        lipgloss.Style
@@ -54,6 +55,7 @@ type styles struct {
 	paneItem paneItemStyles
 
 	paneStyle                  lipgloss.Style
+	focusedPaneStyle           lipgloss.Style
 	lineNumbersStyle           lipgloss.Style
 	canceledGlyph              lipgloss.Style
 	skippedGlyph               lipgloss.Style
@@ -113,7 +115,8 @@ func makeStyles() styles {
 	}
 
 	errorBgStyle := lipgloss.NewStyle().Background(tint.Darken(t.Red, 80))
-	bg := tint.Darken(t.Bg, 10)
+	bg := tint.Darken(t.Bg, 40)
+	brighterBg := tint.Darken(t.Bg, 10)
 	unfocusedBg := tint.Darken(focusedColor, 50)
 	unfocusedFg := tint.Darken(focusedColor, 10)
 	headerBg := colors.fainterColor
@@ -151,9 +154,9 @@ func makeStyles() styles {
 				BorderForeground(unfocusedBg),
 
 			focusedSelectedStyle: lipgloss.NewStyle().
-				Background(bg).
+				Background(brighterBg).
 				BorderForeground(focusedColor).
-				BorderBackground(bg).
+				BorderBackground(brighterBg).
 				Border(lipgloss.OuterHalfBlockBorder(), false, false, false, true),
 
 			selectedTitleStyle: lipgloss.NewStyle().
@@ -162,16 +165,18 @@ func makeStyles() styles {
 				Background(bg),
 
 			focusedTitleStyle:         lipgloss.NewStyle().Bold(true).Foreground(t.White),
-			focusedSelectedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(focusedColor).Background(bg),
+			focusedSelectedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(focusedColor).Background(brighterBg),
+			unfocusedTitleStyle:       lipgloss.NewStyle().Bold(true).Foreground(colors.subtleWhite),
 
-			unfocusedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(colors.subtleWhite),
-
-			selectedDescStyle: lipgloss.NewStyle().Foreground(t.White).PaddingLeft(2).Background(bg),
-			descStyle:         lipgloss.NewStyle().Foreground(colors.faintColor).PaddingLeft(2),
+			selectedDescStyle:        lipgloss.NewStyle().Foreground(t.White).PaddingLeft(2).Background(bg),
+			descStyle:                lipgloss.NewStyle().Foreground(colors.faintColor).PaddingLeft(2),
+			focusedSelectedDescStyle: lipgloss.NewStyle().Foreground(t.White).PaddingLeft(2).Background(brighterBg),
 		},
 
 		paneStyle: lipgloss.NewStyle().BorderRight(true).BorderStyle(
 			lipgloss.NormalBorder()).BorderForeground(colors.faintColor),
+		focusedPaneStyle: lipgloss.NewStyle().BorderRight(true).BorderStyle(
+			lipgloss.NormalBorder()).BorderForeground(colors.focusedColor),
 		lineNumbersStyle:           lipgloss.NewStyle().Foreground(colors.faintColor).Align(lipgloss.Right),
 		canceledGlyph:              lipgloss.NewStyle().Foreground(colors.warnColor).SetString(CanceledIcon),
 		skippedGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(SkippedIcon),

@@ -324,3 +324,16 @@ func ReRunJob(repo string, jobId string) error {
 	err = client.Post(fmt.Sprintf("repos/%s/actions/jobs/%s/rerun", repo, jobId), body, res)
 	return err
 }
+
+func ReRunRun(repo string, runId string) error {
+	client, err := gh.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	body := strings.NewReader("")
+	res := struct{}{}
+
+	err = client.Post(fmt.Sprintf("repos/%s/actions/runs/%s/rerun", repo, runId), body, res)
+	return err
+}
