@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/log/v2"
@@ -309,4 +310,17 @@ func FetchCheckRunOutput(repo string, runID string) (CheckRunOutputResponse, err
 func (pr *PR) IsStatusCheckInProgress() bool {
 	return (pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "" ||
 		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING")
+}
+
+func ReRunJob(repo string, jobId string) error {
+	client, err := gh.DefaultRESTClient()
+	if err != nil {
+		return err
+	}
+
+	body := strings.NewReader("")
+	res := struct{}{}
+
+	err = client.Post(fmt.Sprintf("repos/%s/actions/jobs/%s/rerun", repo, jobId), body, res)
+	return err
 }

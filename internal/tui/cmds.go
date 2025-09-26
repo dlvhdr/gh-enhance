@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/v2/list"
 	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/log/v2"
 	"github.com/cli/go-gh"
@@ -55,7 +56,7 @@ func (m model) fetchPRChecks(prNumber string) tea.Msg {
 	log.Debug("fetched pr checks", "repo", m.repo, "prNumber", prNumber, "len(checks)", len(checkRuns))
 	runsMap := make(map[string]data.WorkflowRun)
 
-	latestRuns := takeOnlyLatest(checkRuns)
+	latestRuns := takeOnlyLatestRun(checkRuns)
 	log.Debug("removed old runs", "len(checkRuns)", len(checkRuns), "len(latestRuns)", len(latestRuns))
 
 	for _, statusCheck := range latestRuns {
@@ -308,7 +309,7 @@ func (m *model) makeFetchWorkflowRunStepsCmd(runId string) tea.Cmd {
 
 func makeOpenUrlCmd(url string) tea.Cmd {
 	return func() tea.Msg {
-		log.Debug("opening run url", "url", url)
+		log.Info("opening run url", "url", url)
 		b := browser.New("", os.Stdout, os.Stdin)
 		b.Browse(url)
 		return nil
@@ -319,7 +320,7 @@ func (m *model) makeInitCmd() tea.Cmd {
 	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(), m.makeGetPRChecksCmd(m.prNumber))
 }
 
-func takeOnlyLatest(checkRuns []api.CheckRun) []api.CheckRun {
+func takeOnlyLatestRun(checkRuns []api.CheckRun) []api.CheckRun {
 	// clean duplicate check runs because of old attempts
 	type latestMap struct {
 		runs   []api.CheckRun
@@ -350,12 +351,32 @@ func takeOnlyLatest(checkRuns []api.CheckRun) []api.CheckRun {
 	return flat
 }
 
-type watchChecksTickMsg struct {
-	t time.Time
+type reRunJobMsg struct {
+	jobId string
+	err   error
 }
 
-func (m *model) makeWatchChecksCmd() tea.Cmd {
-	return tea.Every(time.Second, func(t time.Time) tea.Msg {
-		return watchChecksTickMsg{t}
+func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
+	ri := m.getRunItemById(runId)
+	ji := m.getJobItemById(jobId)
+	if ri == nil || ji == nil {
+		return cmds
+	}
+
+	ji.job.Bucket = data.CheckBucketPending
+	ji.job.State = api.StatusPending
+	ji.job.StartedAt = time.Now()
+	ji.job.CompletedAt = time.Time{}
+	ji.steps = make([]*stepItem, 0)
+	m.stepsList.ResetSelected()
+	m.stepsList.SetItems(make([]list.Item, 0))
+
+	cmds = append(cmds, ri.Tick(), ji.Tick(), m.inProgressSpinner.Tick, func() tea.Msg {
+		return reRunJobMsg{jobId: jobId, err: api.ReRunJob(m.repo, jobId)}
 	})
+	return cmds
 }
+
+// func (m *model) rerunWorkflow() {
+// }

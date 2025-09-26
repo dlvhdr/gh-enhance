@@ -88,6 +88,11 @@ var (
 		key.WithHelp("R", "refresh all"),
 	)
 
+	rerunKey = key.NewBinding(
+		key.WithKeys("ctrl+r"),
+		key.WithHelp("ctrl+r", "rerun"),
+	)
+
 	helpKey = key.NewBinding(
 		key.WithKeys("?"),
 		key.WithHelp("?", "toggle help"),

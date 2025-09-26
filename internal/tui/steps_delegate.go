@@ -104,7 +104,7 @@ func (d *stepsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		log.Debug("key pressed on step", "key", msg.Text)
+		log.Info("key pressed on step", "key", msg.Text)
 		switch {
 		case key.Matches(msg, openUrlKey):
 			return makeOpenUrlCmd(step.Link())

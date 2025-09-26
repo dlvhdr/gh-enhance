@@ -16,6 +16,3 @@ var SmallCheckmarkSign string
 
 //go:embed small-cross-sign.txt
 var SmallCrossSign string
-
-//go:embed small-minus-sign.txt
-var SmallMinusSign string

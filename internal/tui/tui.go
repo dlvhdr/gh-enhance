@@ -234,8 +234,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case reRunJobMsg:
+		if msg.err != nil {
+			log.Error("error rerunning job", "jobId", msg.jobId, "err", msg.err)
+		}
+		ji := m.getJobItemById(msg.jobId)
+		if ji == nil {
+			break
+		}
+
+		cmds = append(cmds, tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
+			return m.fetchPRChecks(m.prNumber)
+		}))
+
 	case tea.WindowSizeMsg:
-		log.Debug("window size changed", "width", msg.Width, "height", msg.Height)
+		log.Info("window size changed", "width", msg.Width, "height", msg.Height)
 		m.width = msg.Width
 		m.height = msg.Height
 		m.setHeights()
@@ -244,11 +257,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setFocusedPaneStyles()
 	case tea.KeyPressMsg:
 		if key.Matches(msg, quitKey) {
-			log.Debug("quitting", "msg", msg)
+			log.Info("quitting", "msg", msg)
 			return m, tea.Quit
 		}
 
-		log.Debug("👤 key pressed", "key", msg.String())
+		log.Info("👤 key pressed", "key", msg.String())
 		if m.runsList.FilterState() == list.Filtering ||
 			m.jobsList.FilterState() == list.Filtering ||
 			m.stepsList.FilterState() == list.Filtering {
@@ -285,6 +298,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newModel.setFocusedPaneStyles()
 
 			return newModel, newModel.makeInitCmd()
+		}
+
+		if key.Matches(msg, rerunKey) {
+			if m.focusedPane != PaneJobs {
+				break
+			}
+
+			ri := m.getSelectedRunItem()
+			ji := m.getSelectedJobItem()
+			if ri == nil || ji == nil {
+				break
+			}
+
+			cmds = append(cmds, m.rerunJob(ri.run.Id, ji.job.Id)...)
 		}
 
 		if key.Matches(msg, helpKey) {
@@ -1372,7 +1399,7 @@ func (m *model) renderFullScreenLogsSpinner(message string, cta string) string {
 			"  ",
 			lipgloss.NewStyle().Foreground(m.styles.colors.warnColor).Render(message)),
 		"",
-		m.styles.faintFgStyle.Render("Logs will be available when it is complete"),
+		m.styles.faintFgStyle.Render("(logs will be available when it is complete)"),
 		"",
 		lipgloss.JoinHorizontal(lipgloss.Top, m.styles.faintFgStyle.Render("Press "),
 			m.styles.keyStyle.Render("o"),
@@ -1404,6 +1431,7 @@ func (m *model) onWorkflowRunsFetched(msg workflowRunsFetchedMsg) []tea.Cmd {
 			ji := m.getJobItemById(job.Id)
 			if ji == nil {
 				nji := NewJobItem(job, m.styles)
+				cmds = append(cmds, nji.Tick(), m.inProgressSpinner.Tick)
 				ji = &nji
 			}
 			ji.job = &job
@@ -1456,7 +1484,7 @@ func (m *model) viewCommitStatus(bgStyle lipgloss.Style) string {
 	case api.CommitStateError, api.CommitStateFailure:
 		res = s.Foreground(m.styles.colors.errorColor).Render(art.SmallCrossSign)
 	case api.CommitStateExpected, api.CommitStatePending:
-		res = s.Foreground(m.styles.colors.warnColor).Render(art.SmallMinusSign)
+		res = s.Foreground(m.styles.colors.warnColor).Render(WaitingIcon)
 	}
 
 	if res != "" {

@@ -123,7 +123,7 @@ func (d *runsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		log.Debug("key pressed on run", "key", msg.Text)
+		log.Info("key pressed on run", "key", msg.Text)
 		switch {
 		case key.Matches(msg, openUrlKey):
 			return makeOpenUrlCmd(selected.run.Link)
