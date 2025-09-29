@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -63,15 +64,21 @@ type model struct {
 	logsInput         textinput.Model
 	inProgressSpinner spinner.Model
 	lastTick          time.Time
+	version           string
 	help              help.Model
 }
 
 func NewModel(repo string, number string) model {
 	tint.NewDefaultRegistry()
-	tint.SetTint(tint.TintTokyoNightStorm)
+	tint.SetTintID(tint.TintTokyoNightStorm.ID)
 	theme := os.Getenv("ENHANCE_THEME")
 	if theme != "" {
 		tint.SetTintID(theme)
+	}
+
+	version := "dev"
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Sum != "" {
+		version = info.Main.Version
 	}
 
 	s := makeStyles()
@@ -160,6 +167,7 @@ func NewModel(repo string, number string) model {
 		logsSpinner:       ls,
 		logsInput:         li,
 		help:              h,
+		version:           version,
 		inProgressSpinner: ips,
 	}
 	m.setFocusedPaneStyles()
@@ -545,7 +553,7 @@ func (m model) View() string {
 
 func (m *model) viewHeader() string {
 	s := lipgloss.NewStyle().Background(m.styles.headerStyle.GetBackground())
-	version := s.Height(lipgloss.Height(Logo)).Render(" \n v0.1.0")
+	version := s.Height(lipgloss.Height(Logo)).Render(fmt.Sprintf(" \n %s", m.version))
 
 	logoWidth := lipgloss.Width(Logo) + lipgloss.Width(version)
 	logo := lipgloss.PlaceHorizontal(

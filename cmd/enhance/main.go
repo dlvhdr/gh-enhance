@@ -5,6 +5,8 @@ import (
 	slog "log"
 	"net/url"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
@@ -16,10 +18,17 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/tui"
 )
 
+var (
+	Version = "dev"
+	Commit  = ""
+	Date    = ""
+	BuiltBy = ""
+)
+
 var rootCmd = &cobra.Command{
 	Use:     "gh enhance [<url> | <number>] [flags]",
 	Short:   "",
-	Version: "0.0.1",
+	Version: "1.0.0",
 	Args:    cobra.ExactArgs(1),
 }
 
@@ -84,6 +93,9 @@ func init() {
 		"help for gh-enhance",
 	)
 
+	rootCmd.Version = buildVersion(Version, Commit, Date, BuiltBy)
+	rootCmd.SetVersionTemplate(`gh-dash {{printf "version %s\n" .Version}}`)
+
 	rootCmd.Run = func(_ *cobra.Command, args []string) {
 		url, err := url.Parse(args[0])
 		if err == nil && url.Hostname() == "github.com" {
@@ -114,6 +126,24 @@ func init() {
 			os.Exit(1)
 		}
 	}
+}
+
+func buildVersion(version, commit, date, builtBy string) string {
+	result := version
+	if commit != "" {
+		result = fmt.Sprintf("%s\ncommit: %s", result, commit)
+	}
+	if date != "" {
+		result = fmt.Sprintf("%s\nbuilt at: %s", result, date)
+	}
+	if builtBy != "" {
+		result = fmt.Sprintf("%s\nbuilt by: %s", result, builtBy)
+	}
+	result = fmt.Sprintf("%s\ngoos: %s\ngoarch: %s", result, runtime.GOOS, runtime.GOARCH)
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Sum != "" {
+		result = fmt.Sprintf("%s\nmodule version: %s, checksum: %s", result, info.Main.Version, info.Main.Sum)
+	}
+	return result
 }
 
 func exitWithUsage() {

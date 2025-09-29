@@ -1,44 +1,94 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
 version: 2
+
 before:
   hooks:
     - go mod tidy
 
 gomod:
   proxy: true
+  env:
+    - GOPROXY=https://proxy.golang.org,direct
+    - GOSUMDB=sum.golang.org
+    - GOPRIVATE=github.com/dlvhdr/enhance
+  mod: mod
 
 builds:
-  - env: ["CGO_ENABLED=0"]
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags: ["-trimpath"]
-    targets: ["go_first_class"]
+  - main: ./cmd/enhance/
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -tags=nodbus
+    goos:
+      - android
+      - freebsd
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - "386"
+    goarm:
+      - "6"
+      - "7"
+    ldflags:
+      - -s -w
+      - -X github.com/dlvhdr/gh-enhance/main.Version={{.Version}}
+      - -X github.com/dlvhdr/gh-enhance/main.Commit={{.Commit}}
+      - -X github.com/dlvhdr/gh-enhance/main.Date={{.CommitDate}}
+      - -X github.com/dlvhdr/gh-enhance/main.BuiltBy=goreleaser
+    # Skipping builds for Android non-ARM64 architectures as they need CGO enabled
+    # https://goreleaser.com/limitations/cgo/
+    ignore:
+      - goos: android
+        goarch: "386"
+      - goos: android
+        goarch: amd64
+      - goos: android
+        goarch: arm
+
+archives:
+  - formats:
+      - binary
+    name_template: "gh-enhance_{{ .Tag }}_{{ .Os }}-{{ .Arch }}{{if .Arm}}_{{.Arm}}{{end}}"
+checksum:
+  name_template: "checksums.txt"
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+release:
+  footer: |
+    ---
+
+    If you enjoy `enhance`, consider [making a donation](https://www.gh-dash.dev/donating) ❤️
+
+    Have questions? Join our [Discord community](https://discord.gg/SXNXp9NctV)!
 
 changelog:
   sort: asc
   use: github
   filters:
     exclude:
-      - "^docs:"
       - "^test:"
       - "^chore"
+      - "merge conflict"
       - Merge pull request
       - Merge remote-tracking branch
       - Merge branch
       - go mod tidy
   groups:
+    - title: Dependency updates
+      regexp: "^.*\\(deps\\)*:+.*$"
+      order: 300
     - title: "New Features"
       regexp: "^.*feat[(\\w)]*:+.*$"
-      order: 0
+      order: 100
     - title: "Bug fixes"
       regexp: "^.*fix[(\\w)]*:+.*$"
-      order: 10
+      order: 200
+    - title: "Documentation updates"
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 400
     - title: Other work
-      order: 999
-
-release:
-  footer: |
-
-    ---
-
-    _Released with [GoReleaser](https://goreleaser.com)!_
+      order: 9999
