@@ -94,7 +94,7 @@ func init() {
 	)
 
 	rootCmd.Version = buildVersion(Version, Commit, Date, BuiltBy)
-	rootCmd.SetVersionTemplate(`gh-dash {{printf "version %s\n" .Version}}`)
+	rootCmd.SetVersionTemplate(`gh-enhance {{printf "version %s\n" .Version}}`)
 
 	rootCmd.Run = func(_ *cobra.Command, args []string) {
 		url, err := url.Parse(args[0])

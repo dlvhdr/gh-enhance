@@ -65,3 +65,9 @@ tasks:
     cmds:
       - nerdfix fix --format=json $(fd --extension go)
     desc: Fix broken nerdfont icons
+
+  release:
+    cmds:
+      - git checkout main
+      - git tag $(svu next)
+      - git push --tags
