@@ -132,7 +132,7 @@ func makeStyles() styles {
 		headerStyle: lipgloss.NewStyle().Foreground(focusedColor).PaddingLeft(1).PaddingTop(1).PaddingRight(1).Border(
 			lipgloss.InnerHalfBlockBorder(), false, false, true,
 			false).BorderForeground(headerBg).Background(headerBg),
-		logoStyle:   lipgloss.NewStyle().Foreground(t.BrightBlue).Background(headerBg),
+		logoStyle:   lipgloss.NewStyle().Foreground(t.BrightGreen).Background(headerBg),
 		footerStyle: lipgloss.NewStyle().Background(colors.fainterColor).PaddingLeft(1),
 		helpButtonStyle: lipgloss.NewStyle().Background(colors.darkerColor).Foreground(
 			t.BrightWhite).PaddingLeft(1).PaddingRight(1),

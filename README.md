@@ -1,3 +1,3 @@
 # gh-enhance
 
-![Demo](./enhance.gif)
+![Demo](./tapes/demo.gif)
