@@ -9,7 +9,7 @@ gomod:
   env:
     - GOPROXY=https://proxy.golang.org,direct
     - GOSUMDB=sum.golang.org
-    - GOPRIVATE=github.com/dlvhdr/enhance
+    - GOPRIVATE=github.com/dlvhdr/gh-enhance
   mod: mod
 
 builds:
