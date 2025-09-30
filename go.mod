@@ -3,6 +3,7 @@ module github.com/dlvhdr/gh-enhance
 go 1.24.3
 
 require (
+	github.com/caarlos0/go-version v0.2.2
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbles/v2 v2.0.0-beta.1
 	github.com/charmbracelet/bubbletea/v2 v2.0.0-beta.4

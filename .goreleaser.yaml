@@ -1,20 +1,18 @@
 version: 2
 
+project_name: enhance
+
 before:
   hooks:
     - go mod tidy
 
-gomod:
-  proxy: true
-  env:
-    - GOPROXY=https://proxy.golang.org,direct
-    - GOSUMDB=sum.golang.org
-    - GOPRIVATE=github.com/dlvhdr/gh-enhance
-  mod: mod
+env:
+  - GO111MODULE=on
+
+report_sizes: true
 
 builds:
-  - main: ./cmd/enhance/
-    env:
+  - env:
       - CGO_ENABLED=0
     flags:
       - -tags=nodbus
@@ -33,11 +31,11 @@ builds:
       - "6"
       - "7"
     ldflags:
-      - -s -w
-      - -X github.com/dlvhdr/gh-enhance/main.Version={{.Version}}
-      - -X github.com/dlvhdr/gh-enhance/main.Commit={{.Commit}}
-      - -X github.com/dlvhdr/gh-enhance/main.Date={{.CommitDate}}
-      - -X github.com/dlvhdr/gh-enhance/main.BuiltBy=goreleaser
+      - -s -w # make binary smaller
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.CommitDate}}
+      - -X main.builtBy=goreleaser
     # Skipping builds for Android non-ARM64 architectures as they need CGO enabled
     # https://goreleaser.com/limitations/cgo/
     ignore:
