@@ -75,13 +75,6 @@ func init() {
 		"passing this flag will allow writing debug output to debug.log",
 	)
 
-	rootCmd.Flags().Uint64P(
-		"attempt",
-		"a",
-		0,
-		"The attempt number of the workflow run",
-	)
-
 	rootCmd.Flags().BoolP(
 		"help",
 		"h",
