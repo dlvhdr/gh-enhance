@@ -6,14 +6,14 @@ silent: true
 tasks:
   default:
     cmds:
-      - DEBUG=true go run ./cmd/enhance {{.CLI_ARGS}}
+      - DEBUG=true go run . {{.CLI_ARGS}}
     interactive: true
     desc: Run
 
   debug:
     cmds:
       - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
-      - DEBUG=true go run ./cmd/enhance {{.CLI_ARGS}}
+      - DEBUG=true go run . {{.CLI_ARGS}}
     interactive: true
     desc: Run in debug mode. Run `task logs` to watch the logs.
 
