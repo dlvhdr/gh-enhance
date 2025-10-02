@@ -24,7 +24,7 @@
 ## Join Insiders
 To get access to `gh-enhance` join the `DASH Insiders` program.
 
-You can join by sponsoring me on GitHub and gets you access to exclusive companion apps.
+You can join by sponsoring me on GitHub and this gets you access to exclusive companion apps.
 
 To learn more visit: https://gh-dash.dev/insiders.
 
