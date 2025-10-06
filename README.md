@@ -21,10 +21,13 @@
 
 ![Demo](./demo.gif)
 
-## Join Insiders
-To get access to `gh-enhance` join the `DASH Insiders` program.
-
-You can join by sponsoring me on GitHub and this gets you access to exclusive companion apps.
+## Get Early Access
+To get early access to `gh-enhance` join the `DASH Insiders` program.
 
 To learn more visit: https://gh-dash.dev/insiders.
 
+## Help Open Source This App
+
+I've set a goal of sponsorships that once hit - will make this app open source.
+
+To help towards it, see my [sponsors profile](https://github.com/sponsors/dlvhdr).
