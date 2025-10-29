@@ -16,6 +16,7 @@ func (km keyMap) FullHelp() [][]key.Binding {
 			prevPaneKey,
 			gotoTopKey,
 			gotoBottomKey,
+			zoomPaneKey,
 		},
 		{
 			searchKey,

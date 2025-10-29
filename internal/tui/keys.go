@@ -28,6 +28,11 @@ var (
 		key.WithHelp("k/↑", "previous row"),
 	)
 
+	zoomPaneKey = key.NewBinding(
+		key.WithKeys("z"),
+		key.WithHelp("z", "zoom pane"),
+	)
+
 	nextPaneKey = key.NewBinding(
 		key.WithKeys("l"),
 		key.WithHelp("l", "next pane"),

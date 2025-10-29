@@ -33,10 +33,10 @@ import (
 
 type errMsg error
 
-type focusedPane int
+type pane int
 
 const (
-	PaneRuns focusedPane = iota
+	PaneRuns pane = iota
 	PaneJobs
 	PaneSteps
 	PaneLogs
@@ -54,7 +54,8 @@ type model struct {
 	logsViewport      viewport.Model
 	numHighlights     int
 	scrollbar         tea.Model
-	focusedPane       focusedPane
+	focusedPane       pane
+	zoomedPane        *pane
 	err               error
 	runsDelegate      list.ItemDelegate
 	jobsDelegate      list.ItemDelegate
@@ -309,6 +310,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if key.Matches(msg, zoomPaneKey) {
+			if m.zoomedPane == nil {
+				m.zoomedPane = &m.focusedPane
+				m.setWidths()
+			} else {
+				m.zoomedPane = nil
+			}
+		}
+
 		if key.Matches(msg, refreshAllKey) {
 			newModel := NewModel(m.repo, m.prNumber)
 			newModel.width = m.width
@@ -357,6 +367,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				pane = pane + 1
 			}
 			m.focusedPane = min(PaneLogs, pane)
+			m.zoomedPane = nil
 			m.setFocusedPaneStyles()
 		}
 
@@ -366,6 +377,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				pane = pane - 1
 			}
 			m.focusedPane = max(PaneRuns, pane)
+			m.zoomedPane = nil
 			m.setFocusedPaneStyles()
 		}
 
@@ -500,12 +512,6 @@ func (m model) View() string {
 		return m.err.Error()
 	}
 
-	rootStyle := lipgloss.NewStyle().
-		Width(m.width).
-		MaxWidth(m.width).
-		Height(m.height).
-		MaxHeight(m.height)
-
 	header := m.viewHeader()
 	footer := m.viewFooter()
 
@@ -517,7 +523,18 @@ func (m model) View() string {
 	}
 
 	panes := make([]string, 0)
-	if m.width != 0 && m.width <= smallScreen {
+	if m.zoomedPane != nil {
+		switch *m.zoomedPane {
+		case PaneRuns:
+			panes = append(panes, runsPane)
+		case PaneJobs:
+			panes = append(panes, jobsPane)
+		case PaneSteps:
+			panes = append(panes, stepsPane)
+		case PaneLogs:
+			panes = append(panes, m.viewLogs())
+		}
+	} else if m.width != 0 && m.width <= smallScreen {
 		switch m.focusedPane {
 		case PaneRuns:
 			panes = append(panes, runsPane)
@@ -528,18 +545,24 @@ func (m model) View() string {
 		case PaneLogs:
 			break
 		}
+		panes = append(panes, m.viewLogs())
 	} else {
 		panes = append(panes, runsPane)
 		panes = append(panes, jobsPane)
 		panes = append(panes, stepsPane)
+		panes = append(panes, m.viewLogs())
 	}
-	panes = append(panes, m.viewLogs())
 
 	if m.help.ShowAll {
 		help := m.styles.helpPaneStyle.Width(m.width).Render(m.help.View(keys))
 		footer = lipgloss.JoinVertical(lipgloss.Left, help, footer)
 	}
 
+	rootStyle := lipgloss.NewStyle().
+		Width(m.width).
+		MaxWidth(m.width).
+		Height(m.height).
+		MaxHeight(m.height)
 	return rootStyle.Render(lipgloss.JoinVertical(
 		lipgloss.Left,
 		header,
@@ -733,7 +756,7 @@ func (m *model) setFocusedPaneStyles() {
 		m.runsDelegate.(*runsDelegate).focused = true
 		m.jobsDelegate.(*jobsDelegate).focused = false
 		m.stepsDelegate.(*stepsDelegate).focused = false
-		m.setListFocusedStyles(&m.runsList, &m.runsDelegate)
+		m.setListFocusedStyles(&m.runsList, &m.runsDelegate, PaneRuns)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	case PaneJobs:
@@ -741,7 +764,7 @@ func (m *model) setFocusedPaneStyles() {
 		m.jobsDelegate.(*jobsDelegate).focused = true
 		m.stepsDelegate.(*stepsDelegate).focused = false
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
-		m.setListFocusedStyles(&m.jobsList, &m.jobsDelegate)
+		m.setListFocusedStyles(&m.jobsList, &m.jobsDelegate, PaneJobs)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	case PaneSteps:
 		m.runsDelegate.(*runsDelegate).focused = false
@@ -749,7 +772,7 @@ func (m *model) setFocusedPaneStyles() {
 		m.stepsDelegate.(*stepsDelegate).focused = true
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
-		m.setListFocusedStyles(&m.stepsList, &m.stepsDelegate)
+		m.setListFocusedStyles(&m.stepsList, &m.stepsDelegate, PaneSteps)
 	case PaneLogs:
 		m.runsDelegate.(*runsDelegate).focused = false
 		m.jobsDelegate.(*jobsDelegate).focused = false
@@ -765,7 +788,7 @@ func (m *model) setFocusedPaneStyles() {
 		w-lipgloss.Width(m.logsInput.Prompt)-2))))
 }
 
-func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
+func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate, p pane) {
 	if m.width != 0 && m.width <= smallScreen {
 		l.Styles.Title = m.styles.focusedPaneTitleStyle.Bold(false)
 		l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle.Bold(false)
@@ -776,7 +799,7 @@ func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate)
 		l.Title = makePill(m.getPaneTitle(l), l.Styles.Title, m.styles.colors.focusedColor)
 	}
 
-	w := m.getFocusedPaneWidth(l)
+	w := m.getFocusedPaneWidth(l, p)
 	l.SetWidth(w)
 	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1).Width(w)
 	l.SetDelegate(*delegate)
@@ -956,6 +979,10 @@ func (m *model) getSelectedJobItem() *jobItem {
 func (m *model) logsWidth() int {
 	if m.width == 0 {
 		return 0
+	}
+
+	if m.zoomedPane != nil && *m.zoomedPane == PaneLogs {
+		return m.width - 1
 	}
 
 	var borders int
@@ -1312,7 +1339,10 @@ func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
 	return lines, unstyledLines
 }
 
-func (m *model) getFocusedPaneWidth(l *list.Model) int {
+func (m *model) getFocusedPaneWidth(l *list.Model, p pane) int {
+	if m.zoomedPane != nil && p == *m.zoomedPane {
+		return m.width - 1
+	}
 	if m.width > smallScreen {
 		if len(l.Items()) == 0 {
 			return unfocusedLargePaneWidth
@@ -1519,7 +1549,7 @@ func (m *model) viewCommitStatus(bgStyle lipgloss.Style) string {
 	return string(status)
 }
 
-func (m *model) paneStyle(pane focusedPane) lipgloss.Style {
+func (m *model) paneStyle(pane pane) lipgloss.Style {
 	// the border of the pane is the actually rendered by the previous pane
 	if m.focusedPane-1 == pane {
 		return m.styles.focusedPaneStyle
