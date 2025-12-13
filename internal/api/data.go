@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/log/v2"
 	gh "github.com/cli/go-gh/v2/pkg/api"
+	checks "github.com/dlvhdr/x/gh-checks"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -150,6 +151,18 @@ const (
 	CommitStateSuccess  CommitState = "SUCCESS"
 )
 
+type PageInfo struct {
+	EndCursor       string
+	HasNextPage     bool
+	HasPreviousPage bool
+}
+
+type ContextNode struct {
+	Typename      string        `graphql:"__typename"`
+	CheckRun      CheckRun      `graphql:"... on CheckRun"`
+	StatusContext StatusContext `graphql:"... on StatusContext"`
+}
+
 type PR struct {
 	Title      string
 	Number     int
@@ -167,21 +180,13 @@ type PR struct {
 				StatusCheckRollup struct {
 					State    CommitState
 					Contexts struct {
-						CheckRunCount         int
-						CheckRunCountsByState []struct {
-							Count int
-							State CheckRunState
-						}
-						StatusContextCountsByState []struct {
-							Count int
-							State Conclusion
-						}
-						Nodes []struct {
-							Typename      string        `graphql:"__typename"`
-							CheckRun      CheckRun      `graphql:"... on CheckRun"`
-							StatusContext StatusContext `graphql:"... on StatusContext"`
-						}
-					} `graphql:"contexts(first: 100)"`
+						CheckRunCount              int
+						CheckRunCountsByState      []checks.ContextCountByState
+						StatusContextCount         int
+						StatusContextCountsByState []checks.ContextCountByState
+						Nodes                      []ContextNode
+						PageInfo                   PageInfo
+					} `graphql:"contexts(first: 100, after: $cursor)"`
 				}
 			}
 		}
@@ -209,7 +214,7 @@ func getClient() (*gh.GraphQLClient, error) {
 	return client, err
 }
 
-func FetchPRCheckRuns(repo string, prNumber string) (PRCheckRunsQuery, error) {
+func FetchPRCheckRuns(repo string, prNumber string, cursor string) (PRCheckRunsQuery, error) {
 	var err error
 	var res PRCheckRunsQuery
 	c, err := getClient()
@@ -222,7 +227,8 @@ func FetchPRCheckRuns(repo string, prNumber string) (PRCheckRunsQuery, error) {
 		return res, err
 	}
 	variables := map[string]any{
-		"url": githubv4.URI{URL: parsedUrl},
+		"url":    githubv4.URI{URL: parsedUrl},
+		"cursor": githubv4.String(cursor),
 	}
 
 	err = c.Query("FetchCheckRuns", &res, variables)

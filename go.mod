@@ -1,6 +1,6 @@
 module github.com/dlvhdr/gh-enhance
 
-go 1.24.3
+go 1.24.7
 
 require (
 	github.com/caarlos0/go-version v0.2.2
@@ -15,6 +15,8 @@ require (
 	github.com/charmbracelet/x/exp/teatest/v2 v2.0.0-20250922100529-c9afca5d6f21
 	github.com/cli/go-gh v1.2.1
 	github.com/cli/go-gh/v2 v2.12.1
+	github.com/dlvhdr/x/gh-checks v0.4.0
+	github.com/hasura/go-graphql-client v0.15.0
 	github.com/lrstanley/bubbletint/v2 v2.0.0-alpha.2
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
 	github.com/spf13/cobra v1.9.1
@@ -37,10 +39,12 @@ require (
 	github.com/cli/browser v1.3.0 // indirect
 	github.com/cli/safeexec v1.0.1 // indirect
 	github.com/cli/shurcooL-graphql v0.0.4 // indirect
+	github.com/coder/websocket v1.8.13 // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/henvic/httpretty v0.0.6 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

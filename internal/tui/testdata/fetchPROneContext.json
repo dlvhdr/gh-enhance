@@ -1,0 +1,60 @@
+{
+  "data": {
+    "resource": {
+      "title": "fix(prompt): prompt mark not placed after text edits correctly",
+      "number": 34671,
+      "url": "https://github.com/neovim/neovim/pull/34671",
+      "repository": {
+        "nameWithOwner": "neovim/neovim"
+      },
+      "commits": {
+        "nodes": [
+          {
+            "commit": {
+              "statusCheckRollup": {
+                "state": "FAILURE",
+                "contexts": {
+                  "nodes": [
+                    {
+                      "__typename": "CheckRun",
+                      "id": "CR_kwDOAPphoM8AAAAKdilagw",
+                      "name": "lint-commits",
+                      "status": "COMPLETED",
+                      "title": null,
+                      "url": "https://github.com/neovim/neovim/runs/44932094595",
+                      "detailsUrl": "https://github.com/neovim/neovim/actions/runs/15928656163/job/44932094595",
+                      "conclusion": "FAILURE",
+                      "databaseId": 44932094595,
+                      "startedAt": "2025-06-27T14:28:26Z",
+                      "completedAt": "2025-06-27T14:29:39Z",
+                      "checkSuite": {
+                        "conclusion": "FAILURE",
+                        "databaseId": 40825235128,
+                        "app": {
+                          "id": "MDM6QXBwMTUzNjg=",
+                          "name": "GitHub Actions"
+                        },
+                        "workflowRun": {
+                          "url": "https://github.com/neovim/neovim/actions/runs/15928656163",
+                          "databaseId": 15928656163,
+                          "event": "pull_request",
+                          "runNumber": 35405,
+                          "pendingDeploymentRequests": {
+                            "nodes": []
+                          },
+                          "workflow": {
+                            "name": "lintcommit"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

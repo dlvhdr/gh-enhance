@@ -21,6 +21,7 @@ import (
 	"github.com/charmbracelet/lipgloss/v2"
 	"github.com/charmbracelet/log/v2"
 	"github.com/charmbracelet/x/ansi"
+	checks "github.com/dlvhdr/x/gh-checks"
 	tint "github.com/lrstanley/bubbletint/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
@@ -48,6 +49,8 @@ type model struct {
 	prNumber          string
 	repo              string
 	pr                api.PR
+	workflowRuns      []data.WorkflowRun
+	gqlPageInfo       api.PageInfo
 	runsList          list.Model
 	jobsList          list.Model
 	stepsList         list.Model
@@ -193,19 +196,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case workflowRunsFetchedMsg:
 		m.pr = msg.pr
-		m.runsList.StopSpinner()
-		m.jobsList.StopSpinner()
+		if len(msg.pr.Commits.Nodes) > 0 {
+			pageInfo := msg.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo
+			if !pageInfo.HasPreviousPage {
+				m.workflowRuns = make([]data.WorkflowRun, 0)
+			}
+
+			if pageInfo.HasNextPage {
+				m.gqlPageInfo = pageInfo
+				log.Info("fetching next checks page", "pageInfo", pageInfo)
+				cmds = append(cmds, m.makeGetNextPagePRChecksCmd())
+			} else {
+				m.gqlPageInfo = api.PageInfo{}
+				m.stopSpinners()
+				log.Info("fetched all checks", "pageInfo", pageInfo)
+			}
+
+			m.mergeWorkflowRuns(msg)
+		} else {
+			m.stopSpinners()
+		}
 
 		if msg.err != nil {
 			log.Debug("error when fetching workflow runs", "err", msg.err)
 			m.err = msg.err
-			msgCmd := tea.Printf("%s\nrepo=%s, number=%s\n",
+			msgCmd := tea.Printf("%s\nrepo=%s, number=%s\nOriginal error: %v\n",
 				lipgloss.NewStyle().Foreground(m.styles.colors.errorColor).Bold(true).Render(
-					"❌ Pull request not found."), m.repo, m.prNumber)
+					"❌ Pull request not found."), m.repo, m.prNumber, msg.err)
 			return m, tea.Sequence(tea.ExitAltScreen, msgCmd, tea.Quit)
 		}
 
-		cmds = append(cmds, m.onWorkflowRunsFetched(msg)...)
+		cmds = append(cmds, m.onWorkflowRunsFetched()...)
 
 	case workflowRunStepsFetchedMsg:
 		cmds = append(cmds, m.enrichRunWithJobsStepsV2(msg)...)
@@ -252,9 +273,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 
-		cmds = append(cmds, tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
-			return m.fetchPRChecks(m.prNumber)
-		}))
+		cmds = append(cmds, m.fetchPRChecksWithInterval())
 
 	case reRunRunMsg:
 		if msg.err != nil {
@@ -265,9 +284,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 
-		cmds = append(cmds, tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
-			return m.fetchPRChecks(m.prNumber)
-		}))
+		cmds = append(cmds, m.fetchPRChecksWithInterval())
 
 	case tea.WindowSizeMsg:
 		log.Info("window size changed", "width", msg.Width, "height", msg.Height)
@@ -633,76 +650,48 @@ func (m *model) viewPRName(width int, bgStyle lipgloss.Style) string {
 }
 
 func (m *model) viewFooter() string {
-	if m.width == 0 {
-		return ""
-	}
+	bg := lipgloss.NewStyle().Background(m.styles.footerStyle.GetBackground())
+	sFooter := m.styles.footerStyle.Width(m.width)
 
-	failingChecks, successfulChecks, skippedChecks, inProgressChecks := 0, 0, 0, 0
-	failingContext := 0
-	if len(m.pr.Commits.Nodes) == 0 {
-		return ""
+	if m.width == 0 || len(m.pr.Commits.Nodes) == 0 {
+		return sFooter.Inherit(bg).Render("")
 	}
-	for _, item := range m.runsList.Items() {
-		ri := item.(*runItem)
-		for _, ji := range ri.jobsItems {
-			switch ji.job.Bucket {
-			case data.CheckBucketPass:
-				successfulChecks += 1
-			case data.CheckBucketFail:
-				failingChecks += 1
-			case data.CheckBucketSkipping:
-				skippedChecks += 1
-			case data.CheckBucketCancel:
-				skippedChecks += 1
-			default:
-				inProgressChecks += 1
-			}
-		}
-	}
-
-	// for _, count := range m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.StatusContextCountsByState {
-	// 	switch count.State {
-	// 	case api.ConclusionFailure:
-	// 		failingContext += count.Count
-	// 	case api.ConclusionActionRequired:
-	// 	case api.ConclusionCancelled:
-	// 	case api.ConclusionNeutral:
-	// 	case api.ConclusionStartupFailure:
-	// 	case api.ConclusionTimedOut:
-	// 		failingContext += count.Count
-	// 	}
-	// }
 
 	texts := make([]string, 0)
-	bg := lipgloss.NewStyle().Background(m.styles.footerStyle.GetBackground())
-	if failingChecks > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(
-			fmt.Sprintf("%d failing", failingChecks)))
-	}
-	if inProgressChecks > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.warnColor).Render(
-			fmt.Sprintf("%d in progress", inProgressChecks)))
-	}
-	if successfulChecks > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.successColor).Render(
-			fmt.Sprintf("%d successful", successfulChecks)))
-	}
-	if skippedChecks > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(
-			fmt.Sprintf("%d skipped", skippedChecks)))
+
+	contexts := m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts
+	total := contexts.CheckRunCount + contexts.StatusContextCount
+	totalText := ""
+	if total > 0 {
+		totalText = bg.Foreground(m.styles.colors.lightColor).Render(
+			fmt.Sprintf("%d total checks: ", total))
 	}
 
-	if failingContext > 0 {
+	stats := checks.AccumulatedStats(contexts.CheckRunCountsByState, contexts.StatusContextCountsByState)
+
+	if stats.Failed > 0 {
 		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(
-			fmt.Sprintf("%d failing contexts", failingContext)))
+			fmt.Sprintf("%d failing", stats.Failed)))
+	}
+	if stats.InProgress > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.warnColor).Render(
+			fmt.Sprintf("%d in progress", stats.InProgress)))
+	}
+	if stats.Succeeded > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.successColor).Render(
+			fmt.Sprintf("%d successful", stats.Succeeded)))
+	}
+	if stats.Skipped > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(
+			fmt.Sprintf("%d skipped", stats.Skipped)))
 	}
 
 	checks := bg.Render(strings.Join(texts, bg.Render(", ")))
 
 	help := m.styles.helpButtonStyle.Render("? help")
 
-	return m.styles.footerStyle.Width(m.width).Render(
-		lipgloss.JoinHorizontal(lipgloss.Top, checks, bg.Render(
+	return sFooter.Render(
+		lipgloss.JoinHorizontal(lipgloss.Top, totalText, checks, bg.Render(
 			strings.Repeat(" ", m.width-lipgloss.Width(checks)-lipgloss.Width(help)-
 				m.styles.footerStyle.GetHorizontalFrameSize())), help))
 }
@@ -1462,7 +1451,7 @@ func (m *model) renderFullScreenLogsSpinner(message string, cta string) string {
 	)
 }
 
-func (m *model) onWorkflowRunsFetched(msg workflowRunsFetchedMsg) []tea.Cmd {
+func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 	selectedRun := m.runsList.SelectedItem()
 	var before *runItem
@@ -1470,7 +1459,7 @@ func (m *model) onWorkflowRunsFetched(msg workflowRunsFetchedMsg) []tea.Cmd {
 		before = selectedRun.(*runItem)
 	}
 
-	for i, run := range msg.runs {
+	for i, run := range m.workflowRuns {
 		ri := m.getRunItemById(run.Id)
 		if ri == nil {
 			nr := NewRunItem(run, m.styles)
@@ -1512,11 +1501,9 @@ func (m *model) onWorkflowRunsFetched(msg workflowRunsFetchedMsg) []tea.Cmd {
 	}
 
 	if m.pr.IsStatusCheckInProgress() {
-		log.Debug("refetching, PR is still in progress", "state",
-			m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.State)
-		cmds = append(cmds, tea.Tick(time.Second*5, func(t time.Time) tea.Msg {
-			return m.fetchPRChecks(m.prNumber)
-		}))
+		state := m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.State
+		log.Debug("refetching, PR is still in progress", "state", state)
+		cmds = append(cmds, m.fetchPRChecksWithInterval())
 	} else {
 		log.Debug("stopping refetching, all tasks are done")
 	}
@@ -1556,4 +1543,9 @@ func (m *model) paneStyle(pane pane) lipgloss.Style {
 	}
 
 	return m.styles.paneStyle
+}
+
+func (m *model) stopSpinners() {
+	m.runsList.StopSpinner()
+	m.jobsList.StopSpinner()
 }

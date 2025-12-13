@@ -1,11 +1,14 @@
 package data
 
 import (
+	"sort"
 	"time"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
 )
 
+// WorkflowRun holds all the the jobs that were part of it
+// It is defined by a workflow file that defines the jobs to run
 type WorkflowRun struct {
 	Id       string
 	Name     string
@@ -32,6 +35,7 @@ type WorkflowJob struct {
 	CompletedAt time.Time
 	Bucket      CheckBucket
 	Kind        JobKind
+	RunNumber   int
 }
 
 type LogKind int
@@ -85,4 +89,25 @@ func GetConclusionBucket(conclusion api.Conclusion) CheckBucket {
 	default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
 		return CheckBucketPending
 	}
+}
+
+func (run WorkflowRun) SortJobs() {
+	sort.Slice(run.Jobs, func(i, j int) bool {
+		if run.Jobs[i].Bucket == CheckBucketFail &&
+			run.Jobs[j].Bucket != CheckBucketFail {
+			return true
+		}
+		if run.Jobs[j].Bucket == CheckBucketFail &&
+			run.Jobs[i].Bucket != CheckBucketFail {
+			return false
+		}
+		if run.Jobs[i].StartedAt.IsZero() {
+			return false
+		}
+		if run.Jobs[j].StartedAt.IsZero() {
+			return true
+		}
+
+		return run.Jobs[i].StartedAt.Before(run.Jobs[j].StartedAt)
+	})
 }
