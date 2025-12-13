@@ -56,12 +56,28 @@ snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
 release:
+  header: |
+    # {{ .Version }}
+
+    <!-- what's new in this version? -->
+
+    To update run:
+    ```bash
+    gh extension upgrade enhance
+    ```
   footer: |
     ---
 
     If you enjoy `enhance`, consider [making a donation](https://www.gh-dash.dev/donating) ❤️
 
     Have questions? Join our [Discord community](https://discord.gg/SXNXp9NctV)!
+
+    <a  class="underline: none;" href="https://gh-dash.dev/enhance">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://gh-dash.dev/logo.png">
+        <img alt="DASH Logo" width="600" src="https://gh-dash.dev/logo-light.png">
+      </picture>
+    </a>
 
 changelog:
   sort: asc
