@@ -15,6 +15,11 @@
                 "state": "FAILURE",
                 "contexts": {
                   "checkRunCount": 33,
+                  "pageInfo": {
+                    "hasPreviousPage": false,
+                    "endCursor": "MjAw",
+                    "hasNextPage": false
+                  },
                   "checkRunCountsByState": [
                     {
                       "count": 0,

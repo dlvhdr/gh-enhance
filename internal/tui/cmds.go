@@ -32,9 +32,9 @@ func (m model) makeInitialGetPRChecksCmd(prNumber string) tea.Cmd {
 	}
 }
 
-func (m model) makeGetNextPagePRChecksCmd() tea.Cmd {
+func (m model) makeGetNextPagePRChecksCmd(endCursor string) tea.Cmd {
 	return func() tea.Msg {
-		return m.fetchPRChecksWithCursor(m.prNumber, m.gqlPageInfo.EndCursor)
+		return m.fetchPRChecksWithCursor(m.prNumber, endCursor)
 	}
 }
 
@@ -44,7 +44,7 @@ func (m model) fetchPRChecksWithInterval() tea.Cmd {
 	})
 }
 
-func (m model) fetchPRChecks(prNumber string) tea.Msg {
+func (m *model) fetchPRChecks(prNumber string) tea.Msg {
 	return m.fetchPRChecksWithCursor(prNumber, "")
 }
 
@@ -200,8 +200,8 @@ func (m *model) makeInitCmd() tea.Cmd {
 }
 
 func workflowName(cr api.CheckRun) string {
-	wfr := cr.CheckSuite.WorkflowRun
 	wfName := ""
+	wfr := cr.CheckSuite.WorkflowRun
 	isGHA := cr.CheckSuite.App.Name == api.GithubActionsAppName
 	if !isGHA {
 		wfName = cr.CheckSuite.App.Name
@@ -231,18 +231,26 @@ func jobKind(cr api.CheckRun) data.JobKind {
 func (m *model) mergeWorkflowRuns(msg workflowRunsFetchedMsg) {
 	runsMap := make(map[string]data.WorkflowRun)
 
+	// start with existing workflow runs to keep order and
+	// prevent the UI from jumping
 	for _, run := range m.workflowRuns {
 		runsMap[run.Name] = run
 	}
 
 	for _, run := range msg.runs {
 		existing, ok := runsMap[run.Name]
+		log.Debug("merging runs", "run", run.Name)
+
+		// run is new, no need to merge its jobs with the existing one
 		if !ok {
 			runsMap[run.Name] = run
+			log.Debug("no need to merge", "run", run.Name)
 			continue
 		}
 
+		// run already exists, merge its jobs with the existing one
 		existing.Jobs = append(existing.Jobs, run.Jobs...)
+		log.Debug("merging", "run", run.Name)
 		runsMap[run.Name] = existing
 	}
 

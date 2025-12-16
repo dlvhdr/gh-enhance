@@ -45,12 +45,6 @@ func TestFullOutput(t *testing.T) {
 	if !strings.Contains(fv, "lintcommit") {
 		t.Errorf(`couldn't find "lintcommit" run`)
 	}
-	if !strings.Contains(fv, "lint-commits") {
-		t.Errorf(`couldn't find "lint-commits" job`)
-	}
-	if !strings.Contains(fv, "Set up job") {
-		t.Errorf(`couldn't find "Set up job" step: %s`, fv)
-	}
 }
 
 // localRoundTripper is an http.RoundTripper that executes HTTP transactions

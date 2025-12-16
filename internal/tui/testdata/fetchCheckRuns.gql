@@ -22,6 +22,11 @@ query FetchCheckRuns {
                   count
                   state
                 }
+                pageInfo {
+                  hasPreviousPage
+                  endCursor
+                  hasNextPage
+                }
                 nodes {
                   __typename
                   ... on CheckRun {

@@ -50,7 +50,6 @@ type model struct {
 	repo              string
 	pr                api.PR
 	workflowRuns      []data.WorkflowRun
-	gqlPageInfo       api.PageInfo
 	runsList          list.Model
 	jobsList          list.Model
 	stepsList         list.Model
@@ -203,11 +202,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if pageInfo.HasNextPage {
-				m.gqlPageInfo = pageInfo
 				log.Info("fetching next checks page", "pageInfo", pageInfo)
-				cmds = append(cmds, m.makeGetNextPagePRChecksCmd())
+				cmds = append(cmds, m.makeGetNextPagePRChecksCmd(pageInfo.EndCursor))
 			} else {
-				m.gqlPageInfo = api.PageInfo{}
 				m.stopSpinners()
 				log.Info("fetched all checks", "pageInfo", pageInfo)
 			}
@@ -1268,6 +1265,16 @@ func (m *model) getRunItemById(runId string) *runItem {
 	return nil
 }
 
+func (m *model) getRunItemByName(runName string) *runItem {
+	for _, run := range m.runsList.Items() {
+		ri := run.(*runItem)
+		if ri.run.Name == runName {
+			return ri
+		}
+	}
+	return nil
+}
+
 func (m *model) getJobItemById(jobId string) *jobItem {
 	for _, run := range m.runsList.Items() {
 		ri := run.(*runItem)
@@ -1459,8 +1466,10 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 		before = selectedRun.(*runItem)
 	}
 
+	log.Debug("onWorkflowRunsFetched", "len(m.workflowRuns)", len(m.workflowRuns))
 	for i, run := range m.workflowRuns {
-		ri := m.getRunItemById(run.Id)
+		ri := m.getRunItemByName(run.Name)
+		log.Debug("found?", "ri != nil", ri != nil, "run.Name", run.Name)
 		if ri == nil {
 			nr := NewRunItem(run, m.styles)
 			ri = &nr
@@ -1482,7 +1491,6 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 		}
 
 		ri.jobsItems = jobs
-		cmds = append(cmds, m.runsList.SetItem(i, ri))
 	}
 
 	if len(m.runsList.Items()) > 0 {
