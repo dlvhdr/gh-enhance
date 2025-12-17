@@ -3,7 +3,7 @@ package tui
 import (
 	"time"
 
-	"github.com/charmbracelet/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/spinner"
 )
 
 const (

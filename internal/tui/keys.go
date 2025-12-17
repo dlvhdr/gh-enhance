@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/charmbracelet/bubbles/v2/key"
+import "charm.land/bubbles/v2/key"
 
 var (
 	openUrlKey = key.NewBinding(

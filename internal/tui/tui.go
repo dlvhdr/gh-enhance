@@ -9,17 +9,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/cursor"
-	"github.com/charmbracelet/bubbles/v2/help"
-	"github.com/charmbracelet/bubbles/v2/key"
-	"github.com/charmbracelet/bubbles/v2/list"
-	"github.com/charmbracelet/bubbles/v2/paginator"
-	"github.com/charmbracelet/bubbles/v2/spinner"
-	"github.com/charmbracelet/bubbles/v2/textinput"
-	"github.com/charmbracelet/bubbles/v2/viewport"
-	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/charmbracelet/log/v2"
+	"charm.land/bubbles/v2/cursor"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/paginator"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/log/v2"
 	"github.com/charmbracelet/x/ansi"
 	checks "github.com/dlvhdr/x/gh-checks"
 	tint "github.com/lrstanley/bubbletint/v2"
@@ -29,6 +29,7 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/parser"
 	"github.com/dlvhdr/gh-enhance/internal/tui/art"
 	"github.com/dlvhdr/gh-enhance/internal/tui/scrollbar"
+	"github.com/dlvhdr/gh-enhance/internal/tui/util"
 	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
@@ -58,7 +59,7 @@ type model struct {
 	checksList        list.Model
 	logsViewport      viewport.Model
 	numHighlights     int
-	scrollbar         tea.Model
+	scrollbar         util.Model
 	focusedPane       pane
 	zoomedPane        *pane
 	err               error
@@ -143,25 +144,26 @@ func NewModel(repo string, number string, opts ModelOpts) model {
 
 	li := textinput.New()
 	li.SetWidth(20)
-	li.Styles.Cursor = textinput.CursorStyle{
-		Color: s.colors.faintColor,
-		Shape: tea.CursorBar,
-		Blink: false,
-	}
-	li.VirtualCursor = true
+	li.SetStyles(textinput.Styles{
+		Cursor: textinput.CursorStyle{
+			Color: s.colors.faintColor,
+			Shape: tea.CursorBar,
+			Blink: false,
+		},
+		Focused: textinput.StyleState{
+			Text:        lipgloss.NewStyle(),
+			Placeholder: s.faintFgStyle,
+			Prompt:      s.faintFgStyle,
+		},
+		Blurred: textinput.StyleState{
+			Text:        lipgloss.NewStyle(),
+			Placeholder: s.faintFgStyle,
+			Prompt:      s.faintFgStyle,
+		},
+	})
+	li.SetVirtualCursor(true)
 	li.Prompt = " "
 	li.Placeholder = "Search..."
-	li.Styles.Focused = textinput.StyleState{
-		Text:        lipgloss.NewStyle(),
-		Placeholder: s.faintFgStyle,
-		Prompt:      s.faintFgStyle,
-	}
-
-	li.Styles.Blurred = textinput.StyleState{
-		Text:        lipgloss.NewStyle(),
-		Placeholder: s.faintFgStyle,
-		Prompt:      s.faintFgStyle,
-	}
 
 	ips := spinner.New(spinner.WithSpinner(InProgressFrames))
 	ips.Style = lipgloss.NewStyle().Foreground(s.colors.warnColor)
@@ -281,7 +283,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			msgCmd := tea.Printf("%s\nrepo=%s, number=%s\nOriginal error: %v\n",
 				lipgloss.NewStyle().Foreground(m.styles.colors.errorColor).Bold(true).Render(
 					"❌ Pull request not found."), m.repo, m.prNumber, wrMsg.err)
-			return m, tea.Sequence(tea.ExitAltScreen, msgCmd, tea.Quit)
+			return m, tea.Sequence(msgCmd, tea.Quit)
 		}
 
 	case workflowRunStepsFetchedMsg:
@@ -541,7 +543,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case errMsg:
 		m.err = msg
-		return m, tea.Sequence(tea.ExitAltScreen, tea.Quit)
+		return m, tea.Quit
 	}
 
 	switch m.focusedPane {
@@ -628,10 +630,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
+	var v tea.View
 	if m.err != nil {
 		log.Error("fatal error", "err", m.err)
-		return m.err.Error()
+		v.SetContent(m.err.Error())
+		v.AltScreen = false
+		return v
 	}
 
 	header := m.viewHeader()
@@ -654,12 +659,15 @@ func (m model) View() string {
 		MaxWidth(m.width).
 		Height(m.height).
 		MaxHeight(m.height)
-	return rootStyle.Render(lipgloss.JoinVertical(
+
+	v.AltScreen = true
+	v.SetContent(rootStyle.Render(lipgloss.JoinVertical(
 		lipgloss.Left,
 		header,
 		panes,
 		footer,
-	))
+	)))
+	return v
 }
 
 func (m *model) viewHierarchicalChecks() string {
@@ -1281,19 +1289,20 @@ func (m *model) fullScreenMessageView(message string) string {
 }
 
 func (m *model) noLogsView(message string) string {
-	emptySetArt := ""
+	emptySetArt := strings.Builder{}
 	for _, char := range art.EmptySet {
 		if char == '╱' {
-			emptySetArt += lipgloss.NewStyle().Foreground(m.styles.colors.errorColor).Render("╱")
+			emptySetArt.WriteString(lipgloss.NewStyle().Foreground(
+				m.styles.colors.errorColor).Render("╱"))
 		} else {
-			emptySetArt += m.styles.watermarkIllustrationStyle.Render(string(char))
+			emptySetArt.WriteString(m.styles.watermarkIllustrationStyle.Render(string(char)))
 		}
 	}
 
 	return m.fullScreenMessageView(
 		lipgloss.JoinVertical(
 			lipgloss.Center,
-			emptySetArt,
+			emptySetArt.String(),
 			m.styles.noLogsStyle.Render(message),
 		),
 	)
@@ -1771,7 +1780,7 @@ func (m *model) setHeights() {
 }
 
 func (m *model) setWidths() {
-	m.help.Width = m.width
+	m.help.SetWidth(m.width)
 	w := m.logsWidth()
 	m.logsViewport.SetWidth(w)
 	m.logsInput.SetWidth(w - 10)

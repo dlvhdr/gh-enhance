@@ -7,10 +7,10 @@ import (
 	"os"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/log/v2"
 	goversion "github.com/caarlos0/go-version"
-	tea "github.com/charmbracelet/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
-	"github.com/charmbracelet/log/v2"
 	"github.com/cli/go-gh"
 	"github.com/spf13/cobra"
 
@@ -118,7 +118,7 @@ func init() {
 			log.Fatal("Cannot parse the flat flag", err)
 		}
 
-		p := tea.NewProgram(tui.NewModel(repo, number, tui.ModelOpts{Flat: flat}), tea.WithAltScreen())
+		p := tea.NewProgram(tui.NewModel(repo, number, tui.ModelOpts{Flat: flat}))
 		if _, err := p.Run(); err != nil {
 			log.Error("failed starting program", "err", err)
 			fmt.Println(err)
