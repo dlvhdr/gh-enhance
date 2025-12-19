@@ -442,7 +442,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case errMsg:
 		m.err = msg
-		return m, nil
+		return m, tea.Sequence(tea.ExitAltScreen, tea.Quit)
 	}
 
 	switch m.focusedPane {
@@ -506,7 +506,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
-	cmds = append(cmds, cmd)
 	if _, ok := msg.(tea.KeyPressMsg); !ok && m.logsInput.Focused() {
 		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
