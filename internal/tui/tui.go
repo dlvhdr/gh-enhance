@@ -40,6 +40,7 @@ const (
 	PaneRuns pane = iota
 	PaneJobs
 	PaneSteps
+	PaneChecks
 	PaneLogs
 )
 
@@ -53,6 +54,7 @@ type model struct {
 	runsList          list.Model
 	jobsList          list.Model
 	stepsList         list.Model
+	checksList        list.Model
 	logsViewport      viewport.Model
 	numHighlights     int
 	scrollbar         tea.Model
@@ -62,16 +64,23 @@ type model struct {
 	runsDelegate      list.ItemDelegate
 	jobsDelegate      list.ItemDelegate
 	stepsDelegate     list.ItemDelegate
+	checksDelegate    list.ItemDelegate
 	styles            styles
 	logsSpinner       spinner.Model
 	logsInput         textinput.Model
 	inProgressSpinner spinner.Model
+	flat              bool
 	lastTick          time.Time
 	version           string
+	rateLimit         api.RateLimit
 	help              help.Model
 }
 
-func NewModel(repo string, number string) model {
+type ModelOpts struct {
+	Flat bool
+}
+
+func NewModel(repo string, number string, opts ModelOpts) model {
 	tint.NewDefaultRegistry()
 	tint.SetTintID(tint.TintTokyoNightStorm.ID)
 	theme := os.Getenv("ENHANCE_THEME")
@@ -103,6 +112,12 @@ func NewModel(repo string, number string) model {
 		s.colors.unfocusedColor)
 	stepsList.SetStatusBarItemName("step", "steps")
 	stepsList.SetWidth(unfocusedLargePaneWidth)
+
+	checksList, checksDelegate := newChecksDefaultList(s)
+	checksList.Title = makePill(ListSymbol+" checks", s.unfocusedPaneTitleStyle,
+		s.colors.unfocusedColor)
+	checksList.SetStatusBarItemName("step", "checks")
+	checksList.SetWidth(unfocusedLargePaneWidth)
 
 	vp := viewport.New()
 	vp.LeftGutterFunc = func(info viewport.GutterContext) string {
@@ -155,15 +170,22 @@ func NewModel(repo string, number string) model {
 	h.Styles.FullSeparator = lipgloss.NewStyle().Foreground(lipgloss.Blue)
 	h.Styles.Ellipsis = lipgloss.NewStyle().Foreground(lipgloss.Blue)
 
+	focusedPane := PaneRuns
+	if opts.Flat {
+		focusedPane = PaneChecks
+	}
+
 	m := model{
 		jobsList:          jobsList,
 		runsList:          runsList,
 		stepsList:         stepsList,
+		checksList:        checksList,
 		prNumber:          number,
 		repo:              repo,
 		runsDelegate:      runsDelegate,
 		jobsDelegate:      jobsDelegate,
 		stepsDelegate:     stepsDelegate,
+		checksDelegate:    checksDelegate,
 		logsViewport:      vp,
 		scrollbar:         sb,
 		styles:            s,
@@ -172,6 +194,8 @@ func NewModel(repo string, number string) model {
 		help:              h,
 		version:           version,
 		inProgressSpinner: ips,
+		flat:              opts.Flat,
+		focusedPane:       focusedPane,
 	}
 	m.setFocusedPaneStyles()
 	return m
@@ -193,10 +217,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
 
-	case workflowRunsFetchedMsg:
-		m.pr = msg.pr
-		if len(msg.pr.Commits.Nodes) > 0 {
-			pageInfo := msg.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo
+	case workflowRunsFetchedMsg, prChecksIntervalTickMsg:
+		var wrMsg workflowRunsFetchedMsg
+		if tickMsg, ok := msg.(prChecksIntervalTickMsg); ok {
+			wrMsg = tickMsg.msg.(workflowRunsFetchedMsg)
+		} else {
+			wrMsg = msg.(workflowRunsFetchedMsg)
+		}
+		m.rateLimit = wrMsg.rateLimit
+		if wrMsg.err != nil && wrMsg.rateLimit.Remaining == 0 {
+			log.Warn("rate limit reached, waiting", "rateLimit", wrMsg.rateLimit)
+			return m, nil
+		}
+
+		log.Debug("workflow runs fetched", "rateLimit", wrMsg.rateLimit)
+
+		m.pr = wrMsg.pr
+		if _, ok := msg.(prChecksIntervalTickMsg); ok {
+			cmds = append(cmds, m.fetchPRChecksWithInterval())
+		}
+
+		if len(wrMsg.pr.Commits.Nodes) > 0 {
+			pageInfo := wrMsg.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo
 			if !pageInfo.HasPreviousPage {
 				m.workflowRuns = make([]data.WorkflowRun, 0)
 			}
@@ -209,17 +251,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				log.Info("fetched all checks", "pageInfo", pageInfo)
 			}
 
-			m.mergeWorkflowRuns(msg)
+			m.mergeWorkflowRuns(wrMsg)
 		} else {
 			m.stopSpinners()
 		}
 
-		if msg.err != nil {
-			log.Debug("error when fetching workflow runs", "err", msg.err)
-			m.err = msg.err
+		if wrMsg.err != nil {
+			log.Debug("error when fetching workflow runs", "err", wrMsg.err)
+			m.err = wrMsg.err
 			msgCmd := tea.Printf("%s\nrepo=%s, number=%s\nOriginal error: %v\n",
 				lipgloss.NewStyle().Foreground(m.styles.colors.errorColor).Bold(true).Render(
-					"❌ Pull request not found."), m.repo, m.prNumber, msg.err)
+					"❌ Pull request not found."), m.repo, m.prNumber, wrMsg.err)
 			return m, tea.Sequence(tea.ExitAltScreen, msgCmd, tea.Quit)
 		}
 
@@ -229,6 +271,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.enrichRunWithJobsStepsV2(msg)...)
 		cmds = append(cmds, m.updateLists()...)
 
+	case checkStepsFetchedMsg:
+		m.enrichCheckWithSteps(msg)
+		cmds = append(cmds, m.updateLists()...)
+
 	case jobLogsFetchedMsg:
 		ji := m.getJobItemById(msg.jobId)
 		if ji != nil {
@@ -236,8 +282,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ji.logsErr = msg.err
 			ji.logsStderr = msg.stderr
 			ji.loadingLogs = false
-			currJob := m.jobsList.SelectedItem()
-			if currJob != nil && currJob.(*jobItem).job.Id == msg.jobId {
+			currJob := m.getSelectedJobItem()
+			if currJob != nil && currJob.job.Id == msg.jobId {
 				cmds = append(cmds, m.renderJobLogs())
 				m.goToErrorInLogs()
 			}
@@ -298,7 +344,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		log.Info("👤 key pressed", "key", msg.String())
-		if m.runsList.FilterState() == list.Filtering ||
+		if m.checksList.FilterState() == list.Filtering ||
+			m.runsList.FilterState() == list.Filtering ||
 			m.jobsList.FilterState() == list.Filtering ||
 			m.stepsList.FilterState() == list.Filtering {
 			break
@@ -324,6 +371,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if key.Matches(msg, modeKey) {
+			m.flat = !m.flat
+			if m.flat {
+				m.focusedPane = PaneChecks
+			} else {
+				m.focusedPane = PaneRuns
+			}
+			cmds = append(cmds, m.onWorkflowRunsFetched()...)
+			if m.flat {
+				cmds = append(cmds, m.onCheckChanged()...)
+			} else {
+				cmds = append(cmds, m.onRunChanged()...)
+			}
+		}
+
 		if key.Matches(msg, zoomPaneKey) {
 			if m.zoomedPane == nil {
 				m.zoomedPane = &m.focusedPane
@@ -334,7 +396,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, refreshAllKey) {
-			newModel := NewModel(m.repo, m.prNumber)
+			newModel := NewModel(m.repo, m.prNumber, ModelOpts{})
 			newModel.width = m.width
 			newModel.height = m.height
 			newModel.setHeights()
@@ -346,6 +408,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, rerunKey) {
+			// TODO: handle check
 			if m.focusedPane != PaneRuns && m.focusedPane != PaneJobs {
 				break
 			}
@@ -376,26 +439,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, nextPaneKey) {
-			pane := m.focusedPane + 1
-			if pane == PaneSteps && !m.shouldShowSteps() {
-				pane = pane + 1
-			}
-			m.focusedPane = min(PaneLogs, pane)
+			m.focusedPane = m.nextPane()
 			m.zoomedPane = nil
 			m.setFocusedPaneStyles()
 		}
 
 		if key.Matches(msg, prevPaneKey) {
-			pane := m.focusedPane - 1
-			if pane == PaneSteps && !m.shouldShowSteps() {
-				pane = pane - 1
-			}
-			m.focusedPane = max(PaneRuns, pane)
+			m.focusedPane = m.previousPane()
 			m.zoomedPane = nil
 			m.setFocusedPaneStyles()
 		}
 
 	case spinner.TickMsg:
+		checks := m.checksList.Items()
+		for _, run := range checks {
+			ci := run.(*checkItem)
+			if ci != nil && ci.isStatusInProgress() {
+				ci.spinner, cmd = ci.spinner.Update(msg)
+				cmds = append(cmds, cmd)
+			}
+		}
+
 		runs := m.runsList.Items()
 		for _, run := range runs {
 			ri := run.(*runItem)
@@ -432,6 +496,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
+		ci := m.getSelectedCheckItem()
+		if ci == nil || ci.loadingLogs {
+			m.logsSpinner, cmd = m.logsSpinner.Update(msg)
+			cmds = append(cmds, cmd)
+		} else if ci.isStatusInProgress() {
+			m.inProgressSpinner, cmd = m.inProgressSpinner.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+
+		m.checksList, cmd = m.checksList.Update(msg)
+		cmds = append(cmds, cmd)
 		m.runsList, cmd = m.runsList.Update(msg)
 		cmds = append(cmds, cmd)
 		m.jobsList, cmd = m.jobsList.Update(msg)
@@ -446,6 +521,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.focusedPane {
+	case PaneChecks:
+		before := m.checksList.GlobalIndex()
+		m.checksList, cmd = m.checksList.Update(msg)
+		cmds = append(cmds, cmd)
+		after := m.checksList.GlobalIndex()
+		if before != after {
+			cmds = append(cmds, m.onCheckChanged()...)
+			cmds = append(cmds, m.updateLists()...)
+		}
 	case PaneRuns:
 		before := m.runsList.GlobalIndex()
 		m.runsList, cmd = m.runsList.Update(msg)
@@ -528,6 +612,32 @@ func (m model) View() string {
 	header := m.viewHeader()
 	footer := m.viewFooter()
 
+	panes := ""
+	if m.flat {
+		panes = m.viewFlatChecks()
+	} else {
+		panes = m.viewHierarchicalChecks()
+	}
+
+	if m.help.ShowAll {
+		help := m.styles.helpPaneStyle.Width(m.width).Render(m.help.View(keys))
+		footer = lipgloss.JoinVertical(lipgloss.Left, help, footer)
+	}
+
+	rootStyle := lipgloss.NewStyle().
+		Width(m.width).
+		MaxWidth(m.width).
+		Height(m.height).
+		MaxHeight(m.height)
+	return rootStyle.Render(lipgloss.JoinVertical(
+		lipgloss.Left,
+		header,
+		panes,
+		footer,
+	))
+}
+
+func (m *model) viewHierarchicalChecks() string {
 	runsPane := makePointingBorder(m.paneStyle(PaneRuns).Render(m.runsList.View()))
 	jobsPane := makePointingBorder(m.paneStyle(PaneJobs).Render(m.jobsList.View()))
 	stepsPane := ""
@@ -566,25 +676,49 @@ func (m model) View() string {
 		panes = append(panes, m.viewLogs())
 	}
 
-	if m.help.ShowAll {
-		help := m.styles.helpPaneStyle.Width(m.width).Render(m.help.View(keys))
-		footer = lipgloss.JoinVertical(lipgloss.Left, help, footer)
+	return lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		panes...,
+	)
+}
+
+func (m *model) viewFlatChecks() string {
+	checksPane := makePointingBorder(m.paneStyle(PaneChecks).Render(m.checksList.View()))
+	stepsPane := ""
+	if m.shouldShowSteps() {
+		stepsPane = makePointingBorder(m.paneStyle(PaneSteps).Render(m.stepsList.View()))
 	}
 
-	rootStyle := lipgloss.NewStyle().
-		Width(m.width).
-		MaxWidth(m.width).
-		Height(m.height).
-		MaxHeight(m.height)
-	return rootStyle.Render(lipgloss.JoinVertical(
-		lipgloss.Left,
-		header,
-		lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			panes...,
-		),
-		footer,
-	))
+	panes := make([]string, 0)
+	if m.zoomedPane != nil {
+		switch *m.zoomedPane {
+		case PaneChecks:
+			panes = append(panes, checksPane)
+		case PaneSteps:
+			panes = append(panes, stepsPane)
+		case PaneLogs:
+			panes = append(panes, m.viewLogs())
+		}
+	} else if m.width != 0 && m.width <= smallScreen {
+		switch m.focusedPane {
+		case PaneChecks:
+			panes = append(panes, checksPane)
+		case PaneSteps:
+			panes = append(panes, stepsPane)
+		case PaneLogs:
+			break
+		}
+		panes = append(panes, m.viewLogs())
+	} else {
+		panes = append(panes, checksPane)
+		panes = append(panes, stepsPane)
+		panes = append(panes, m.viewLogs())
+	}
+
+	return lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		panes...,
+	)
 }
 
 func (m *model) viewHeader() string {
@@ -693,11 +827,19 @@ func (m *model) viewFooter() string {
 }
 
 func (m *model) shouldShowSteps() bool {
-	job := m.jobsList.SelectedItem()
 	loadingSteps := false
-	if job != nil {
-		ji := job.(*jobItem)
-		loadingSteps = ji.loadingSteps
+	if m.flat {
+		check := m.checksList.SelectedItem()
+		if check != nil {
+			ci := check.(*checkItem)
+			loadingSteps = ci.loadingSteps
+		}
+	} else {
+		job := m.jobsList.SelectedItem()
+		if job != nil {
+			ji := job.(*jobItem)
+			loadingSteps = ji.loadingSteps
+		}
 	}
 
 	return loadingSteps || len(m.stepsList.VisibleItems()) > 0
@@ -737,6 +879,11 @@ func (m *model) viewLogs() string {
 
 func (m *model) setFocusedPaneStyles() {
 	switch m.focusedPane {
+	case PaneChecks:
+		m.checksDelegate.(*checksDelegate).focused = true
+		m.stepsDelegate.(*stepsDelegate).focused = false
+		m.setListFocusedStyles(&m.checksList, &m.checksDelegate, PaneChecks)
+		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	case PaneRuns:
 		m.runsDelegate.(*runsDelegate).focused = true
 		m.jobsDelegate.(*jobsDelegate).focused = false
@@ -752,16 +899,20 @@ func (m *model) setFocusedPaneStyles() {
 		m.setListFocusedStyles(&m.jobsList, &m.jobsDelegate, PaneJobs)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	case PaneSteps:
+		m.checksDelegate.(*checksDelegate).focused = true
 		m.runsDelegate.(*runsDelegate).focused = false
 		m.jobsDelegate.(*jobsDelegate).focused = false
 		m.stepsDelegate.(*stepsDelegate).focused = true
+		m.setListUnfocusedStyles(&m.checksList, &m.checksDelegate)
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListFocusedStyles(&m.stepsList, &m.stepsDelegate, PaneSteps)
 	case PaneLogs:
+		m.checksDelegate.(*checksDelegate).focused = true
 		m.runsDelegate.(*runsDelegate).focused = false
 		m.jobsDelegate.(*jobsDelegate).focused = false
 		m.stepsDelegate.(*stepsDelegate).focused = false
+		m.setListUnfocusedStyles(&m.checksList, &m.checksDelegate)
 		m.setListUnfocusedStyles(&m.runsList, &m.runsDelegate)
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
@@ -821,6 +972,11 @@ func newStepsDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 	return newList(styles, d), d
 }
 
+func newChecksDefaultList(styles styles) (list.Model, list.ItemDelegate) {
+	d := newCheckItemDelegate(styles)
+	return newList(styles, d), d
+}
+
 func newList(styles styles, delegate list.ItemDelegate) list.Model {
 	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.KeyMap.Quit = quitKey
@@ -844,14 +1000,49 @@ func newList(styles styles, delegate list.ItemDelegate) list.Model {
 func (m *model) updateLists() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 
-	rCmds := m.updateRunsList()
-	cmds = append(cmds, rCmds...)
+	if m.flat {
+		cCmds := m.updateChecksList()
+		cmds = append(cmds, cCmds...)
+	} else {
+		rCmds := m.updateRunsList()
+		cmds = append(cmds, rCmds...)
 
-	jCmds := m.updateJobsList()
-	cmds = append(cmds, jCmds...)
+		jCmds := m.updateJobsList()
+		cmds = append(cmds, jCmds...)
+	}
 
+	// the steps list is used in both modes
 	sCmds := m.updateStepsList()
 	cmds = append(cmds, sCmds...)
+
+	return cmds
+}
+
+func (m *model) updateChecksList() []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
+	if len(m.checksList.VisibleItems()) == 0 {
+		return cmds
+	}
+
+	check := m.checksList.SelectedItem()
+	if check == nil {
+		return cmds
+	}
+	ci, ok := check.(*checkItem)
+	if !ok {
+		return cmds
+	}
+
+	if ci.loadingSteps {
+		cmds = append(cmds, m.stepsList.StartSpinner())
+	} else {
+		m.stepsList.StopSpinner()
+	}
+	if len(m.checksList.VisibleItems()) > 0 || m.checksList.FilterState() == list.FilterApplied {
+		m.checksList.SetShowStatusBar(true)
+	} else {
+		m.checksList.SetShowStatusBar(false)
+	}
 
 	return cmds
 }
@@ -909,7 +1100,13 @@ func (m *model) updateJobsList() []tea.Cmd {
 func (m *model) updateStepsList() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 
-	ji := m.getSelectedJobItem()
+	var ji *jobItem
+	if ci := m.getSelectedCheckItem(); ci != nil && m.flat {
+		ji = &ci.jobItem
+	} else {
+		ji = m.getSelectedJobItem()
+	}
+
 	existing := m.stepsList.Items()
 	existingCount := len(existing)
 	if ji != nil {
@@ -935,6 +1132,19 @@ func (m *model) updateStepsList() []tea.Cmd {
 	return cmds
 }
 
+func (m *model) getSelectedCheckItem() *checkItem {
+	check := m.checksList.SelectedItem()
+	if check == nil {
+		return nil
+	}
+	ci, ok := check.(*checkItem)
+	if !ok {
+		return nil
+	}
+
+	return ci
+}
+
 func (m *model) getSelectedRunItem() *runItem {
 	run := m.runsList.SelectedItem()
 	if run == nil {
@@ -949,16 +1159,27 @@ func (m *model) getSelectedRunItem() *runItem {
 }
 
 func (m *model) getSelectedJobItem() *jobItem {
-	job := m.jobsList.SelectedItem()
-	if job == nil {
-		return nil
+	if m.flat {
+		check := m.checksList.SelectedItem()
+		if check == nil {
+			return nil
+		}
+		ci, ok := check.(*checkItem)
+		if !ok {
+			return nil
+		}
+		return &ci.jobItem
+	} else {
+		job := m.jobsList.SelectedItem()
+		if job == nil {
+			return nil
+		}
+		ji, ok := job.(*jobItem)
+		if !ok {
+			return nil
+		}
+		return ji
 	}
-	ji, ok := job.(*jobItem)
-	if !ok {
-		return nil
-	}
-
-	return ji
 }
 
 func (m *model) logsWidth() int {
@@ -973,20 +1194,31 @@ func (m *model) logsWidth() int {
 	var borders int
 	if m.width != 0 && m.width <= smallScreen {
 		borders = 1
+	} else if m.flat {
+		borders = 1
 	} else {
 		borders = 2
 	}
-	sb := 0
+
+	scbar := 0
 	ji := m.getSelectedJobItem()
 	if ji != nil && (len(ji.renderedLogs) > 0 || len(ji.renderedText) > 0) && m.isScrollbarVisible() {
-		sb = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())
+		scbar = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())
 	}
+
 	steps := 0
 	if m.shouldShowSteps() {
 		steps = m.stepsList.Width()
 		borders = borders + 1
 	}
-	return m.width - m.runsList.Width() - m.jobsList.Width() - steps - borders - sb
+
+	w := m.width - steps - borders - scbar
+	if m.flat {
+		w -= m.checksList.Width()
+	} else {
+		w -= m.runsList.Width() + m.jobsList.Width()
+	}
+	return w
 }
 
 func (m *model) loadingLogsView() string {
@@ -1037,7 +1269,7 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.C
 
 	ri := m.getRunItemById(msg.runId)
 	if ri == nil {
-		log.Error("run not found when trying to enrich with steps", "msg", msg)
+		log.Error("run not found when trying to enrich with steps", "msg.runId", msg.runId)
 		return cmds
 	}
 
@@ -1062,6 +1294,49 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.C
 
 		ri.jobsItems[jIdx].steps = steps
 	}
+
+	return cmds
+}
+
+func (m *model) enrichCheckWithSteps(msg checkStepsFetchedMsg) {
+	ci := m.getCheckItemById(msg.checkId)
+	if ci == nil {
+		log.Error("check not found when trying to enrich with steps", "msg", msg)
+		return
+	}
+
+	ci.loadingSteps = false
+
+	steps := make([]*stepItem, 0)
+	for _, step := range msg.steps {
+		si := NewStepItem(step, ci.job.Link, m.styles)
+		steps = append(steps, &si)
+	}
+
+	ci.steps = steps
+}
+
+func (m *model) onCheckChanged() []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
+	m.resetStepsState()
+	cmds = append(cmds, m.updateStepsList()...)
+	cmds = append(cmds, m.tickSteps()...)
+	cmds = append(cmds, m.logsSpinner.Tick, m.inProgressSpinner.Tick)
+
+	currCheck := m.getSelectedCheckItem()
+	if currCheck == nil {
+		log.Error("check changed but current check is nil")
+		return nil
+	}
+
+	if currCheck.loadingSteps {
+		cmds = append(cmds, m.makeFetchCheckStepsCmd(currCheck.job.Id))
+	}
+
+	if !currCheck.initiatedLogsFetch && !currCheck.isStatusInProgress() {
+		cmds = append(cmds, m.makeFetchJobLogsCmd())
+	}
+	cmds = append(cmds, m.onJobChanged()...)
 
 	return cmds
 }
@@ -1098,20 +1373,9 @@ func (m *model) onRunChanged() []tea.Cmd {
 
 func (m *model) onJobChanged() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
-
-	m.logsViewport.ClearHighlights()
-	m.numHighlights = 0
-	m.logsInput.Reset()
-	m.stepsList.ResetSelected()
-	m.stepsList.ResetFilter()
+	m.resetStepsState()
 	cmds = append(cmds, m.updateStepsList()...)
-
-	steps := m.stepsList.Items()
-	for _, step := range steps {
-		si := step.(*stepItem)
-		cmds = append(cmds, si.Tick())
-	}
-
+	cmds = append(cmds, m.tickSteps()...)
 	cmds = append(cmds, m.logsSpinner.Tick, m.inProgressSpinner.Tick)
 
 	currJob := m.getSelectedJobItem()
@@ -1128,7 +1392,7 @@ func (m *model) onJobChanged() []tea.Cmd {
 }
 
 func (m *model) onStepChanged() {
-	job := m.jobsList.SelectedItem()
+	ji := m.getSelectedJobItem()
 	step := m.stepsList.SelectedItem()
 	cursor := m.stepsList.Cursor()
 
@@ -1141,7 +1405,7 @@ func (m *model) onStepChanged() {
 		return
 	}
 
-	for i, log := range job.(*jobItem).logs {
+	for i, log := range ji.logs {
 		if log.Time.After(step.(*stepItem).step.StartedAt) {
 			m.logsViewport.SetYOffset(i - 1)
 			return
@@ -1150,13 +1414,12 @@ func (m *model) onStepChanged() {
 }
 
 func (m *model) renderJobLogs() tea.Cmd {
-	currJob := m.jobsList.SelectedItem()
-	if currJob == nil || currJob.(*jobItem).loadingLogs {
+	ji := m.getSelectedJobItem()
+	if ji == nil || ji.loadingLogs {
 		m.logsViewport.SetContent("")
 	}
 
-	ji, ok := currJob.(*jobItem)
-	if !ok {
+	if ji == nil {
 		return nil
 	}
 
@@ -1178,7 +1441,8 @@ func (m *model) renderJobLogs() tea.Cmd {
 		return nil
 	}
 
-	if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
+	if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun ||
+		ji.job.Kind == data.JobKindExternal {
 		m.logsViewport.SetContent(ji.renderedText)
 		m.logsViewport.SetWidth(5)
 		m.setHeights()
@@ -1274,12 +1538,31 @@ func (m *model) getRunItemByName(runName string) *runItem {
 	return nil
 }
 
+func (m *model) getCheckItemById(checkId string) *checkItem {
+	for _, check := range m.checksList.Items() {
+		ci := check.(*checkItem)
+		if ci.job.Id == checkId {
+			return ci
+		}
+	}
+	return nil
+}
+
 func (m *model) getJobItemById(jobId string) *jobItem {
-	for _, run := range m.runsList.Items() {
-		ri := run.(*runItem)
-		for i := range ri.jobsItems {
-			if ri.jobsItems[i].job.Id == jobId {
-				return ri.jobsItems[i]
+	if m.flat {
+		for _, check := range m.checksList.Items() {
+			ci := check.(*checkItem)
+			if ci.job.Id == jobId {
+				return &ci.jobItem
+			}
+		}
+	} else {
+		for _, run := range m.runsList.Items() {
+			ri := run.(*runItem)
+			for i := range ri.jobsItems {
+				if ri.jobsItems[i].job.Id == jobId {
+					return ri.jobsItems[i]
+				}
 			}
 		}
 	}
@@ -1424,6 +1707,7 @@ func (m *model) getMainContentHeight() int {
 func (m *model) setHeights() {
 	h := m.getMainContentHeight()
 
+	m.checksList.SetHeight(h)
 	m.runsList.SetHeight(h)
 	m.jobsList.SetHeight(h)
 	m.stepsList.SetHeight(h)
@@ -1459,16 +1743,76 @@ func (m *model) renderFullScreenLogsSpinner(message string, cta string) string {
 
 func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
-	selectedRun := m.runsList.SelectedItem()
-	var before *runItem
-	if selectedRun != nil {
-		before = selectedRun.(*runItem)
+
+	if m.flat {
+		selectedCheck := m.checksList.SelectedItem()
+		var before *checkItem
+		if selectedCheck != nil {
+			before = selectedCheck.(*checkItem)
+		}
+
+		cmds = append(cmds, m.buildFlatChecksLists()...)
+
+		if len(m.checksList.Items()) > 0 {
+			ci := m.checksList.SelectedItem().(*checkItem)
+			if before == nil || before.job.Id != ci.job.Id {
+				cmds = append(cmds, m.onCheckChanged()...)
+			}
+		}
+
+		if before != nil && !before.initiatedLogsFetch {
+			cmds = append(cmds, m.logsSpinner.Tick, m.makeFetchJobLogsCmd())
+		}
+	} else {
+		selectedRun := m.runsList.SelectedItem()
+		var before *runItem
+		if selectedRun != nil {
+			before = selectedRun.(*runItem)
+		}
+
+		cmds = append(cmds, m.buildHierachicalChecksLists()...)
+
+		if len(m.runsList.Items()) > 0 {
+			ri := m.runsList.SelectedItem().(*runItem)
+			cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(ri.run.Id))
+			if before == nil || before.run.Id != ri.run.Id {
+				cmds = append(cmds, m.onRunChanged()...)
+			}
+		}
+
+		currJob := m.getSelectedJobItem()
+		if currJob != nil && !currJob.initiatedLogsFetch {
+			cmds = append(cmds, m.logsSpinner.Tick, m.makeFetchJobLogsCmd())
+		}
 	}
 
-	log.Debug("onWorkflowRunsFetched", "len(m.workflowRuns)", len(m.workflowRuns))
+	cmds = append(cmds, m.updateLists()...)
+
+	return cmds
+}
+
+func (m *model) buildFlatChecksLists() []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
+	cNum := 0
+	for _, run := range m.workflowRuns {
+		for j, job := range run.Jobs {
+			ci := m.getCheckItemById(job.Id)
+			if ci == nil {
+				nci := NewCheckItem(job, m.styles)
+				ci = &nci
+				cmds = append(cmds, ci.Tick())
+				cmds = append(cmds, m.checksList.InsertItem(cNum+j, ci))
+			}
+		}
+		cNum += len(run.Jobs)
+	}
+	return cmds
+}
+
+func (m *model) buildHierachicalChecksLists() []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
 	for i, run := range m.workflowRuns {
 		ri := m.getRunItemByName(run.Name)
-		log.Debug("found?", "ri != nil", ri != nil, "run.Name", run.Name)
 		if ri == nil {
 			nr := NewRunItem(run, m.styles)
 			ri = &nr
@@ -1491,30 +1835,6 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 
 		ri.jobsItems = jobs
 	}
-
-	if len(m.runsList.Items()) > 0 {
-		ri := m.runsList.SelectedItem().(*runItem)
-		cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(ri.run.Id))
-		if before == nil || before.run.Id != ri.run.Id {
-			cmds = append(cmds, m.onRunChanged()...)
-		}
-	}
-
-	cmds = append(cmds, m.updateLists()...)
-
-	currJob := m.getSelectedJobItem()
-	if currJob != nil && !currJob.initiatedLogsFetch {
-		cmds = append(cmds, m.logsSpinner.Tick, m.makeFetchJobLogsCmd())
-	}
-
-	if m.pr.IsStatusCheckInProgress() {
-		state := m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.State
-		log.Debug("refetching, PR is still in progress", "state", state)
-		cmds = append(cmds, m.fetchPRChecksWithInterval())
-	} else {
-		log.Debug("stopping refetching, all tasks are done")
-	}
-
 	return cmds
 }
 
@@ -1545,7 +1865,7 @@ func (m *model) viewCommitStatus(bgStyle lipgloss.Style) string {
 
 func (m *model) paneStyle(pane pane) lipgloss.Style {
 	// the border of the pane is the actually rendered by the previous pane
-	if m.focusedPane-1 == pane {
+	if m.previousPane() == pane {
 		return m.styles.focusedPaneStyle
 	}
 
@@ -1553,6 +1873,25 @@ func (m *model) paneStyle(pane pane) lipgloss.Style {
 }
 
 func (m *model) stopSpinners() {
+	m.checksList.StopSpinner()
 	m.runsList.StopSpinner()
 	m.jobsList.StopSpinner()
+}
+
+func (m *model) resetStepsState() {
+	m.logsViewport.ClearHighlights()
+	m.numHighlights = 0
+	m.logsInput.Reset()
+	m.stepsList.ResetSelected()
+	m.stepsList.ResetFilter()
+}
+
+func (m *model) tickSteps() []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
+	steps := m.stepsList.Items()
+	for _, step := range steps {
+		si := step.(*stepItem)
+		cmds = append(cmds, si.Tick())
+	}
+	return cmds
 }

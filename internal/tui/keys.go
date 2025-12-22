@@ -68,6 +68,11 @@ var (
 		key.WithHelp("/", "search in pane"),
 	)
 
+	modeKey = key.NewBinding(
+		key.WithKeys("m"),
+		key.WithHelp("m", "switch display mode"),
+	)
+
 	cancelSearchKey = key.NewBinding(
 		key.WithKeys("esc"),
 		key.WithHelp("esc", "cancel search"),

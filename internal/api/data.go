@@ -1,7 +1,10 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -193,31 +196,53 @@ type PR struct {
 	} `graphql:"commits(last: 1)"`
 }
 
+type RateLimit struct {
+	Cost      int64
+	Limit     int64
+	NodeCount int64
+	Remaining int64
+	ResetAt   time.Time
+	Used      int64
+}
+
 type PRCheckRunsQuery struct {
-	Resource struct {
+	RateLimit RateLimit
+	Resource  struct {
 		PullRequest PR `graphql:"... on PullRequest"`
 	} `graphql:"resource(url: $url)"`
 }
 
-var client *gh.GraphQLClient
+var (
+	gqlClient  *gh.GraphQLClient
+	httpClient *http.Client
+)
 
 func SetClient(c *gh.GraphQLClient) {
-	client = c
+	gqlClient = c
 }
 
-func getClient() (*gh.GraphQLClient, error) {
+func getGraphQLClient() (*gh.GraphQLClient, error) {
 	var err error
-	if client != nil {
-		return client, nil
+	if gqlClient != nil {
+		return gqlClient, nil
 	}
-	client, err = gh.DefaultGraphQLClient()
-	return client, err
+	gqlClient, err = gh.DefaultGraphQLClient()
+	return gqlClient, err
+}
+
+func getHTTPClient() (*http.Client, error) {
+	var err error
+	if httpClient != nil {
+		return httpClient, nil
+	}
+	httpClient, err = gh.DefaultHTTPClient()
+	return httpClient, err
 }
 
 func FetchPRCheckRuns(repo string, prNumber string, cursor string) (PRCheckRunsQuery, error) {
 	var err error
 	var res PRCheckRunsQuery
-	c, err := getClient()
+	c, err := getGraphQLClient()
 	if err != nil {
 		return res, err
 	}
@@ -261,7 +286,7 @@ type WorkflowRunStepsQuery struct {
 
 func FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunStepsQuery, error) {
 	res := WorkflowRunStepsQuery{}
-	c, err := getClient()
+	c, err := getGraphQLClient()
 	if err != nil {
 		return res, err
 	}
@@ -280,6 +305,78 @@ func FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunStepsQuery, er
 		log.Error("error fetching check run steps", "err", err)
 		return res, err
 	}
+
+	return res, nil
+}
+
+type httpStep struct {
+	Conclusion  string
+	Name        string
+	Number      int
+	StartedAt   time.Time `json:"started_at"`
+	CompletedAt time.Time `json:"completed_at"`
+	Status      string
+}
+
+type jobStepsResponse struct {
+	Id           int
+	Url          string
+	WorkflowName string
+	Steps        []httpStep
+}
+
+type NormalizedJobStepsResponse struct {
+	Id           int
+	Url          string
+	WorkflowName string
+	Steps        []Step
+}
+
+func FetchJobSteps(repo string, jobID string) (NormalizedJobStepsResponse, error) {
+	res := NormalizedJobStepsResponse{}
+	c, err := getHTTPClient()
+	if err != nil {
+		return res, err
+	}
+
+	jobUrl, err := url.Parse(fmt.Sprintf("https://api.github.com/repos/%s/actions/jobs/%s", repo, jobID))
+	if err != nil {
+		return res, err
+	}
+
+	log.Debug("fetching job steps", "url", jobUrl)
+	resp, err := c.Get(jobUrl.String())
+	if err != nil {
+		return res, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return res, err
+	}
+
+	raw := jobStepsResponse{}
+	err = json.Unmarshal(body, &raw)
+	if err != nil {
+		log.Error("error fetching job steps", "err", err)
+		return res, err
+	}
+
+	normalized := make([]Step, 0)
+	for _, job := range raw.Steps {
+		normalized = append(normalized, Step{
+			Conclusion:  Conclusion(strings.ToUpper(job.Conclusion)),
+			Name:        job.Name,
+			Number:      job.Number,
+			StartedAt:   job.StartedAt,
+			CompletedAt: job.CompletedAt,
+			Status:      Status(strings.ToUpper(job.Status)),
+		})
+	}
+	res.Id = raw.Id
+	res.Url = raw.Url
+	res.WorkflowName = raw.WorkflowName
+	res.Steps = normalized
 
 	return res, nil
 }
@@ -314,6 +411,9 @@ func FetchCheckRunOutput(repo string, runID string) (CheckRunOutputResponse, err
 }
 
 func (pr *PR) IsStatusCheckInProgress() bool {
+	if pr == nil || len(pr.Commits.Nodes) == 0 {
+		return true
+	}
 	return (pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "" ||
 		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING")
 }

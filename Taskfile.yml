@@ -13,9 +13,17 @@ tasks:
   debug:
     cmds:
       - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
-      - DEBUG=true go run . {{.CLI_ARGS}}
+      - DEBUG=true LOG_LEVEL={{.LOG_LEVEL}} go run . {{.CLI_ARGS}}
     interactive: true
     desc: Run in debug mode. Run `task logs` to watch the logs.
+
+  debug:info:
+    cmds:
+      - task: debug
+        vars:
+          LOG_LEVEL: info
+    interactive: true
+    desc: Run in debug mode with INFO level logs. Run `task logs` to watch the logs.
 
   dlv:
     cmds:

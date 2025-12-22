@@ -30,7 +30,7 @@ func TestFullOutput(t *testing.T) {
 	}
 	setMockClient(t)
 
-	m := NewModel("dlvhdr/gh-enhance", "1")
+	m := NewModel("dlvhdr/gh-enhance", "1", ModelOpts{})
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(160, 60))
 
 	waitForText(t, tm, "fix(prompt): prompt mark not placed after text edits correctly", teatest.WithDuration(5*time.Second))

@@ -32,6 +32,7 @@ func (km keyMap) FullHelp() [][]key.Binding {
 			refreshAllKey,
 		},
 		{
+			modeKey,
 			quitKey,
 			helpKey,
 		},

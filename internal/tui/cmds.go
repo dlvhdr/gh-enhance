@@ -21,50 +21,66 @@ import (
 )
 
 type workflowRunsFetchedMsg struct {
-	pr   api.PR
-	runs []data.WorkflowRun
-	err  error
+	pr        api.PR
+	runs      []data.WorkflowRun
+	rateLimit api.RateLimit
+	err       error
 }
 
-func (m model) makeInitialGetPRChecksCmd(prNumber string) tea.Cmd {
+func (m *model) makeInitialGetPRChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
 		return m.fetchPRChecksWithCursor(prNumber, "")
 	}
 }
 
-func (m model) makeGetNextPagePRChecksCmd(endCursor string) tea.Cmd {
+func (m *model) makeGetNextPagePRChecksCmd(endCursor string) tea.Cmd {
 	return func() tea.Msg {
 		return m.fetchPRChecksWithCursor(m.prNumber, endCursor)
 	}
 }
 
-func (m model) fetchPRChecksWithInterval() tea.Cmd {
+type prChecksIntervalTickMsg struct {
+	msg tea.Msg
+}
+
+func (m *model) fetchPRChecksWithInterval() tea.Cmd {
 	return tea.Tick(time.Second*10, func(t time.Time) tea.Msg {
-		return m.fetchPRChecks(m.prNumber)
+		if !m.pr.IsStatusCheckInProgress() {
+			log.Info("all tasks have concluded - not refetching anymore")
+			return nil
+		}
+
+		if m.rateLimit.Remaining == 0 && time.Now().Before(m.rateLimit.ResetAt) {
+			log.Warn("rate limit reached, waiting", "m.rateLimit", m.rateLimit)
+			return nil
+		}
+		return prChecksIntervalTickMsg{msg: m.fetchPRChecks(m.prNumber)}
 	})
 }
 
 func (m *model) fetchPRChecks(prNumber string) tea.Msg {
+	log.Info("fetching pr checks from the begginging")
 	return m.fetchPRChecksWithCursor(prNumber, "")
 }
 
 func (m model) fetchPRChecksWithCursor(prNumber string, cursor string) tea.Msg {
-	response, err := api.FetchPRCheckRuns(m.repo, prNumber, cursor)
+	resp, err := api.FetchPRCheckRuns(m.repo, prNumber, cursor)
 	if err != nil {
 		log.Error("error fetching pr checks", "err", err)
-		return workflowRunsFetchedMsg{err: err}
+		return workflowRunsFetchedMsg{err: err, rateLimit: resp.RateLimit}
 	}
 
-	if response.Resource.PullRequest.Number == 0 {
+	if resp.Resource.PullRequest.Number == 0 {
 		return workflowRunsFetchedMsg{err: errors.New("pull request not found")}
 	}
 
-	nodes := response.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
+	nodes := resp.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 	runs := makeWorkflowRuns(nodes)
 
 	return workflowRunsFetchedMsg{
-		pr:   response.Resource.PullRequest,
-		runs: runs,
+		rateLimit: resp.RateLimit,
+		pr:        resp.Resource.PullRequest,
+		runs:      runs,
 	}
 }
 
@@ -84,26 +100,41 @@ type checkRunOutputFetchedMsg struct {
 }
 
 func (m *model) makeFetchJobLogsCmd() tea.Cmd {
-	if len(m.runsList.VisibleItems()) == 0 {
+	if m.flat && len(m.checksList.VisibleItems()) == 0 {
 		return nil
 	}
-	ri := m.runsList.SelectedItem().(*runItem)
-	if len(ri.jobsItems) == 0 {
+	if !m.flat && len(m.runsList.VisibleItems()) == 0 {
 		return nil
 	}
-	job := m.jobsList.SelectedItem()
-	if job == nil {
-		return nil
+
+	var ji *jobItem
+	if m.flat {
+		ci := m.checksList.SelectedItem().(*checkItem)
+		if ci == nil {
+			return nil
+		}
+		ji = &ci.jobItem
+	} else {
+		ri := m.runsList.SelectedItem().(*runItem)
+		if len(ri.jobsItems) == 0 {
+			return nil
+		}
+		job := m.jobsList.SelectedItem()
+		if job == nil {
+			return nil
+		}
+		j, ok := job.(*jobItem)
+		if !ok {
+			return nil
+		}
+		ji = j
 	}
-	ji, ok := job.(*jobItem)
-	if !ok {
-		return nil
-	}
+
 	if ji.isStatusInProgress() {
 		return nil
 	}
 
-	log.Debug("fetching job logs", "job", ji.job.Name)
+	log.Info("fetching job logs", "job", ji.job.Name)
 	ji.loadingLogs = true
 	ji.initiatedLogsFetch = true
 	return func() tea.Msg {
@@ -185,6 +216,27 @@ func (m *model) makeFetchWorkflowRunStepsCmd(runId string) tea.Cmd {
 	}
 }
 
+type checkStepsFetchedMsg struct {
+	checkId string
+	steps   []api.Step
+}
+
+func (m *model) makeFetchCheckStepsCmd(jobId string) tea.Cmd {
+	return func() tea.Msg {
+		log.Debug("fetching check steps", "repo", m.repo, "jobId", jobId)
+		stepsRes, err := api.FetchJobSteps(m.repo, jobId)
+		if err != nil {
+			log.Error("error fetching job steps", "repo", m.repo, "prNumber", m.prNumber, "jobId", jobId, "err", err)
+			return nil
+		}
+
+		return checkStepsFetchedMsg{
+			checkId: jobId,
+			steps:   stepsRes.Steps,
+		}
+	}
+}
+
 func makeOpenUrlCmd(url string) tea.Cmd {
 	return func() tea.Msg {
 		log.Info("opening run url", "url", url)
@@ -196,7 +248,7 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 
 func (m *model) makeInitCmd() tea.Cmd {
 	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(),
-		m.makeInitialGetPRChecksCmd(m.prNumber))
+		m.makeInitialGetPRChecksCmd(m.prNumber), m.fetchPRChecksWithInterval())
 }
 
 func workflowName(cr api.CheckRun) string {
@@ -239,18 +291,15 @@ func (m *model) mergeWorkflowRuns(msg workflowRunsFetchedMsg) {
 
 	for _, run := range msg.runs {
 		existing, ok := runsMap[run.Name]
-		log.Debug("merging runs", "run", run.Name)
 
 		// run is new, no need to merge its jobs with the existing one
 		if !ok {
 			runsMap[run.Name] = run
-			log.Debug("no need to merge", "run", run.Name)
 			continue
 		}
 
 		// run already exists, merge its jobs with the existing one
 		existing.Jobs = append(existing.Jobs, run.Jobs...)
-		log.Debug("merging", "run", run.Name)
 		runsMap[run.Name] = existing
 	}
 
@@ -455,4 +504,62 @@ func filterForCheckRuns(nodes []api.ContextNode) []api.CheckRun {
 		checkRuns = append(checkRuns, node.CheckRun)
 	}
 	return checkRuns
+}
+
+func (m *model) nextPane() pane {
+	showSteps := m.shouldShowSteps()
+	switch m.focusedPane {
+	case PaneRuns:
+		return PaneJobs
+
+	case PaneJobs:
+		if showSteps {
+			return PaneSteps
+		}
+
+	case PaneSteps:
+		return PaneLogs
+
+	case PaneChecks:
+		if showSteps {
+			return PaneSteps
+		}
+		return PaneLogs
+
+	case PaneLogs:
+		return PaneLogs
+	}
+
+	return PaneLogs
+}
+
+func (m *model) previousPane() pane {
+	showSteps := m.shouldShowSteps()
+	switch m.focusedPane {
+	case PaneRuns:
+		return PaneRuns
+
+	case PaneJobs:
+		return PaneRuns
+
+	case PaneSteps:
+		if m.flat {
+			return PaneChecks
+		}
+		return PaneJobs
+
+	case PaneChecks:
+		return PaneChecks
+
+	case PaneLogs:
+		if showSteps {
+			return PaneSteps
+		}
+		return PaneJobs
+	}
+
+	if m.flat {
+		return PaneChecks
+	}
+	return PaneRuns
 }

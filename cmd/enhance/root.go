@@ -41,7 +41,7 @@ func init() {
 			log.SetOutput(newConfigFile)
 			log.SetTimeFormat("15:04:05.000")
 			log.SetReportCaller(true)
-			log.SetLevel(log.DebugLevel)
+			setDebugLogLevel()
 			log.Debug("Logging to debug.log")
 		} else {
 			loggerFile, _ = tea.LogToFile("debug.log", "debug")
@@ -68,6 +68,12 @@ func init() {
 	)
 
 	rootCmd.SetVersionTemplate(`gh-enhance {{printf "version %s\n" .Version}}`)
+
+	rootCmd.Flags().Bool(
+		"flat",
+		false,
+		"passing this flag will present checks as a flat list",
+	)
 
 	rootCmd.Flags().Bool(
 		"debug",
@@ -107,7 +113,12 @@ func init() {
 			number = args[0]
 		}
 
-		p := tea.NewProgram(tui.NewModel(repo, number), tea.WithAltScreen())
+		flat, err := rootCmd.Flags().GetBool("flat")
+		if err != nil {
+			log.Fatal("Cannot parse the flat flag", err)
+		}
+
+		p := tea.NewProgram(tui.NewModel(repo, number, tui.ModelOpts{Flat: flat}), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			log.Error("failed starting program", "err", err)
 			fmt.Println(err)
@@ -119,4 +130,19 @@ func init() {
 func exitWithUsage() {
 	fmt.Println("Usage: -R owner/repo 15623 or URL to a PR")
 	os.Exit(1)
+}
+
+func setDebugLogLevel() {
+	switch os.Getenv("LOG_LEVEL") {
+	case "debug", "":
+		log.SetLevel(log.DebugLevel)
+	case "info":
+		log.SetLevel(log.InfoLevel)
+	case "warn":
+		log.SetLevel(log.WarnLevel)
+	case "error":
+		log.SetLevel(log.ErrorLevel)
+	}
+
+	log.Debug("log level set", "level", log.GetLevel())
 }

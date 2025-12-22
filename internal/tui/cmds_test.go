@@ -48,7 +48,7 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 		},
 	}
 
-	m := NewModel("dlvhdr/gh-dash", "1")
+	m := NewModel("dlvhdr/gh-dash", "1", ModelOpts{})
 	m.pr = res.Data.Resource.PullRequest
 
 	runs := makeWorkflowRuns(m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes)
@@ -90,7 +90,7 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 
 	wfr := makeWorkflowRun(res.Data.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes[0].CheckRun)
 
-	m := NewModel("dlvhdr/gh-dash", "1")
+	m := NewModel("dlvhdr/gh-dash", "1", ModelOpts{})
 	m.pr = res.Data.Resource.PullRequest
 
 	runs := makeWorkflowRuns(m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes)
