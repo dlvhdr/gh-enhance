@@ -166,7 +166,7 @@ type ContextNode struct {
 	StatusContext StatusContext `graphql:"... on StatusContext"`
 }
 
-type PR struct {
+type PRWithChecks struct {
 	Title      string
 	Number     int
 	Url        string
@@ -208,7 +208,7 @@ type RateLimit struct {
 type PRCheckRunsQuery struct {
 	RateLimit RateLimit
 	Resource  struct {
-		PullRequest PR `graphql:"... on PullRequest"`
+		PullRequest PRWithChecks `graphql:"... on PullRequest"`
 	} `graphql:"resource(url: $url)"`
 }
 
@@ -410,12 +410,15 @@ func FetchCheckRunOutput(repo string, runID string) (CheckRunOutputResponse, err
 	return res, nil
 }
 
-func (pr *PR) IsStatusCheckInProgress() bool {
+func (pr *PRWithChecks) IsStatusCheckInProgress() bool {
 	if pr == nil || len(pr.Commits.Nodes) == 0 {
 		return true
 	}
+
+	contexts := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts
+	stats := checks.AccumulatedStats(contexts.CheckRunCountsByState, contexts.StatusContextCountsByState)
 	return (pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "" ||
-		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING")
+		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING" || stats.InProgress > 0)
 }
 
 func ReRunJob(repo string, jobId string) error {
@@ -442,4 +445,57 @@ func ReRunRun(repo string, runId string) error {
 
 	err = client.Post(fmt.Sprintf("repos/%s/actions/runs/%s/rerun", repo, runId), body, res)
 	return err
+}
+
+type PR struct {
+	Title      string
+	Number     int
+	Url        string
+	Repository struct {
+		NameWithOwner string
+	}
+	Merged      bool
+	IsDraft     bool
+	Closed      bool
+	HeadRefName string
+	Commits     struct {
+		Nodes []struct {
+			Commit struct {
+				StatusCheckRollup struct {
+					State CommitState
+				}
+			}
+		}
+	} `graphql:"commits(last: 1)"`
+}
+
+type PRQuery struct {
+	Resource struct {
+		PullRequest PR `graphql:"... on PullRequest"`
+	} `graphql:"resource(url: $url)"`
+}
+
+func FetchPR(repo string, prNumber string) (PRQuery, error) {
+	var err error
+	var res PRQuery
+	c, err := getGraphQLClient()
+	if err != nil {
+		return res, err
+	}
+
+	parsedUrl, err := url.Parse(fmt.Sprintf("https://github.com/%s/pull/%s", repo, prNumber))
+	if err != nil {
+		return res, err
+	}
+	variables := map[string]any{
+		"url": githubv4.URI{URL: parsedUrl},
+	}
+
+	err = c.Query("FetchPR", &res, variables)
+	if err != nil {
+		log.Error("error fetching PR", "err", err)
+		return res, err
+	}
+
+	return res, nil
 }

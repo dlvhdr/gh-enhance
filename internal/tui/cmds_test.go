@@ -49,10 +49,10 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 	}
 
 	m := NewModel("dlvhdr/gh-dash", "1", ModelOpts{})
-	m.pr = res.Data.Resource.PullRequest
+	m.prWithChecks = res.Data.Resource.PullRequest
 
-	runs := makeWorkflowRuns(m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes)
-	msg1 := workflowRunsFetchedMsg{runs: runs, pr: m.pr}
+	runs := makeWorkflowRuns(m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes)
+	msg1 := workflowRunsFetchedMsg{runs: runs, pr: m.prWithChecks}
 	m.mergeWorkflowRuns(msg1)
 
 	if len(m.workflowRuns) != 1 {
@@ -91,10 +91,10 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 	wfr := makeWorkflowRun(res.Data.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes[0].CheckRun)
 
 	m := NewModel("dlvhdr/gh-dash", "1", ModelOpts{})
-	m.pr = res.Data.Resource.PullRequest
+	m.prWithChecks = res.Data.Resource.PullRequest
 
-	runs := makeWorkflowRuns(m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes)
-	msg1 := workflowRunsFetchedMsg{runs: runs, pr: m.pr}
+	runs := makeWorkflowRuns(m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes)
+	msg1 := workflowRunsFetchedMsg{runs: runs, pr: m.prWithChecks}
 	m.mergeWorkflowRuns(msg1)
 
 	if len(m.workflowRuns) != 1 {

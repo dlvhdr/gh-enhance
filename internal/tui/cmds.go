@@ -21,10 +21,16 @@ import (
 )
 
 type workflowRunsFetchedMsg struct {
-	pr        api.PR
+	pr        api.PRWithChecks
 	runs      []data.WorkflowRun
 	rateLimit api.RateLimit
 	err       error
+}
+
+func (m *model) makeFetchPRCmd() tea.Cmd {
+	return func() tea.Msg {
+		return m.fetchPR()
+	}
 }
 
 func (m *model) makeInitialGetPRChecksCmd(prNumber string) tea.Cmd {
@@ -43,19 +49,25 @@ type prChecksIntervalTickMsg struct {
 	msg tea.Msg
 }
 
-func (m *model) fetchPRChecksWithInterval() tea.Cmd {
-	return tea.Tick(time.Second*10, func(t time.Time) tea.Msg {
-		if !m.pr.IsStatusCheckInProgress() {
-			log.Info("all tasks have concluded - not refetching anymore")
-			return nil
-		}
+var refreshInterval = time.Second * 10
 
-		if m.rateLimit.Remaining == 0 && time.Now().Before(m.rateLimit.ResetAt) {
-			log.Warn("rate limit reached, waiting", "m.rateLimit", m.rateLimit)
-			return nil
-		}
-		return prChecksIntervalTickMsg{msg: m.fetchPRChecks(m.prNumber)}
-	})
+func (m *model) fetchPRChecksWithInterval() tea.Cmd {
+	return tea.Batch(
+		m.makeFetchPRCmd(),
+		tea.Tick(refreshInterval, func(t time.Time) tea.Msg {
+			if !m.prWithChecks.IsStatusCheckInProgress() {
+				log.Info("all tasks have concluded - not refetching anymore")
+				return nil
+			}
+
+			if m.rateLimit.Remaining == 0 && time.Now().Before(m.rateLimit.ResetAt) {
+				log.Warn("rate limit reached, waiting", "m.rateLimit", m.rateLimit)
+				return nil
+			}
+
+			return prChecksIntervalTickMsg{msg: m.fetchPRChecks(m.prNumber)}
+		}),
+	)
 }
 
 func (m *model) fetchPRChecks(prNumber string) tea.Msg {
@@ -248,7 +260,7 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 
 func (m *model) makeInitCmd() tea.Cmd {
 	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(),
-		m.makeInitialGetPRChecksCmd(m.prNumber), m.fetchPRChecksWithInterval())
+		m.makeFetchPRCmd(), m.makeInitialGetPRChecksCmd(m.prNumber), m.fetchPRChecksWithInterval())
 }
 
 func workflowName(cr api.CheckRun) string {
@@ -448,7 +460,7 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 		return cmds
 	}
 
-	commits := m.pr.Commits.Nodes
+	commits := m.prWithChecks.Commits.Nodes
 	if len(commits) > 0 {
 		commits[0].Commit.StatusCheckRollup.State = api.CommitStatePending
 	}
@@ -478,7 +490,7 @@ func (m *model) rerunRun(runId string) []tea.Cmd {
 		return cmds
 	}
 
-	commits := m.pr.Commits.Nodes
+	commits := m.prWithChecks.Commits.Nodes
 	if len(commits) > 0 {
 		commits[0].Commit.StatusCheckRollup.State = api.CommitStatePending
 	}
@@ -493,6 +505,27 @@ func (m *model) rerunRun(runId string) []tea.Cmd {
 		return reRunRunMsg{runId: runId, err: api.ReRunRun(m.repo, runId)}
 	})
 	return cmds
+}
+
+type prFetchedMsg struct {
+	pr  api.PR
+	err error
+}
+
+func (m model) fetchPR() tea.Msg {
+	resp, err := api.FetchPR(m.repo, m.prNumber)
+	if err != nil {
+		log.Error("error fetching pr", "err", err)
+		return prFetchedMsg{err: err}
+	}
+
+	if resp.Resource.PullRequest.Number == 0 {
+		return prFetchedMsg{err: errors.New("pull request not found")}
+	}
+
+	return prFetchedMsg{
+		pr: resp.Resource.PullRequest,
+	}
 }
 
 func filterForCheckRuns(nodes []api.ContextNode) []api.CheckRun {

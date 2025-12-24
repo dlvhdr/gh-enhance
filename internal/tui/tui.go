@@ -50,6 +50,7 @@ type model struct {
 	prNumber          string
 	repo              string
 	pr                api.PR
+	prWithChecks      api.PRWithChecks
 	workflowRuns      []data.WorkflowRun
 	runsList          list.Model
 	jobsList          list.Model
@@ -73,6 +74,7 @@ type model struct {
 	lastTick          time.Time
 	version           string
 	rateLimit         api.RateLimit
+	lastFetched       time.Time
 	help              help.Model
 }
 
@@ -196,6 +198,7 @@ func NewModel(repo string, number string, opts ModelOpts) model {
 		inProgressSpinner: ips,
 		flat:              opts.Flat,
 		focusedPane:       focusedPane,
+		lastFetched:       time.Now(),
 	}
 	m.setFocusedPaneStyles()
 	return m
@@ -217,6 +220,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
 
+	case prFetchedMsg:
+		m.pr = msg.pr
+
 	case workflowRunsFetchedMsg, prChecksIntervalTickMsg:
 		var wrMsg workflowRunsFetchedMsg
 		if tickMsg, ok := msg.(prChecksIntervalTickMsg); ok {
@@ -232,8 +238,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		log.Debug("workflow runs fetched", "rateLimit", wrMsg.rateLimit)
 
-		m.pr = wrMsg.pr
+		m.prWithChecks = wrMsg.pr
 		if _, ok := msg.(prChecksIntervalTickMsg); ok {
+			m.lastFetched = time.Now()
 			cmds = append(cmds, m.fetchPRChecksWithInterval())
 		}
 
@@ -316,6 +323,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 
+		m.lastFetched = time.Now()
 		cmds = append(cmds, m.fetchPRChecksWithInterval())
 
 	case reRunRunMsg:
@@ -327,6 +335,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 
+		m.lastFetched = time.Now()
 		cmds = append(cmds, m.fetchPRChecksWithInterval())
 
 	case tea.WindowSizeMsg:
@@ -404,6 +413,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			newModel.setFocusedPaneStyles()
 
+			m.lastFetched = time.Now()
 			return newModel, newModel.makeInitCmd()
 		}
 
@@ -434,8 +444,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.logsInput.Focus())
 		}
 
-		if key.Matches(msg, openPRKey) && m.pr.Url != "" {
-			cmds = append(cmds, makeOpenUrlCmd(m.pr.Url))
+		if key.Matches(msg, openPRKey) && m.prWithChecks.Url != "" {
+			cmds = append(cmds, makeOpenUrlCmd(m.prWithChecks.Url))
 		}
 
 		if key.Matches(msg, nextPaneKey) {
@@ -722,32 +732,34 @@ func (m *model) viewFlatChecks() string {
 }
 
 func (m *model) viewHeader() string {
-	s := lipgloss.NewStyle().Background(m.styles.headerStyle.GetBackground())
-	version := s.Height(lipgloss.Height(Logo)).Render(fmt.Sprintf(" \n %s", m.version))
+	bgStyle := lipgloss.NewStyle().Background(m.styles.headerStyle.GetBackground())
+	version := bgStyle.Height(lipgloss.Height(Logo)).Render(fmt.Sprintf(" \n %s", m.version))
 
 	logoWidth := lipgloss.Width(Logo) + lipgloss.Width(version)
 	logo := lipgloss.PlaceHorizontal(
 		logoWidth,
 		lipgloss.Right,
-		s.Width(logoWidth).Render(
+		bgStyle.Width(logoWidth).Render(
 			lipgloss.JoinHorizontal(lipgloss.Bottom,
 				m.styles.logoStyle.Render(Logo),
 				m.styles.faintFgStyle.Render(version),
 			)))
 
-	status := s.Render(m.viewCommitStatus(s))
+	status := bgStyle.Render(m.viewCommitStatus(bgStyle))
 	prWidth := m.width - lipgloss.Width(status) - logoWidth -
 		m.styles.headerStyle.GetHorizontalFrameSize()
-	pr := s.Width(prWidth).Render(fmt.Sprintf("Loading %s PR #%s...", m.repo, m.prNumber))
+	title := ""
 	if m.pr.Title != "" {
-		pr = s.Width(prWidth).Render(lipgloss.JoinVertical(lipgloss.Left,
-			m.viewRepo(prWidth, s),
-			m.viewPRName(prWidth, s),
+		title = bgStyle.Width(prWidth).Render(lipgloss.JoinVertical(lipgloss.Left,
+			m.viewRepo(prWidth, bgStyle),
+			m.viewPRName(prWidth, bgStyle),
 		))
+	} else {
+		title = bgStyle.Width(prWidth).Render(fmt.Sprintf("Loading %s PR #%s...", m.repo, m.prNumber))
 	}
 
 	return m.styles.headerStyle.Width(m.width).Render(
-		lipgloss.JoinHorizontal(lipgloss.Left, status, s.Render(pr), logo))
+		lipgloss.JoinHorizontal(lipgloss.Left, status, bgStyle.Render(title), logo))
 }
 
 func (m *model) viewRepo(width int, bgStyle lipgloss.Style) string {
@@ -769,9 +781,11 @@ func (m *model) viewRepo(width int, bgStyle lipgloss.Style) string {
 	return bgStyle.Width(width).Render(lipgloss.JoinHorizontal(lipgloss.Top,
 		bgStyle.Render(status),
 		bgStyle.Render(" "),
-		bgStyle.Foreground(m.styles.colors.darkColor).Bold(true).Render(m.pr.Repository.NameWithOwner),
+		bgStyle.Foreground(m.styles.colors.darkColor).Bold(true).Render(
+			m.pr.Repository.NameWithOwner),
 		bgStyle.Render(" "),
-		bgStyle.Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("#%d", m.pr.Number)),
+		bgStyle.Foreground(m.styles.colors.faintColor).Render(
+			fmt.Sprintf("#%d", m.pr.Number)),
 	))
 }
 
@@ -783,18 +797,18 @@ func (m *model) viewFooter() string {
 	bg := lipgloss.NewStyle().Background(m.styles.footerStyle.GetBackground())
 	sFooter := m.styles.footerStyle.Width(m.width)
 
-	if m.width == 0 || len(m.pr.Commits.Nodes) == 0 {
+	if m.width == 0 || len(m.prWithChecks.Commits.Nodes) == 0 {
 		return sFooter.Inherit(bg).Render("")
 	}
 
 	texts := make([]string, 0)
 
-	contexts := m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts
+	contexts := m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts
 	total := contexts.CheckRunCount + contexts.StatusContextCount
 	totalText := ""
 	if total > 0 {
 		totalText = bg.Foreground(m.styles.colors.lightColor).Render(
-			fmt.Sprintf("%d total checks: ", total))
+			fmt.Sprintf("%d checks: ", total))
 	}
 
 	stats := checks.AccumulatedStats(contexts.CheckRunCountsByState, contexts.StatusContextCountsByState)
@@ -818,12 +832,25 @@ func (m *model) viewFooter() string {
 
 	checks := bg.Render(strings.Join(texts, bg.Render(", ")))
 
+	reFetchingIn := ""
+	if m.prWithChecks.Number != 0 && m.prWithChecks.IsStatusCheckInProgress() {
+		until := time.Until(m.lastFetched.Add(refreshInterval)).Truncate(time.Second).Seconds()
+		untilStr := fmt.Sprintf("in %ds", int(until))
+		if until <= 0 {
+			untilStr = "now..."
+		}
+		reFetchingIn = bg.Padding(0, 1).Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("Refreshing %s", untilStr))
+	}
+
 	help := m.styles.helpButtonStyle.Render("? help")
 
+	gap := bg.Render(
+		strings.Repeat(" ", m.width-lipgloss.Width(totalText)-lipgloss.Width(checks)-
+			lipgloss.Width(reFetchingIn)-lipgloss.Width(help)-
+			m.styles.footerStyle.GetHorizontalFrameSize()))
+
 	return sFooter.Render(
-		lipgloss.JoinHorizontal(lipgloss.Top, totalText, checks, bg.Render(
-			strings.Repeat(" ", m.width-lipgloss.Width(checks)-lipgloss.Width(help)-
-				m.styles.footerStyle.GetHorizontalFrameSize())), help))
+		lipgloss.JoinHorizontal(lipgloss.Top, totalText, checks, gap, reFetchingIn, help))
 }
 
 func (m *model) shouldShowSteps() bool {
@@ -1458,14 +1485,14 @@ func (m *model) renderJobLogs() tea.Cmd {
 }
 
 func (m *model) logsContentView() string {
-	if m.pr.Number != 0 && len(m.pr.Commits.Nodes) > 0 &&
-		m.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.CheckRunCount == 0 {
+	if m.prWithChecks.Number != 0 && len(m.prWithChecks.Commits.Nodes) > 0 &&
+		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.CheckRunCount == 0 {
 		return m.fullScreenMessageView(
 			lipgloss.JoinVertical(lipgloss.Center,
 				lipgloss.NewStyle().Foreground(m.styles.tint.BrightWhite).Render(art.CheckmarkSign),
 				"",
 				m.styles.faintFgStyle.Bold(true).Render(
-					fmt.Sprintf("No checks reported on the '%s' branch", m.pr.HeadRefName))))
+					fmt.Sprintf("No checks reported on the '%s' branch", m.prWithChecks.HeadRefName))))
 	}
 
 	ji := m.getSelectedJobItem()
