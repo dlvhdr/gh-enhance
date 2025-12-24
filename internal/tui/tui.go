@@ -1820,19 +1820,19 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 
 func (m *model) buildFlatChecksLists() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
-	cNum := 0
+	sorted := make([]data.WorkflowJob, 0)
 	for _, run := range m.workflowRuns {
-		for j, job := range run.Jobs {
-			ci := m.getCheckItemById(job.Id)
-			if ci == nil {
-				nci := NewCheckItem(job, m.styles)
-				ci = &nci
-				cmds = append(cmds, ci.Tick())
-				cmds = append(cmds, m.checksList.InsertItem(cNum+j, ci))
-			}
-		}
-		cNum += len(run.Jobs)
+		sorted = append(sorted, run.Jobs...)
 	}
+	data.SortJobs(sorted)
+
+	items := make([]list.Item, 0)
+	for _, job := range sorted {
+		ci := NewCheckItem(job, m.styles)
+		items = append(items, &ci)
+		cmds = append(cmds, ci.Tick())
+	}
+	m.checksList.SetItems(items)
 	return cmds
 }
 

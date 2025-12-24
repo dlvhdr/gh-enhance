@@ -35,6 +35,9 @@ func (i *runItem) Title() string {
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (i *runItem) Description() string {
 	if i.run.Event == "" {
+		if i.run.Workflow == "" {
+			return "status check"
+		}
 		return i.run.Workflow
 	}
 
@@ -61,18 +64,7 @@ func (i *runItem) viewStatus() string {
 		return i.spinner.View()
 	}
 
-	switch i.run.Bucket {
-	case data.CheckBucketPass:
-		return i.meta.styles.successGlyph.Inherit(s).Render()
-	case data.CheckBucketFail:
-		return i.meta.styles.failureGlyph.Inherit(s).Render()
-	case data.CheckBucketSkipping:
-		return i.meta.styles.skippedGlyph.Inherit(s).Render()
-	case data.CheckBucketCancel:
-		return i.meta.styles.canceledGlyph.Inherit(s).Render()
-	default:
-		return i.meta.styles.pendingGlyph.Inherit(s).Render()
-	}
+	return bucketToIcon(i.run.Bucket, s, i.meta.styles)
 }
 
 func (ri *runItem) Tick() tea.Cmd {

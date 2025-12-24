@@ -24,6 +24,9 @@ func (ci *checkItem) Title() string {
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (ci *checkItem) Description() string {
 	if ci.job.Event == "" {
+		if ci.job.Workflow == "" {
+			return "status check"
+		}
 		return ci.job.Workflow
 	}
 
@@ -73,7 +76,7 @@ func (d *checksDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		log.Info("key pressed on run", "key", msg.Text)
+		log.Info("key pressed on check", "key", msg.Text)
 		switch {
 		case key.Matches(msg, openUrlKey):
 			return makeOpenUrlCmd(selected.job.Link)

@@ -74,14 +74,17 @@ const (
 	CheckBucketFail
 	CheckBucketCancel
 	CheckBucketPending
+	CheckBucketNeutral
 )
 
 func GetConclusionBucket(conclusion api.Conclusion) CheckBucket {
 	switch conclusion {
 	case "SUCCESS":
 		return CheckBucketPass
-	case "SKIPPED", "NEUTRAL":
+	case "SKIPPED":
 		return CheckBucketSkipping
+	case "NEUTRAL":
+		return CheckBucketNeutral
 	case "ERROR", "FAILURE", "TIMED_OUT", "ACTION_REQUIRED":
 		return CheckBucketFail
 	case "CANCELLED":
@@ -92,22 +95,59 @@ func GetConclusionBucket(conclusion api.Conclusion) CheckBucket {
 }
 
 func (run WorkflowRun) SortJobs() {
-	sort.Slice(run.Jobs, func(i, j int) bool {
-		if run.Jobs[i].Bucket == CheckBucketFail &&
-			run.Jobs[j].Bucket != CheckBucketFail {
+	SortJobs(run.Jobs)
+}
+
+func SortJobs(jobs []WorkflowJob) {
+	sort.SliceStable(jobs, func(i, j int) bool {
+		if jobs[i].Bucket == CheckBucketFail &&
+			jobs[j].Bucket != CheckBucketFail {
 			return true
 		}
-		if run.Jobs[j].Bucket == CheckBucketFail &&
-			run.Jobs[i].Bucket != CheckBucketFail {
+		if jobs[j].Bucket == CheckBucketFail &&
+			jobs[i].Bucket != CheckBucketFail {
 			return false
 		}
-		if run.Jobs[i].StartedAt.IsZero() {
+
+		if jobs[i].State == api.StatusInProgress &&
+			jobs[j].State != api.StatusInProgress {
+			return true
+		}
+		if jobs[j].State == api.StatusInProgress &&
+			jobs[i].State != api.StatusInProgress {
 			return false
 		}
-		if run.Jobs[j].StartedAt.IsZero() {
+
+		if jobs[i].Conclusion == api.ConclusionSkipped &&
+			jobs[j].Conclusion != api.ConclusionSkipped {
+			return true
+		}
+		if jobs[j].Conclusion == api.ConclusionSkipped &&
+			jobs[i].Conclusion != api.ConclusionSkipped {
+			return false
+		}
+
+		if jobs[i].Conclusion == api.ConclusionNeutral &&
+			jobs[j].Conclusion != api.ConclusionNeutral {
+			return true
+		}
+		if jobs[j].Conclusion == api.ConclusionNeutral &&
+			jobs[i].Conclusion != api.ConclusionNeutral {
+			return false
+		}
+
+		if jobs[i].StartedAt.IsZero() {
+			return false
+		}
+		// if second job hasn't started yet, it should appear last
+		if jobs[j].StartedAt.IsZero() {
 			return true
 		}
 
-		return run.Jobs[i].StartedAt.Before(run.Jobs[j].StartedAt)
+		return jobs[i].StartedAt.Before(jobs[j].StartedAt)
 	})
+}
+
+func (job WorkflowJob) IsStatusInProgress() bool {
+	return job.State == api.StatusInProgress
 }

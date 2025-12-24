@@ -59,6 +59,7 @@ type styles struct {
 	lineNumbersStyle           lipgloss.Style
 	canceledGlyph              lipgloss.Style
 	skippedGlyph               lipgloss.Style
+	neutralGlyph               lipgloss.Style
 	waitingGlyph               lipgloss.Style
 	pendingGlyph               lipgloss.Style
 	failureGlyph               lipgloss.Style
@@ -180,6 +181,7 @@ func makeStyles() styles {
 		lineNumbersStyle:           lipgloss.NewStyle().Foreground(colors.faintColor).Align(lipgloss.Right),
 		canceledGlyph:              lipgloss.NewStyle().Foreground(colors.warnColor).SetString(CanceledIcon),
 		skippedGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(SkippedIcon),
+		neutralGlyph:               lipgloss.NewStyle().Foreground(colors.whiteColor).SetString(NeutralIcon),
 		waitingGlyph:               lipgloss.NewStyle().Foreground(t.Yellow).SetString(WaitingIcon),
 		pendingGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(PendingIcon),
 		failureGlyph:               lipgloss.NewStyle().Foreground(t.Red).SetString(FailureIcon),

@@ -78,18 +78,7 @@ func (i *jobItem) viewStatus() string {
 	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
 		return i.spinner.View()
 	}
-	switch i.job.Bucket {
-	case data.CheckBucketPass:
-		return i.meta.styles.successGlyph.Inherit(s).Render()
-	case data.CheckBucketFail:
-		return i.meta.styles.failureGlyph.Inherit(s).Render()
-	case data.CheckBucketSkipping:
-		return i.meta.styles.skippedGlyph.Inherit(s).Render()
-	case data.CheckBucketCancel:
-		return i.meta.styles.canceledGlyph.Inherit(s).Render()
-	default:
-		return i.meta.styles.pendingGlyph.Inherit(s).Render()
-	}
+	return bucketToIcon(i.job.Bucket, s, i.meta.styles)
 }
 
 // jobsDelegate implements github.com/charmbracelet/bubbles.list.ItemDelegate

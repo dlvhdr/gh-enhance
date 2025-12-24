@@ -21,6 +21,7 @@ const (
 const (
 	CanceledIcon = ""
 	SkippedIcon  = ""
+	NeutralIcon  = ""
 	WaitingIcon  = ""
 	PendingIcon  = ""
 	FailureIcon  = "󰅙"
