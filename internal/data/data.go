@@ -2,6 +2,7 @@ package data
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
@@ -10,13 +11,14 @@ import (
 // WorkflowRun holds all the the jobs that were part of it
 // It is defined by a workflow file that defines the jobs to run
 type WorkflowRun struct {
-	Id       string
-	Name     string
-	Link     string
-	Workflow string
-	Event    string
-	Jobs     []WorkflowJob
-	Bucket   CheckBucket
+	Id        string
+	Name      string
+	Link      string
+	Workflow  string
+	Event     string
+	Jobs      []WorkflowJob
+	Bucket    CheckBucket
+	StartedAt time.Time
 }
 
 type WorkflowJob struct {
@@ -150,4 +152,46 @@ func SortJobs(jobs []WorkflowJob) {
 
 func (job WorkflowJob) IsStatusInProgress() bool {
 	return job.State == api.StatusInProgress
+}
+
+func SortRuns(runs []WorkflowRun) {
+	sort.SliceStable(runs, func(i, j int) bool {
+		if runs[i].Bucket == CheckBucketFail &&
+			runs[j].Bucket != CheckBucketFail {
+			return true
+		}
+		if runs[j].Bucket == CheckBucketFail &&
+			runs[i].Bucket != CheckBucketFail {
+			return false
+		}
+
+		if runs[i].Bucket == CheckBucketPending &&
+			runs[j].Bucket != CheckBucketPending {
+			return true
+		}
+		if runs[j].Bucket == CheckBucketPending &&
+			runs[i].Bucket != CheckBucketPending {
+			return false
+		}
+
+		if runs[i].Bucket == CheckBucketSkipping &&
+			runs[j].Bucket != CheckBucketSkipping {
+			return true
+		}
+		if runs[j].Bucket == CheckBucketSkipping &&
+			runs[i].Bucket != CheckBucketSkipping {
+			return false
+		}
+
+		if runs[i].Bucket == CheckBucketNeutral &&
+			runs[j].Bucket != CheckBucketNeutral {
+			return true
+		}
+		if runs[j].Bucket == CheckBucketNeutral &&
+			runs[i].Bucket != CheckBucketNeutral {
+			return false
+		}
+
+		return strings.Compare(runs[i].Name, runs[j].Name) == -1
+	})
 }

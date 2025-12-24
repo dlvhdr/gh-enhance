@@ -323,6 +323,8 @@ func (m *model) mergeWorkflowRuns(msg workflowRunsFetchedMsg) {
 		runs = append(runs, run)
 	}
 
+	data.SortRuns(runs)
+
 	m.workflowRuns = runs
 }
 
@@ -377,12 +379,13 @@ func makeWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
 	}
 
 	run := data.WorkflowRun{
-		Id:       fmt.Sprintf("%d", id),
-		Name:     wfName,
-		Link:     link,
-		Workflow: checkRun.CheckSuite.WorkflowRun.Workflow.Name,
-		Event:    checkRun.CheckSuite.WorkflowRun.Event,
-		Bucket:   data.GetConclusionBucket(checkRun.CheckSuite.Conclusion),
+		Id:        fmt.Sprintf("%d", id),
+		Name:      wfName,
+		Link:      link,
+		Workflow:  checkRun.CheckSuite.WorkflowRun.Workflow.Name,
+		Event:     checkRun.CheckSuite.WorkflowRun.Event,
+		Bucket:    data.GetConclusionBucket(checkRun.CheckSuite.Conclusion),
+		StartedAt: checkRun.StartedAt,
 	}
 	return run
 }
@@ -419,30 +422,48 @@ func makeWorkflowJob(checkRun api.CheckRun) data.WorkflowJob {
 // Clean duplicate check runs because of old attempts.
 func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
 	type latestMap struct {
-		runs   []data.WorkflowJob
+		jobs   []data.WorkflowJob
 		number int
 	}
-	latestRuns := map[string]latestMap{}
+
+	wfNameToJobs := map[string]latestMap{}
 	for _, job := range jobs {
 		wfName := job.Workflow
-		existing, ok := latestRuns[wfName]
-		if !ok || existing.number <
-			job.RunNumber {
+		existing, ok := wfNameToJobs[wfName]
+
+		// if the job's wf isn't yet set in the map
+		if !ok {
 			r := make([]data.WorkflowJob, 0)
 			r = append(r, job)
-			latestRuns[wfName] = latestMap{
-				runs:   r,
+			wfNameToJobs[wfName] = latestMap{
+				jobs:   r,
 				number: job.RunNumber,
 			}
-		} else if ok {
-			existing.runs = append(existing.runs, job)
-			latestRuns[wfName] = latestMap{runs: existing.runs, number: existing.number}
+
+			// job is part of a wf that we already met
+			// and it's a later attempt of the same job
+			// override the existing job with the later attempt
+		} else if job.RunNumber > existing.number {
+			found := 0
+			for i, ej := range existing.jobs {
+				if ej.Name == job.Name {
+					found = i
+					break
+				}
+			}
+			existing.jobs[found] = job
+			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, number: job.RunNumber}
+
+			// the job isn't a later attempt - it's a job we haven't met before, append it
+		} else {
+			existing.jobs = append(existing.jobs, job)
+			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, number: existing.number}
 		}
 	}
 
 	flat := make([]data.WorkflowJob, 0)
-	for _, checkRun := range latestRuns {
-		flat = append(flat, checkRun.runs...)
+	for _, checkRun := range wfNameToJobs {
+		flat = append(flat, checkRun.jobs...)
 	}
 	return flat
 }
