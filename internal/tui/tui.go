@@ -256,6 +256,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.stopSpinners()
 				log.Info("fetched all checks", "pageInfo", pageInfo)
+				cmds = append(cmds, m.onWorkflowRunsFetched()...)
 			}
 
 			m.mergeWorkflowRuns(wrMsg)
@@ -271,8 +272,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					"❌ Pull request not found."), m.repo, m.prNumber, wrMsg.err)
 			return m, tea.Sequence(tea.ExitAltScreen, msgCmd, tea.Quit)
 		}
-
-		cmds = append(cmds, m.onWorkflowRunsFetched()...)
 
 	case workflowRunStepsFetchedMsg:
 		cmds = append(cmds, m.enrichRunWithJobsStepsV2(msg)...)
@@ -1781,10 +1780,7 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 		cmds = append(cmds, m.buildFlatChecksLists()...)
 
 		if len(m.checksList.Items()) > 0 {
-			ci := m.checksList.SelectedItem().(*checkItem)
-			if before == nil || before.job.Id != ci.job.Id {
-				cmds = append(cmds, m.onCheckChanged()...)
-			}
+			cmds = append(cmds, m.onCheckChanged()...)
 		}
 
 		if before != nil && !before.initiatedLogsFetch {
