@@ -220,6 +220,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
 
+	// startIntervalFetching is sent after the refreshInterval duration has elapsed
+	// at this point m.fetchPRChecksWithInterval() checks if all checks have concluded
+	// if they did - it's a noop, otherwise we check at the interval
+	// m.fetchPRChecksWithInterval needs an up to date model, so this *cannot* be called
+	// at the `m.makeInitCmd`. The up to date model is received by this `Update` func.
+	case startIntervalFetching:
+		cmds = append(cmds, m.fetchPRChecksWithInterval())
+
 	case prFetchedMsg:
 		m.pr = msg.pr
 
@@ -250,6 +258,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.workflowRuns = make([]data.WorkflowRun, 0)
 			}
 
+			m.mergeWorkflowRuns(wrMsg)
+
 			if pageInfo.HasNextPage {
 				log.Info("fetching next checks page", "pageInfo", pageInfo)
 				cmds = append(cmds, m.makeGetNextPagePRChecksCmd(pageInfo.EndCursor))
@@ -258,8 +268,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				log.Info("fetched all checks", "pageInfo", pageInfo)
 				cmds = append(cmds, m.onWorkflowRunsFetched()...)
 			}
-
-			m.mergeWorkflowRuns(wrMsg)
 		} else {
 			m.stopSpinners()
 		}
@@ -417,8 +425,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, rerunKey) {
-			// TODO: handle check
-			if m.focusedPane != PaneRuns && m.focusedPane != PaneJobs {
+			if m.focusedPane != PaneRuns && m.focusedPane != PaneJobs && m.focusedPane != PaneChecks {
 				break
 			}
 

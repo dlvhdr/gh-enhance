@@ -70,6 +70,14 @@ func (m *model) fetchPRChecksWithInterval() tea.Cmd {
 	)
 }
 
+type startIntervalFetching struct{}
+
+func (m *model) startFetchingPRChecksWithInterval() tea.Cmd {
+	return tea.Tick(refreshInterval, func(t time.Time) tea.Msg {
+		return startIntervalFetching{}
+	})
+}
+
 func (m *model) fetchPRChecks(prNumber string) tea.Msg {
 	log.Info("fetching pr checks from the begginging")
 	return m.fetchPRChecksWithCursor(prNumber, "")
@@ -259,8 +267,8 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 }
 
 func (m *model) makeInitCmd() tea.Cmd {
-	return tea.Batch(m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(),
-		m.makeFetchPRCmd(), m.makeInitialGetPRChecksCmd(m.prNumber), m.fetchPRChecksWithInterval())
+	return tea.Batch(m.checksList.StartSpinner(), m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(),
+		m.makeFetchPRCmd(), m.makeInitialGetPRChecksCmd(m.prNumber), m.startFetchingPRChecksWithInterval())
 }
 
 func workflowName(cr api.CheckRun) string {
@@ -474,6 +482,7 @@ type reRunJobMsg struct {
 }
 
 func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
+	log.Info("re-running job", "runId", runId, "jobId", jobId)
 	cmds := make([]tea.Cmd, 0)
 	ri := m.getRunItemById(runId)
 	ji := m.getJobItemById(jobId)
