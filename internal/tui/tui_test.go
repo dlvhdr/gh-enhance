@@ -97,6 +97,12 @@ func setMockClient(t *testing.T) {
 			body = mustRead(t, req.Body)
 		}
 		switch {
+		case strings.Contains(body, "query FetchPR"):
+			d, err := os.ReadFile("./testdata/fetchPR.json")
+			if err != nil {
+				t.Errorf("failed reading mock data file %v", err)
+			}
+			mustWrite(t, w, string(d))
 		case strings.Contains(body, "query FetchCheckRuns"):
 			d, err := os.ReadFile("./testdata/fetchCheckRuns.json")
 			if err != nil {

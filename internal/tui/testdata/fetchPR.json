@@ -1,0 +1,27 @@
+{
+  "data": {
+    "resource": {
+      "title": "fix(prompt): prompt mark not placed after text edits correctly",
+      "number": 34671,
+      "url": "https://github.com/neovim/neovim/pull/34671",
+      "repository": {
+        "nameWithOwner": "neovim/neovim"
+      },
+      "merged": true,
+      "isDraft": false,
+      "closed": true,
+      "headRefName": "fix/pb1",
+      "commits": {
+        "nodes": [
+          {
+            "commit": {
+              "statusCheckRollup": {
+                "state": "FAILURE"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
