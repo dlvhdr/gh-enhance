@@ -125,6 +125,22 @@ func (ji *jobItem) isStatusInProgress() bool {
 		strings.Contains(ji.logsStderr, "is still in progress;"))
 }
 
+func (ji *jobItem) hasInProgressSteps() bool {
+	// if the job is in progress we must have in progress steps
+	if ji.isStatusInProgress() {
+		return true
+	}
+
+	// if the job isn't in progress but we have stale steps that are still showing
+	// as in progress
+	for _, si := range ji.steps {
+		if si.step.CompletedAt.IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
 func (ji *jobItem) Tick() tea.Cmd {
 	if ji.isStatusInProgress() {
 		return ji.spinner.Tick

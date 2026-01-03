@@ -220,6 +220,6 @@ func makePointingBorder(old string) string {
 }
 
 func NewClockSpinner(styles styles) spinner.Model {
-	return spinner.New(spinner.WithSpinner(ClockFrames),
+	return spinner.New(spinner.WithSpinner(MoonSpinnerFrames),
 		spinner.WithStyle(lipgloss.NewStyle().Width(1).Margin(0).Padding(0).Foreground(styles.colors.warnColor)))
 }

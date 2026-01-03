@@ -54,6 +54,9 @@ var refreshInterval = time.Second * 10
 func (m *model) fetchPRChecksWithInterval() tea.Cmd {
 	return tea.Batch(
 		m.makeFetchPRCmd(),
+		func() tea.Msg {
+			return m.fetchPRChecks(m.prNumber)
+		},
 		tea.Tick(refreshInterval, func(t time.Time) tea.Msg {
 			if !m.prWithChecks.IsStatusCheckInProgress() {
 				log.Info("all tasks have concluded - not refetching anymore")
@@ -301,26 +304,26 @@ func jobKind(cr api.CheckRun) data.JobKind {
 }
 
 func (m *model) mergeWorkflowRuns(msg workflowRunsFetchedMsg) {
-	runsMap := make(map[string]data.WorkflowRun)
+	runsMap := make(map[int]data.WorkflowRun)
 
 	// start with existing workflow runs to keep order and
 	// prevent the UI from jumping
 	for _, run := range m.workflowRuns {
-		runsMap[run.Name] = run
+		runsMap[run.RunNumber] = run
 	}
 
 	for _, run := range msg.runs {
-		existing, ok := runsMap[run.Name]
+		existing, ok := runsMap[run.RunNumber]
 
 		// run is new, no need to merge its jobs with the existing one
 		if !ok {
-			runsMap[run.Name] = run
+			runsMap[run.RunNumber] = run
 			continue
 		}
 
 		// run already exists, merge its jobs with the existing one
 		existing.Jobs = append(existing.Jobs, run.Jobs...)
-		runsMap[run.Name] = existing
+		runsMap[run.RunNumber] = existing
 	}
 
 	runs := make([]data.WorkflowRun, 0)
@@ -337,17 +340,18 @@ func (m *model) mergeWorkflowRuns(msg workflowRunsFetchedMsg) {
 }
 
 // Create workflow runs and their jobs under data the tui can work with
-// E.g. aggregate the check runs (i.e jobs) under workflow runs,
+// E.g. aggregate the check runs (i.e jobs) under workflow runs (a collection of jobs),
 // sort jobs by their status and creation time etc.
 func makeWorkflowRuns(nodes []api.ContextNode) []data.WorkflowRun {
 	checkRuns := filterForCheckRuns(nodes)
-	runsMap := make(map[string]data.WorkflowRun)
+	runsMap := make(map[int]data.WorkflowRun)
 
 	for _, checkRun := range checkRuns {
 		job := makeWorkflowJob(checkRun)
 
-		wfName := workflowName(checkRun)
-		run, ok := runsMap[wfName]
+		wfRunNumber := checkRun.CheckSuite.WorkflowRun.RunNumber
+		// wfName := workflowName(checkRun)
+		run, ok := runsMap[wfRunNumber]
 		if ok {
 			run.Jobs = append(run.Jobs, job)
 		} else {
@@ -355,7 +359,7 @@ func makeWorkflowRuns(nodes []api.ContextNode) []data.WorkflowRun {
 			run.Jobs = []data.WorkflowJob{job}
 		}
 
-		runsMap[wfName] = run
+		runsMap[wfRunNumber] = run
 	}
 
 	runs := make([]data.WorkflowRun, 0)
@@ -394,6 +398,7 @@ func makeWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
 		Event:     checkRun.CheckSuite.WorkflowRun.Event,
 		Bucket:    data.GetConclusionBucket(checkRun.CheckSuite.Conclusion),
 		StartedAt: checkRun.StartedAt,
+		RunNumber: checkRun.CheckSuite.WorkflowRun.RunNumber,
 	}
 	return run
 }
@@ -430,10 +435,11 @@ func makeWorkflowJob(checkRun api.CheckRun) data.WorkflowJob {
 // Clean duplicate check runs because of old attempts.
 func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
 	type latestMap struct {
-		jobs   []data.WorkflowJob
-		number int
+		jobs      []data.WorkflowJob
+		runNumber int
 	}
 
+	jobIds := map[string]bool{}
 	wfNameToJobs := map[string]latestMap{}
 	for _, job := range jobs {
 		wfName := job.Workflow
@@ -441,17 +447,17 @@ func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
 
 		// if the job's wf isn't yet set in the map
 		if !ok {
-			r := make([]data.WorkflowJob, 0)
-			r = append(r, job)
+			onlyJob := make([]data.WorkflowJob, 0)
+			onlyJob = append(onlyJob, job)
 			wfNameToJobs[wfName] = latestMap{
-				jobs:   r,
-				number: job.RunNumber,
+				jobs:      onlyJob,
+				runNumber: job.RunNumber,
 			}
 
 			// job is part of a wf that we already met
 			// and it's a later attempt of the same job
 			// override the existing job with the later attempt
-		} else if job.RunNumber > existing.number {
+		} else if job.RunNumber > existing.runNumber {
 			found := 0
 			for i, ej := range existing.jobs {
 				if ej.Name == job.Name {
@@ -460,13 +466,18 @@ func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
 				}
 			}
 			existing.jobs[found] = job
-			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, number: job.RunNumber}
+			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, runNumber: job.RunNumber}
 
 			// the job isn't a later attempt - it's a job we haven't met before, append it
 		} else {
-			existing.jobs = append(existing.jobs, job)
-			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, number: existing.number}
+			_, ok := jobIds[job.Id]
+			if !ok {
+				existing.jobs = append(existing.jobs, job)
+			}
+			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, runNumber: existing.runNumber}
 		}
+
+		jobIds[job.Id] = true
 	}
 
 	flat := make([]data.WorkflowJob, 0)
@@ -486,7 +497,7 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 	ri := m.getRunItemById(runId)
 	ji := m.getJobItemById(jobId)
-	if ri == nil || ji == nil {
+	if ri == nil && ji == nil {
 		return cmds
 	}
 
@@ -502,7 +513,10 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 	m.stepsList.ResetSelected()
 	m.stepsList.SetItems(make([]list.Item, 0))
 
-	cmds = append(cmds, ri.Tick(), ji.Tick(), m.inProgressSpinner.Tick, func() tea.Msg {
+	if ri != nil {
+		cmds = append(cmds, ri.Tick())
+	}
+	cmds = append(cmds, ji.Tick(), m.inProgressSpinner.Tick, func() tea.Msg {
 		return reRunJobMsg{jobId: jobId, err: api.ReRunJob(m.repo, jobId)}
 	})
 	return cmds

@@ -147,7 +147,7 @@ type Step struct {
 type CommitState string
 
 const (
-	CommitStateExpected CommitState = "EXPECTED"
+	CommitStateExpected CommitState = "EXPECTED" // Note: expected check runs are currently not listed in the API. See https://github.com/cli/cli/issues/6448
 	CommitStateError    CommitState = "ERROR"
 	CommitStateFailure  CommitState = "FAILURE"
 	CommitStatePending  CommitState = "PENDING"
@@ -183,6 +183,7 @@ type PRWithChecks struct {
 				StatusCheckRollup struct {
 					State    CommitState
 					Contexts struct {
+						TotalCount                 int
 						CheckRunCount              int
 						CheckRunCountsByState      []checks.ContextCountByState
 						StatusContextCount         int
@@ -256,12 +257,13 @@ func FetchPRCheckRuns(repo string, prNumber string, cursor string) (PRCheckRunsQ
 		"cursor": githubv4.String(cursor),
 	}
 
+	startTime := time.Now()
 	err = c.Query("FetchCheckRuns", &res, variables)
 	if err != nil {
 		log.Error("error fetching check runs", "err", err)
 		return res, err
 	}
-
+	log.Debug("FetchPRCheckRuns request completed", "duration", time.Since(startTime))
 	return res, nil
 }
 
@@ -300,12 +302,14 @@ func FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunStepsQuery, er
 	}
 
 	log.Debug("fetching check run steps", "url", runUrl)
+	startTime := time.Now()
 	err = c.Query("FetchCheckRunSteps", &res, variables)
 	if err != nil {
 		log.Error("error fetching check run steps", "err", err)
 		return res, err
 	}
 
+	log.Debug("FetchWorkflowRunSteps request completed", "duration", time.Since(startTime))
 	return res, nil
 }
 
@@ -345,10 +349,12 @@ func FetchJobSteps(repo string, jobID string) (NormalizedJobStepsResponse, error
 	}
 
 	log.Debug("fetching job steps", "url", jobUrl)
+	startTime := time.Now()
 	resp, err := c.Get(jobUrl.String())
 	if err != nil {
 		return res, err
 	}
+	log.Debug("FetchJobSteps request completed", "duration", time.Since(startTime))
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -402,11 +408,13 @@ func FetchCheckRunOutput(repo string, runID string) (CheckRunOutputResponse, err
 		return res, err
 	}
 
+	startTime := time.Now()
 	err = client.Get(fmt.Sprintf("repos/%s/check-runs/%s", repo, runID), &res)
 	if err != nil {
 		return res, err
 	}
 
+	log.Debug("FetchCheckRunOutput request completed", "duration", time.Since(startTime))
 	return res, nil
 }
 
@@ -491,11 +499,13 @@ func FetchPR(repo string, prNumber string) (PRQuery, error) {
 		"url": githubv4.URI{URL: parsedUrl},
 	}
 
+	startTime := time.Now()
 	err = c.Query("FetchPR", &res, variables)
 	if err != nil {
 		log.Error("error fetching PR", "err", err)
 		return res, err
 	}
 
+	log.Debug("FetchPR request completed", "duration", time.Since(startTime))
 	return res, nil
 }

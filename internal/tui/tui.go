@@ -220,10 +220,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
 
-	// startIntervalFetching is sent after the refreshInterval duration has elapsed
-	// at this point m.fetchPRChecksWithInterval() checks if all checks have concluded
-	// if they did - it's a noop, otherwise we check at the interval
-	// m.fetchPRChecksWithInterval needs an up to date model, so this *cannot* be called
+	// `startIntervalFetching` is sent after the `refreshInterval` duration has elapsed.
+	// At this point, `m.fetchPRChecksWithInterval()` checks if all checks have concluded.
+	// If they did - it's a noop, otherwise we check at the interval.
+	// `m.fetchPRChecksWithInterval` needs an up to date model, so this *cannot* be called
 	// at the `m.makeInitCmd`. The up to date model is received by this `Update` func.
 	case startIntervalFetching:
 		cmds = append(cmds, m.fetchPRChecksWithInterval())
@@ -244,11 +244,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		log.Debug("workflow runs fetched", "rateLimit", wrMsg.rateLimit)
+		if len(wrMsg.pr.Commits.Nodes) > 0 {
+			log.Debug("workflow runs fetched", "fetched",
+				len(wrMsg.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes))
+		}
 
 		m.prWithChecks = wrMsg.pr
 		if _, ok := msg.(prChecksIntervalTickMsg); ok {
-			m.lastFetched = time.Now()
 			cmds = append(cmds, m.fetchPRChecksWithInterval())
 		}
 
@@ -264,6 +266,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				log.Info("fetching next checks page", "pageInfo", pageInfo)
 				cmds = append(cmds, m.makeGetNextPagePRChecksCmd(pageInfo.EndCursor))
 			} else {
+				m.lastFetched = time.Now()
 				m.stopSpinners()
 				log.Info("fetched all checks", "pageInfo", pageInfo)
 				cmds = append(cmds, m.onWorkflowRunsFetched()...)
@@ -359,7 +362,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-		log.Info("👤 key pressed", "key", msg.String())
+		log.Info("key pressed", "key", msg.String())
 		if m.checksList.FilterState() == list.Filtering ||
 			m.runsList.FilterState() == list.Filtering ||
 			m.jobsList.FilterState() == list.Filtering ||
@@ -413,6 +416,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if key.Matches(msg, refreshAllKey) {
 			newModel := NewModel(m.repo, m.prNumber, ModelOpts{})
+			newModel.flat = m.flat
 			newModel.width = m.width
 			newModel.height = m.height
 			newModel.setHeights()
@@ -434,10 +438,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, m.rerunRun(ri.run.Id)...)
 			} else {
 				ji := m.getSelectedJobItem()
-				if ri == nil || ji == nil {
+				if ri == nil && ji == nil {
 					break
 				}
-				cmds = append(cmds, m.rerunJob(ri.run.Id, ji.job.Id)...)
+				rid := ""
+				if ri != nil {
+					rid = ri.run.Id
+				}
+				cmds = append(cmds, m.rerunJob(rid, ji.job.Id)...)
 			}
 		}
 
@@ -538,11 +546,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch m.focusedPane {
 	case PaneChecks:
-		before := m.checksList.GlobalIndex()
+		before := m.getSelectedCheckItem()
 		m.checksList, cmd = m.checksList.Update(msg)
 		cmds = append(cmds, cmd)
-		after := m.checksList.GlobalIndex()
-		if before != after {
+		after := m.getSelectedCheckItem()
+		if (before == nil && after != nil) || (after == nil && before != nil) ||
+			(before != nil && after != nil && before.job.Id != after.job.Id) {
 			cmds = append(cmds, m.onCheckChanged()...)
 			cmds = append(cmds, m.updateLists()...)
 		}
@@ -845,15 +854,15 @@ func (m *model) viewFooter() string {
 		if until <= 0 {
 			untilStr = "now..."
 		}
-		reFetchingIn = bg.Padding(0, 1).Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("Refreshing %s", untilStr))
+		reFetchingIn = bg.Padding(0, 1).Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("refreshing %s", untilStr))
 	}
 
 	help := m.styles.helpButtonStyle.Render("? help")
 
 	gap := bg.Render(
-		strings.Repeat(" ", m.width-lipgloss.Width(totalText)-lipgloss.Width(checks)-
+		strings.Repeat(" ", max(0, m.width-lipgloss.Width(totalText)-lipgloss.Width(checks)-
 			lipgloss.Width(reFetchingIn)-lipgloss.Width(help)-
-			m.styles.footerStyle.GetHorizontalFrameSize()))
+			m.styles.footerStyle.GetHorizontalFrameSize())))
 
 	return sFooter.Render(
 		lipgloss.JoinHorizontal(lipgloss.Top, totalText, checks, gap, reFetchingIn, help))
@@ -932,7 +941,7 @@ func (m *model) setFocusedPaneStyles() {
 		m.setListFocusedStyles(&m.jobsList, &m.jobsDelegate, PaneJobs)
 		m.setListUnfocusedStyles(&m.stepsList, &m.stepsDelegate)
 	case PaneSteps:
-		m.checksDelegate.(*checksDelegate).focused = true
+		m.checksDelegate.(*checksDelegate).focused = false
 		m.runsDelegate.(*runsDelegate).focused = false
 		m.jobsDelegate.(*jobsDelegate).focused = false
 		m.stepsDelegate.(*stepsDelegate).focused = true
@@ -941,7 +950,7 @@ func (m *model) setFocusedPaneStyles() {
 		m.setListUnfocusedStyles(&m.jobsList, &m.jobsDelegate)
 		m.setListFocusedStyles(&m.stepsList, &m.stepsDelegate, PaneSteps)
 	case PaneLogs:
-		m.checksDelegate.(*checksDelegate).focused = true
+		m.checksDelegate.(*checksDelegate).focused = false
 		m.runsDelegate.(*runsDelegate).focused = false
 		m.jobsDelegate.(*jobsDelegate).focused = false
 		m.stepsDelegate.(*stepsDelegate).focused = false
@@ -1130,20 +1139,21 @@ func (m *model) updateJobsList() []tea.Cmd {
 	return cmds
 }
 
+// updateStepsList sets the step items based on the selected job
 func (m *model) updateStepsList() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 
-	var ji *jobItem
+	var selectedJobItem *jobItem
 	if ci := m.getSelectedCheckItem(); ci != nil && m.flat {
-		ji = &ci.jobItem
+		selectedJobItem = &ci.jobItem
 	} else {
-		ji = m.getSelectedJobItem()
+		selectedJobItem = m.getSelectedJobItem()
 	}
 
 	existing := m.stepsList.Items()
 	existingCount := len(existing)
-	if ji != nil {
-		for i, si := range ji.steps {
+	if selectedJobItem != nil {
+		for i, si := range selectedJobItem.steps {
 			if i < existingCount {
 				cmds = append(cmds, m.stepsList.SetItem(i, si))
 			} else {
@@ -1151,7 +1161,7 @@ func (m *model) updateStepsList() []tea.Cmd {
 			}
 		}
 
-		for i := existingCount; i >= len(ji.steps); i-- {
+		for i := existingCount; i >= len(selectedJobItem.steps); i-- {
 			m.stepsList.RemoveItem(i)
 		}
 	}
@@ -1161,6 +1171,7 @@ func (m *model) updateStepsList() []tea.Cmd {
 	} else {
 		m.stepsList.SetShowStatusBar(false)
 	}
+	cmds = append(cmds, m.tickSteps()...)
 
 	return cmds
 }
@@ -1362,7 +1373,7 @@ func (m *model) onCheckChanged() []tea.Cmd {
 		return nil
 	}
 
-	if currCheck.loadingSteps {
+	if currCheck.hasInProgressSteps() || currCheck.loadingSteps {
 		cmds = append(cmds, m.makeFetchCheckStepsCmd(currCheck.job.Id))
 	}
 
@@ -1413,6 +1424,7 @@ func (m *model) onJobChanged() []tea.Cmd {
 
 	currJob := m.getSelectedJobItem()
 	if currJob != nil && !currJob.initiatedLogsFetch && !currJob.isStatusInProgress() {
+		log.Debug("onJobChanged - fetching logs", "currJob", currJob)
 		cmds = append(cmds, m.makeFetchJobLogsCmd())
 	} else if currJob == nil {
 		log.Error("job changed but current job is nil")
@@ -1523,7 +1535,7 @@ func (m *model) logsContentView() string {
 		return m.fullScreenMessageView(m.renderFullScreenLogsSpinner(text, "view the job on github.com"))
 	}
 
-	if ji.loadingLogs || ji.loadingSteps {
+	if ji.loadingLogs || (ji.loadingSteps && len(ji.steps) == 0) {
 		return m.loadingLogsView()
 	}
 
@@ -1668,6 +1680,10 @@ func (m *model) getPaneTitle(l *list.Model) string {
 	if m.width != 0 && m.width <= smallScreen {
 		s := m.styles.focusedPaneTitleStyle.Bold(false).UnsetBackground()
 		switch m.focusedPane {
+		case PaneChecks:
+			return lipgloss.JoinHorizontal(lipgloss.Top,
+				makePill(s.Bold(true).Render("Checks"), l.Styles.Title,
+					m.styles.colors.focusedColor), s.Render(" > Steps"))
 		case PaneRuns:
 			return lipgloss.JoinHorizontal(lipgloss.Top,
 				makePill(s.Bold(true).Render("Runs"), l.Styles.Title,
@@ -1677,6 +1693,10 @@ func (m *model) getPaneTitle(l *list.Model) string {
 				makePill(s.Bold(true).Render("Jobs"), l.Styles.Title,
 					m.styles.colors.focusedColor), s.Render(" > Steps"))
 		case PaneSteps:
+			if m.flat {
+				return lipgloss.JoinHorizontal(lipgloss.Top, s.Render("Checks > "),
+					makePill(s.Bold(true).Render("Steps"), l.Styles.Title, m.styles.colors.focusedColor))
+			}
 			return lipgloss.JoinHorizontal(lipgloss.Top, s.Render("Runs > Jobs > "),
 				makePill(s.Bold(true).Render("Steps"), l.Styles.Title, m.styles.colors.focusedColor))
 		case PaneLogs:
@@ -1778,16 +1798,28 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 
 	if m.flat {
-		selectedCheck := m.checksList.SelectedItem()
-		var before *checkItem
-		if selectedCheck != nil {
-			before = selectedCheck.(*checkItem)
-		}
+		before := m.getSelectedCheckItem()
 
 		cmds = append(cmds, m.buildFlatChecksLists()...)
 
-		if len(m.checksList.Items()) > 0 {
+		if before == nil && len(m.checksList.Items()) > 0 {
 			cmds = append(cmds, m.onCheckChanged()...)
+		} else if len(m.checksList.Items()) > 0 {
+			currCheck := m.getSelectedCheckItem()
+			if currCheck != nil && currCheck.hasInProgressSteps() {
+				cmds = append(cmds, m.makeFetchCheckStepsCmd(currCheck.job.Id))
+			}
+		}
+
+		// reselect previously selected item as now its index may have changed
+		if before != nil {
+			for i, ci := range m.checksList.VisibleItems() {
+				ci := ci.(*checkItem)
+				if ci.job.Id == before.job.Id {
+					m.checksList.Select(i)
+					break
+				}
+			}
 		}
 
 		if before != nil && !before.initiatedLogsFetch {
@@ -1822,6 +1854,12 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 }
 
 func (m *model) buildFlatChecksLists() []tea.Cmd {
+	existingChecks := map[string]*checkItem{}
+	for _, ci := range m.checksList.Items() {
+		ci := ci.(*checkItem)
+		existingChecks[ci.job.Id] = ci
+	}
+
 	cmds := make([]tea.Cmd, 0)
 	sorted := make([]data.WorkflowJob, 0)
 	for _, run := range m.workflowRuns {
@@ -1832,6 +1870,14 @@ func (m *model) buildFlatChecksLists() []tea.Cmd {
 	items := make([]list.Item, 0)
 	for _, job := range sorted {
 		ci := NewCheckItem(job, m.styles)
+
+		// restore previous item if exists and override with new data
+		existing, ok := existingChecks[job.Id]
+		if ok {
+			newJobData := ci.job
+			ci.jobItem = existing.jobItem
+			ci.job = newJobData
+		}
 		items = append(items, &ci)
 		cmds = append(cmds, ci.Tick())
 	}
@@ -1895,7 +1941,8 @@ func (m *model) viewCommitStatus(bgStyle lipgloss.Style) string {
 
 func (m *model) paneStyle(pane pane) lipgloss.Style {
 	// the border of the pane is the actually rendered by the previous pane
-	if m.previousPane() == pane {
+	prev := m.previousPane()
+	if prev != m.focusedPane && prev == pane {
 		return m.styles.focusedPaneStyle
 	}
 

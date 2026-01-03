@@ -19,6 +19,7 @@ type WorkflowRun struct {
 	Jobs      []WorkflowJob
 	Bucket    CheckBucket
 	StartedAt time.Time
+	RunNumber int
 }
 
 type WorkflowJob struct {
@@ -37,7 +38,9 @@ type WorkflowJob struct {
 	CompletedAt time.Time
 	Bucket      CheckBucket
 	Kind        JobKind
-	RunNumber   int
+
+	// A number that uniquely identifies this workflow run in its parent workflow.
+	RunNumber int
 }
 
 type LogKind int
@@ -100,6 +103,7 @@ func (run WorkflowRun) SortJobs() {
 	SortJobs(run.Jobs)
 }
 
+// Order: failed -> in progress -> skipped -> neutral -> haven't started -> started at -> name
 func SortJobs(jobs []WorkflowJob) {
 	sort.SliceStable(jobs, func(i, j int) bool {
 		if jobs[i].Bucket == CheckBucketFail &&
@@ -144,6 +148,10 @@ func SortJobs(jobs []WorkflowJob) {
 		// if second job hasn't started yet, it should appear last
 		if jobs[j].StartedAt.IsZero() {
 			return true
+		}
+
+		if jobs[i].StartedAt.Equal(jobs[j].StartedAt) {
+			return strings.Compare(jobs[i].Name, jobs[j].Name) < 0
 		}
 
 		return jobs[i].StartedAt.Before(jobs[j].StartedAt)

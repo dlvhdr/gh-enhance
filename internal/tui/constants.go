@@ -261,3 +261,16 @@ var ClockFrames = spinner.Spinner{
 	Frames: []string{"󱑌", "󱑍", "󱑎", "󱑏", "󱑐", "󱑑", "󱑒", "󱑓", "󱑔", "󱑕", "󱑖", "󱑋"},
 	FPS:    time.Second / 6,
 }
+
+var SpinnerFrames = spinner.Spinner{
+	Frames: []string{"󰪞", "󰪟", "󰪠", "󰪡", "󰪢", "󰪣", "󰪤", "󰪥"},
+	FPS:    time.Second / 6,
+}
+
+var MoonSpinnerFrames = spinner.Spinner{
+	Frames: []string{
+		"", "", "", "", "", "", "", "", "", "", "",
+		"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+	},
+	FPS: time.Second / 12,
+}

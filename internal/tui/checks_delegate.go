@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/charmbracelet/bubbles/v2/key"
@@ -23,14 +22,7 @@ func (ci *checkItem) Title() string {
 
 // Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
 func (ci *checkItem) Description() string {
-	if ci.job.Event == "" {
-		if ci.job.Workflow == "" {
-			return "status check"
-		}
-		return ci.job.Workflow
-	}
-
-	return fmt.Sprintf("on: %s", ci.job.Event)
+	return ci.jobItem.Description()
 }
 
 // FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
