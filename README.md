@@ -20,3 +20,16 @@
 <br />
 
 ![Demo](./tapes/demo.gif)
+
+## Usage
+
+```
+gh enhance [<url> | <number>] [flags]
+
+Flags:
+      --debug         passing this flag will allow writing debug output to debug.log
+      --flat          passing this flag will present checks as a flat list
+  -h, --help          help for gh-enhance
+  -R, --repo string   [HOST/]OWNER/REPO   Select another repository using the [HOST/]OWNER/REPO format
+  -v, --version       version for gh
+```
