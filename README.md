@@ -21,6 +21,14 @@
 
 ![Demo](./tapes/demo.gif)
 
+> [!NOTE]
+> Thanks to all the awesome supporters I've reached my goal of 150$ a month in donations. 🫶🏽🫶🏽🫶🏽
+>
+> This is the goal I've set myself and was really happy to see people supporting OSS like this.
+>
+> Hopefully support will continue and I will make even more awesome TUI apps to make the terminal the ultimate place for developers - without depending on web apps! 🤘🏽
+> Check out some of the supporters [here](https://github.com/dlvhdr#-these-awesome-people-sponsor-me-thank-you), or on my [sponsors page](https://github.com/sponsors/dlvhdr).
+
 ## 📃 Docs
 
 `ENHANCE` has an extensive docs site at [https://www.gh-dash.dev/companions/enhance/getting-started/](https://www.gh-dash.dev/companions/enhance/getting-started/).
