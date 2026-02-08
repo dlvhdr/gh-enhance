@@ -17,7 +17,7 @@ require (
 	github.com/cli/go-gh/v2 v2.12.1
 	github.com/dlvhdr/x/gh-checks v0.4.0
 	github.com/hasura/go-graphql-client v0.15.0
-	github.com/lrstanley/bubbletint/v2 v2.0.0-alpha.2
+	github.com/lrstanley/bubbletint/v2 v2.0.0-alpha.10
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
 	github.com/spf13/cobra v1.9.1
 )
