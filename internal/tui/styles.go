@@ -4,8 +4,8 @@ import (
 	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/v2/spinner"
-	"github.com/charmbracelet/lipgloss/v2"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -100,26 +100,26 @@ func makeStyles() styles {
 	focusedColor := t.BrightBlue
 	colors := colors{
 		focusedColor:   focusedColor,
-		unfocusedColor: tint.Darken(t.BrightBlue, 70),
-		darkColor:      tint.Darken(focusedColor, 20),
-		darkerColor:    tint.Darken(focusedColor, 70),
-		lightColor:     tint.Lighten(focusedColor, 20),
+		unfocusedColor: lipgloss.Darken(t.BrightBlue, 0.7),
+		darkColor:      lipgloss.Darken(focusedColor, 0.2),
+		darkerColor:    lipgloss.Darken(focusedColor, 0.7),
+		lightColor:     lipgloss.Lighten(focusedColor, 0.2),
 		errorColor:     t.BrightRed,
 		warnColor:      t.BrightYellow,
 		successColor:   t.BrightGreen,
 		mergedColor:    t.Purple,
-		faintColor:     tint.Darken(focusedColor, 40),
-		fainterColor:   tint.Darken(focusedColor, 80),
+		faintColor:     lipgloss.Darken(focusedColor, 0.4),
+		fainterColor:   lipgloss.Darken(focusedColor, 0.8),
 		whiteColor:     t.White,
-		subtleWhite:    tint.Darken(t.White, 20),
-		grayColor:      tint.Darken(t.White, 40),
+		subtleWhite:    lipgloss.Darken(t.White, 0.2),
+		grayColor:      lipgloss.Darken(t.White, 0.4),
 	}
 
-	errorBgStyle := lipgloss.NewStyle().Background(tint.Darken(t.Red, 80))
-	bg := tint.Darken(t.Bg, 40)
-	brighterBg := tint.Darken(t.Bg, 10)
-	unfocusedBg := tint.Darken(focusedColor, 50)
-	unfocusedFg := tint.Darken(focusedColor, 10)
+	errorBgStyle := lipgloss.NewStyle().Background(lipgloss.Darken(t.Red, 0.8))
+	bg := lipgloss.Darken(t.Bg, 0.4)
+	brighterBg := lipgloss.Darken(t.Bg, 0.1)
+	unfocusedBg := lipgloss.Darken(focusedColor, 0.5)
+	unfocusedFg := lipgloss.Darken(focusedColor, 0.1)
 	headerBg := colors.fainterColor
 
 	baseTitleStyle := lipgloss.NewStyle().Bold(true).Margin(0)

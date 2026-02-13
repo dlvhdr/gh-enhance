@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/charmbracelet/bubbles/v2/list"
-	"github.com/charmbracelet/lipgloss/v2"
+	"charm.land/bubbles/v2/list"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -40,7 +40,7 @@ func (i itemMeta) DescStyle() lipgloss.Style {
 	return i.styles.paneItem.descStyle.MaxHeight(1)
 }
 
-// commonDelegate partially implements github.com/charmbracelet/bubbles.list.ItemDelegate
+// commonDelegate partially implements charm.land/bubbles.list.ItemDelegate
 type commonDelegate struct {
 	focused bool
 	styles  styles
@@ -81,12 +81,12 @@ func (d *commonDelegate) Render(w io.Writer, m list.Model, index int, item list.
 		lipgloss.JoinVertical(lipgloss.Left, title, desc)))
 }
 
-// Height implements github.com/charmbracelet/bubbles.list.ItemDelegate.Height
+// Height implements charm.land/bubbles.list.ItemDelegate.Height
 func (d *commonDelegate) Height() int {
 	return 2
 }
 
-// Spacing implements github.com/charmbracelet/bubbles.list.ItemDelegate.Spacing
+// Spacing implements charm.land/bubbles.list.ItemDelegate.Spacing
 func (d *commonDelegate) Spacing() int {
 	return 1
 }

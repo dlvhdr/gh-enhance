@@ -5,12 +5,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/v2/key"
-	"github.com/charmbracelet/bubbles/v2/list"
-	"github.com/charmbracelet/bubbles/v2/spinner"
-	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/charmbracelet/log/v2"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/log/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
@@ -37,7 +37,7 @@ type jobItem struct {
 	styles             styles
 }
 
-// Title implements github.com/charmbracelet/bubbles.list.DefaultItem.Title
+// Title implements charm.land/bubbles.list.DefaultItem.Title
 func (i *jobItem) Title() string {
 	status := i.viewStatus()
 	s := i.meta.TitleStyle()
@@ -46,7 +46,7 @@ func (i *jobItem) Title() string {
 		s.Width(w).Render(ansi.Truncate(s.Render(i.job.Name), w, Ellipsis)))
 }
 
-// Description implements github.com/charmbracelet/bubbles.list.DefaultItem.Description
+// Description implements charm.land/bubbles.list.DefaultItem.Description
 func (i *jobItem) Description() string {
 	if i.job.Bucket == data.CheckBucketSkipping {
 		return "Skipped"
@@ -68,7 +68,7 @@ func (i *jobItem) Description() string {
 	return i.job.CompletedAt.Sub(i.job.StartedAt).String()
 }
 
-// FilterValue implements github.com/charmbracelet/bubbles.list.Item.FilterValue
+// FilterValue implements charm.land/bubbles.list.Item.FilterValue
 func (i *jobItem) FilterValue() string {
 	return i.job.Name
 }
@@ -81,7 +81,7 @@ func (i *jobItem) viewStatus() string {
 	return bucketToIcon(i.job.Bucket, s, i.meta.styles)
 }
 
-// jobsDelegate implements github.com/charmbracelet/bubbles.list.ItemDelegate
+// jobsDelegate implements charm.land/bubbles.list.ItemDelegate
 type jobsDelegate struct {
 	commonDelegate
 }
@@ -100,7 +100,7 @@ func (d *jobsDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	d.commonDelegate.Render(w, m, index, ji, &ji.meta)
 }
 
-// Update implements github.com/charmbracelet/bubbles.list.ItemDelegate.Update
+// Update implements charm.land/bubbles.list.ItemDelegate.Update
 func (d *jobsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	job, ok := m.SelectedItem().(*jobItem)
 	if !ok {

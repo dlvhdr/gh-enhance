@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/v2/list"
-	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/log/v2"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/log/v2"
 	"github.com/cli/go-gh"
 	"github.com/cli/go-gh/pkg/browser"
 
@@ -262,7 +262,7 @@ func (m *model) makeFetchCheckStepsCmd(jobId string) tea.Cmd {
 
 func makeOpenUrlCmd(url string) tea.Cmd {
 	return func() tea.Msg {
-		log.Info("opening run url", "url", url)
+		log.Info("opening url", "url", url)
 		b := browser.New("", os.Stdout, os.Stdin)
 		b.Browse(url)
 		return nil

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/charmbracelet/bubbles/v2/key"
-	"github.com/charmbracelet/bubbles/v2/list"
-	"github.com/charmbracelet/bubbles/v2/spinner"
-	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/charmbracelet/log/v2"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/log/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dlvhdr/gh-enhance/internal/data"
@@ -23,7 +23,7 @@ type runItem struct {
 	spinner   spinner.Model
 }
 
-// Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
+// Title implements /charm.land/bubbles.list.DefaultItem.Title
 func (i *runItem) Title() string {
 	status := i.viewStatus()
 	s := i.meta.TitleStyle()
@@ -32,7 +32,7 @@ func (i *runItem) Title() string {
 		s.Width(w).Render(ansi.Truncate(s.Render(i.run.Name), w, Ellipsis)))
 }
 
-// Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
+// Description implements /charm.land/bubbles.list.DefaultItem.Description
 func (i *runItem) Description() string {
 	if i.run.Event == "" {
 		if i.run.Workflow == "" {
@@ -44,7 +44,7 @@ func (i *runItem) Description() string {
 	return fmt.Sprintf("on: %s", i.run.Event)
 }
 
-// FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
+// FilterValue implements /charm.land/bubbles.list.Item.FilterValue
 func (i *runItem) FilterValue() string { return i.run.Name }
 
 func (i *runItem) IsInProgress() bool {
@@ -89,17 +89,17 @@ func (d *runsDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	d.commonDelegate.Render(w, m, index, ri, &ri.meta)
 }
 
-// Height implements github.com/charmbracelet/bubbles.list.ItemDelegate.Height
+// Height implements charm.land/bubbles.list.ItemDelegate.Height
 func (d *runsDelegate) Height() int {
 	return 2
 }
 
-// Spacing implements github.com/charmbracelet/bubbles.list.ItemDelegate.Spacing
+// Spacing implements charm.land/bubbles.list.ItemDelegate.Spacing
 func (d *runsDelegate) Spacing() int {
 	return 1
 }
 
-// Update implements github.com/charmbracelet/bubbles.list.ItemDelegate.Update
+// Update implements charm.land/bubbles.list.ItemDelegate.Update
 func (d *runsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	selected, ok := m.SelectedItem().(*runItem)
 

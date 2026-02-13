@@ -5,12 +5,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/v2/key"
-	"github.com/charmbracelet/bubbles/v2/list"
-	"github.com/charmbracelet/bubbles/v2/spinner"
-	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss/v2"
-	"github.com/charmbracelet/log/v2"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/log/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
@@ -24,7 +24,7 @@ type stepItem struct {
 	jobUrl  string
 }
 
-// Title implements /github.com/charmbracelet/bubbles.list.DefaultItem.Title
+// Title implements /charm.land/bubbles.list.DefaultItem.Title
 func (i *stepItem) Title() string {
 	status := i.viewConclusion()
 	s := i.meta.TitleStyle()
@@ -33,7 +33,7 @@ func (i *stepItem) Title() string {
 		s.Width(w).Render(ansi.Truncate(s.Render(i.step.Name), w, Ellipsis)))
 }
 
-// Description implements /github.com/charmbracelet/bubbles.list.DefaultItem.Description
+// Description implements /charm.land/bubbles.list.DefaultItem.Description
 func (i *stepItem) Description() string {
 	if i.step.CompletedAt.IsZero() || i.step.StartedAt.IsZero() {
 		if i.IsInProgress() {
@@ -50,7 +50,7 @@ func (i *stepItem) Description() string {
 	return i.step.CompletedAt.Sub(i.step.StartedAt).String()
 }
 
-// FilterValue implements /github.com/charmbracelet/bubbles.list.Item.FilterValue
+// FilterValue implements /charm.land/bubbles.list.Item.FilterValue
 func (i *stepItem) FilterValue() string { return i.step.Name }
 
 func (i *stepItem) viewConclusion() string {
@@ -95,7 +95,7 @@ func newStepItemDelegate(styles styles) list.ItemDelegate {
 	return &d
 }
 
-// Update implements github.com/charmbracelet/bubbles.list.ItemDelegate.Update
+// Update implements charm.land/bubbles.list.ItemDelegate.Update
 func (d *stepsDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	step, ok := m.SelectedItem().(*stepItem)
 	if !ok {

@@ -4,9 +4,10 @@ import (
 	"math"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/v2/viewport"
-	tea "github.com/charmbracelet/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss/v2"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/dlvhdr/gh-enhance/internal/tui/util"
 )
 
 // NewVertical create a new vertical scrollbar.
@@ -34,14 +35,14 @@ func (m Vertical) Init() tea.Cmd {
 }
 
 // Update updates the scrollbar model.
-func (m Vertical) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Vertical) Update(msg tea.Msg) (util.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case Msg:
 		m.thumbHeight, m.thumbOffset = m.computeThumb(msg.Total, msg.Visible, msg.Offset)
 	case HeightMsg:
 		m.height = m.computeHeight(int(msg))
 	case viewport.Model:
-		m.thumbHeight, m.thumbOffset = m.computeThumb(msg.TotalLineCount(), msg.VisibleLineCount(), msg.YOffset)
+		m.thumbHeight, m.thumbOffset = m.computeThumb(msg.TotalLineCount(), msg.VisibleLineCount(), msg.YOffset())
 	}
 
 	return m, nil

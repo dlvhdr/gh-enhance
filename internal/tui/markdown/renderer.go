@@ -1,11 +1,8 @@
 package markdown
 
 import (
-	"github.com/charmbracelet/glamour/v2"
-	"github.com/charmbracelet/glamour/v2/ansi"
+	"charm.land/glamour/v2"
 )
-
-var markdownStyle *ansi.StyleConfig
 
 func GetMarkdownRenderer(width int) glamour.TermRenderer {
 	markdownRenderer, _ := glamour.NewTermRenderer(
