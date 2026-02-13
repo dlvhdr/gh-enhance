@@ -1,10 +1,10 @@
 module github.com/dlvhdr/gh-enhance
 
-go 1.25.0
+go 1.25.7
 
 require (
 	charm.land/bubbles/v2 v2.0.0-rc.1
-	charm.land/bubbletea/v2 v2.0.0-rc.1.0.20251116163936-f60735dff10c
+	charm.land/bubbletea/v2 v2.0.0-rc.2.0.20251216153312-819e2e89c62e
 	charm.land/glamour/v2 v2.0.0-20251110203732-69649f93d3b1
 	charm.land/lipgloss/v2 v2.0.0-beta.3.0.20251205162909-7869489d8971
 	charm.land/log/v2 v2.0.0-20251110204020-529bb77f35da
@@ -14,6 +14,7 @@ require (
 	github.com/cli/go-gh v1.2.1
 	github.com/cli/go-gh/v2 v2.13.0
 	github.com/dlvhdr/x/gh-checks v0.4.0
+	github.com/dlvhdr/x/help v0.1.0
 	github.com/hasura/go-graphql-client v0.15.0
 	github.com/lrstanley/bubbletint/v2 v2.0.0-alpha.10
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
