@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/cursor"
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/paginator"
@@ -22,6 +21,7 @@ import (
 	"charm.land/log/v2"
 	"github.com/charmbracelet/x/ansi"
 	checks "github.com/dlvhdr/x/gh-checks"
+	help "github.com/dlvhdr/x/help"
 	tint "github.com/lrstanley/bubbletint/v2"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
@@ -76,6 +76,7 @@ type model struct {
 	version           string
 	rateLimit         api.RateLimit
 	lastFetched       time.Time
+	helpOpen          bool
 	help              help.Model
 }
 
@@ -202,6 +203,7 @@ func NewModel(repo string, number string, opts ModelOpts) model {
 		focusedPane:       focusedPane,
 		lastFetched:       time.Now(),
 	}
+	m.help.SetKeys(keys.FullHelp())
 	m.setFocusedPaneStyles()
 	return m
 }
@@ -452,7 +454,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, helpKey) {
-			m.help.ShowAll = !m.help.ShowAll
+			m.helpOpen = !m.helpOpen
 			m.setHeights()
 		}
 
@@ -649,24 +651,36 @@ func (m model) View() tea.View {
 		panes = m.viewHierarchicalChecks()
 	}
 
-	if m.help.ShowAll {
-		help := m.styles.helpPaneStyle.Width(m.width).Render(m.help.View(keys))
-		footer = lipgloss.JoinVertical(lipgloss.Left, help, footer)
-	}
-
 	rootStyle := lipgloss.NewStyle().
 		Width(m.width).
 		MaxWidth(m.width).
 		Height(m.height).
 		MaxHeight(m.height)
-
-	v.AltScreen = true
-	v.SetContent(rootStyle.Render(lipgloss.JoinVertical(
+	appView := rootStyle.Render(lipgloss.JoinVertical(
 		lipgloss.Left,
 		header,
 		panes,
 		footer,
-	)))
+	))
+
+	layers := []*lipgloss.Layer{
+		lipgloss.NewLayer(appView),
+	}
+
+	if m.helpOpen {
+		helpView := m.help.View()
+		row := m.height/4 - 2 // just a bit above the center
+		col := m.width / 2
+		col -= lipgloss.Width(helpView) / 2
+		layers = append(
+			layers,
+			lipgloss.NewLayer(helpView).X(col).Y(row),
+		)
+	}
+
+	comp := lipgloss.NewCompositor(layers...)
+	v.AltScreen = true
+	v.Content = comp.Render()
 	return v
 }
 
@@ -1759,11 +1773,7 @@ func (m *model) getLogsViewportHeight() int {
 }
 
 func (m *model) getMainContentHeight() int {
-	h := m.height - headerHeight - footerHeight
-	if m.help.ShowAll {
-		h -= lipgloss.Height(m.help.View(keys)) + m.styles.helpPaneStyle.GetVerticalFrameSize()
-	}
-	return h
+	return m.height - headerHeight - footerHeight
 }
 
 func (m *model) setHeights() {

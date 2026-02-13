@@ -1,9 +1,9 @@
 # yaml-language-server: $schema=https://gh-dash.dev/schema.json
 prSections:
   - title: Mine
-    filters: repo:dlvhdr-insiders/gh-enhance is:open author:@me updated:>={{ nowModify "-3w" }}
+    filters: is:open author:@me updated:>={{ nowModify "-3w" }}
     layout:
       author:
         hidden: true
 showAuthorIcons: true
-smartFilteringAtLaunch: false
+smartFilteringAtLaunch: true
