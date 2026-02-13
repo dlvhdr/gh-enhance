@@ -1,6 +1,8 @@
 package enhance
 
 import (
+	"context"
+	_ "embed"
 	"fmt"
 	slog "log"
 	"net/url"
@@ -8,24 +10,46 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"charm.land/log/v2"
 	goversion "github.com/caarlos0/go-version"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/cli/go-gh"
 	"github.com/spf13/cobra"
 
+	"github.com/charmbracelet/fang"
 	"github.com/dlvhdr/gh-enhance/internal/tui"
 )
 
+//go:embed logo.txt
+var asciiArt string
+
 var rootCmd = &cobra.Command{
-	Use:   "gh enhance [<url> | <number>] [flags]",
-	Short: "",
+	Use:   "gh enhance [<PR URL> | <PR number>] [flags]",
+	Long:  lipgloss.NewStyle().Foreground(lipgloss.Green).Render(asciiArt),
+	Short: "A Blazingly Fast Terminal UI for GitHub Actions",
 	Args:  cobra.ExactArgs(1),
+	Example: `# look up via a full URL to a GitHub PR
+ gh enhance https://github.com/dlvhdr/gh-dash/pull/767
+
+ # look up via a PR number when inside a clone of dlvhdr/gh-dash
+ # will look at checks of https://github.com/dlvhdr/gh-dash/pull/767
+ gh enhance 767`,
 }
 
 func Execute(version goversion.Info) error {
 	rootCmd.Version = version.String()
-	return rootCmd.Execute()
+	return fang.Execute(context.Background(), rootCmd, fang.WithColorSchemeFunc(func(
+		ld lipgloss.LightDarkFunc,
+	) fang.ColorScheme {
+		def := fang.DefaultColorScheme(ld)
+		def.DimmedArgument = ld(lipgloss.Black, lipgloss.White)
+		def.Codeblock = ld(lipgloss.Color("#F1EFEF"), lipgloss.Color("#141417"))
+		def.Title = lipgloss.Green
+		def.Command = lipgloss.Green
+		def.Program = lipgloss.Green
+		return def
+	}))
 }
 
 func init() {
