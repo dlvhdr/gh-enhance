@@ -42,7 +42,11 @@ func (m Vertical) Update(msg tea.Msg) (util.Model, tea.Cmd) {
 	case HeightMsg:
 		m.height = m.computeHeight(int(msg))
 	case viewport.Model:
-		m.thumbHeight, m.thumbOffset = m.computeThumb(msg.TotalLineCount(), msg.VisibleLineCount(), msg.YOffset())
+		m.thumbHeight, m.thumbOffset = m.computeThumb(
+			msg.TotalLineCount(),
+			msg.VisibleLineCount(),
+			msg.YOffset(),
+		)
 	}
 
 	return m, nil
@@ -66,7 +70,10 @@ func (m Vertical) View() string {
 	bar := strings.TrimRight(
 		strings.Repeat(m.TrackStyle.String()+"\n", m.thumbOffset)+
 			strings.Repeat(m.ThumbStyle.String()+"\n", m.thumbHeight)+
-			strings.Repeat(m.TrackStyle.String()+"\n", max(0, m.height-m.thumbOffset-m.thumbHeight)),
+			strings.Repeat(
+				m.TrackStyle.String()+"\n",
+				max(0, m.height-m.thumbOffset-m.thumbHeight),
+			),
 		"\n",
 	)
 

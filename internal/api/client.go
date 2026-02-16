@@ -11,8 +11,12 @@ import (
 
 func NewClient() (*gh.GraphQLClient, error) {
 	if config.IsFeatureEnabled(config.FF_MOCK_DATA) {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-		return gh.NewGraphQLClient(gh.ClientOptions{Host: "localhost:3000", AuthToken: "fake-token"})
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+		return gh.NewGraphQLClient(
+			gh.ClientOptions{Host: "localhost:3000", AuthToken: "fake-token"},
+		)
 	} else {
 		return gh.DefaultGraphQLClient()
 	}

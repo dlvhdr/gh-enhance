@@ -75,9 +75,9 @@ tasks:
     desc: Run tests
 
   fmt:
-    desc: Run gofumpt
+    desc: Run golangci-lint fmt
     cmds:
-      - gofumpt -w $(git ls-files '*.go')
+      - golangci-lint fmt
 
   check-nerd-font:
     cmds:

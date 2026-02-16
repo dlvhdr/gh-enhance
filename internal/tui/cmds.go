@@ -162,7 +162,8 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 	ji.initiatedLogsFetch = true
 	return func() tea.Msg {
 		defer utils.TimeTrack(time.Now(), "fetching job logs")
-		if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun || ji.job.Kind == data.JobKindExternal {
+		if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun ||
+			ji.job.Kind == data.JobKindExternal {
 			output, err := api.FetchCheckRunOutput(m.repo, ji.job.Id)
 			if err != nil {
 				log.Error("error fetching check run output", "link", ji.job.Link, "err", err)
@@ -208,7 +209,13 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 			}
 		}
 		jobLogs := jobLogsRes.String()
-		log.Debug("success fetching job logs", "link", ji.job.Link, "bytes", len(jobLogsRes.Bytes()))
+		log.Debug(
+			"success fetching job logs",
+			"link",
+			ji.job.Link,
+			"bytes",
+			len(jobLogsRes.Bytes()),
+		)
 
 		return jobLogsFetchedMsg{
 			jobId: ji.job.Id,
@@ -249,7 +256,17 @@ func (m *model) makeFetchCheckStepsCmd(jobId string) tea.Cmd {
 		log.Debug("fetching check steps", "repo", m.repo, "jobId", jobId)
 		stepsRes, err := api.FetchJobSteps(m.repo, jobId)
 		if err != nil {
-			log.Error("error fetching job steps", "repo", m.repo, "prNumber", m.prNumber, "jobId", jobId, "err", err)
+			log.Error(
+				"error fetching job steps",
+				"repo",
+				m.repo,
+				"prNumber",
+				m.prNumber,
+				"jobId",
+				jobId,
+				"err",
+				err,
+			)
 			return nil
 		}
 
@@ -270,8 +287,15 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 }
 
 func (m *model) makeInitCmd() tea.Cmd {
-	return tea.Batch(m.checksList.StartSpinner(), m.runsList.StartSpinner(), m.logsSpinner.Tick, m.jobsList.StartSpinner(),
-		m.makeFetchPRCmd(), m.makeInitialGetPRChecksCmd(m.prNumber), m.startFetchingPRChecksWithInterval())
+	return tea.Batch(
+		m.checksList.StartSpinner(),
+		m.runsList.StartSpinner(),
+		m.logsSpinner.Tick,
+		m.jobsList.StartSpinner(),
+		m.makeFetchPRCmd(),
+		m.makeInitialGetPRChecksCmd(m.prNumber),
+		m.startFetchingPRChecksWithInterval(),
+	)
 }
 
 func workflowName(cr api.CheckRun) string {
@@ -387,7 +411,13 @@ func makeWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
 	}
 
 	if id == 0 {
-		log.Error("run has no ID", "workflowRun", checkRun.CheckSuite.WorkflowRun, "checkRun", checkRun)
+		log.Error(
+			"run has no ID",
+			"workflowRun",
+			checkRun.CheckSuite.WorkflowRun,
+			"checkRun",
+			checkRun,
+		)
 	}
 
 	run := data.WorkflowRun{

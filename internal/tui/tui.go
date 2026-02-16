@@ -133,7 +133,9 @@ func NewModel(repo string, number string, opts ModelOpts) model {
 	vp.KeyMap.Left = leftKey
 
 	vp.HighlightStyle = lipgloss.NewStyle().Foreground(s.tint.Black).Background(s.tint.Blue)
-	vp.SelectedHighlightStyle = lipgloss.NewStyle().Foreground(s.tint.Black).Background(s.tint.BrightGreen)
+	vp.SelectedHighlightStyle = lipgloss.NewStyle().
+		Foreground(s.tint.Black).
+		Background(s.tint.BrightGreen)
 
 	sb := scrollbar.NewVertical()
 	sb.Style = sb.Style.Inherit(s.scrollbarStyle)
@@ -433,7 +435,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, rerunKey) {
-			if m.focusedPane != PaneRuns && m.focusedPane != PaneJobs && m.focusedPane != PaneChecks {
+			if m.focusedPane != PaneRuns && m.focusedPane != PaneJobs &&
+				m.focusedPane != PaneChecks {
 				break
 			}
 
@@ -792,7 +795,8 @@ func (m *model) viewHeader() string {
 			m.viewPRName(prWidth, bgStyle),
 		))
 	} else {
-		title = bgStyle.Width(prWidth).Render(fmt.Sprintf("Loading %s PR #%s...", m.repo, m.prNumber))
+		title = bgStyle.Width(prWidth).
+			Render(fmt.Sprintf("Loading %s PR #%s...", m.repo, m.prNumber))
 	}
 
 	return m.styles.headerStyle.Width(m.width).Render(
@@ -802,8 +806,12 @@ func (m *model) viewHeader() string {
 func (m *model) viewRepo(width int, bgStyle lipgloss.Style) string {
 	status := ""
 	if m.pr.Merged {
-		status = makePill(fmt.Sprintf("%s %s", MergedIcon, "Merged"),
-			lipgloss.NewStyle().Foreground(m.styles.colors.darkerColor), m.styles.colors.mergedColor)
+		status = makePill(
+			fmt.Sprintf("%s %s", MergedIcon, "Merged"),
+			lipgloss.NewStyle().
+				Foreground(m.styles.colors.darkerColor),
+			m.styles.colors.mergedColor,
+		)
 	} else if m.pr.IsDraft {
 		status = makePill(fmt.Sprintf("%s %s", DraftIcon, "Draft"),
 			lipgloss.NewStyle().Foreground(m.styles.colors.darkerColor), m.styles.colors.whiteColor)
@@ -811,8 +819,12 @@ func (m *model) viewRepo(width int, bgStyle lipgloss.Style) string {
 		status = makePill(fmt.Sprintf("%s %s", ClosedIcon, "Closed"),
 			lipgloss.NewStyle().Foreground(m.styles.colors.darkerColor), m.styles.colors.errorColor)
 	} else {
-		status = makePill(fmt.Sprintf("%s %s", OpenIcon, "Open"),
-			lipgloss.NewStyle().Foreground(m.styles.colors.darkerColor), m.styles.colors.successColor)
+		status = makePill(
+			fmt.Sprintf("%s %s", OpenIcon, "Open"),
+			lipgloss.NewStyle().
+				Foreground(m.styles.colors.darkerColor),
+			m.styles.colors.successColor,
+		)
 	}
 
 	return bgStyle.Width(width).Render(lipgloss.JoinHorizontal(lipgloss.Top,
@@ -848,7 +860,10 @@ func (m *model) viewFooter() string {
 			fmt.Sprintf("%d checks: ", total))
 	}
 
-	stats := checks.AccumulatedStats(contexts.CheckRunCountsByState, contexts.StatusContextCountsByState)
+	stats := checks.AccumulatedStats(
+		contexts.CheckRunCountsByState,
+		contexts.StatusContextCountsByState,
+	)
 
 	if stats.Failed > 0 {
 		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(
@@ -876,7 +891,9 @@ func (m *model) viewFooter() string {
 		if until <= 0 {
 			untilStr = "now..."
 		}
-		reFetchingIn = bg.Padding(0, 1).Foreground(m.styles.colors.faintColor).Render(fmt.Sprintf("refreshing %s", untilStr))
+		reFetchingIn = bg.Padding(0, 1).
+			Foreground(m.styles.colors.faintColor).
+			Render(fmt.Sprintf("refreshing %s", untilStr))
 	}
 
 	help := m.styles.helpButtonStyle.Render("? help")
@@ -934,8 +951,12 @@ func (m *model) viewLogs() string {
 	inputView := ""
 	ji := m.getSelectedJobItem()
 	if ji != nil && m.logsViewport.GetContent() != "" && ji.logsStderr == "" {
-		inputView = lipgloss.NewStyle().Width(w).Border(lipgloss.RoundedBorder(), true).BorderForeground(
-			m.styles.colors.fainterColor).Render(m.logsInput.View())
+		inputView = lipgloss.NewStyle().
+			Width(w).
+			Border(lipgloss.RoundedBorder(), true).
+			BorderForeground(
+				m.styles.colors.fainterColor).
+			Render(m.logsInput.View())
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, inputView, m.logsContentView())
@@ -1047,10 +1068,18 @@ func newList(styles styles, delegate list.ItemDelegate) list.Model {
 	l.Paginator.Type = paginator.Arabic
 	l.Styles.StatusBar = l.Styles.StatusBar.Foreground(styles.colors.faintColor)
 	l.Styles.StatusEmpty = l.Styles.StatusEmpty.Foreground(styles.colors.faintColor)
-	l.Styles.StatusBarActiveFilter = l.Styles.StatusBarActiveFilter.Foreground(styles.colors.faintColor)
-	l.Styles.StatusBarFilterCount = l.Styles.StatusBarFilterCount.Foreground(styles.colors.faintColor)
-	l.Styles.NoItems = l.Styles.NoItems.Width(unfocusedLargePaneWidth).Foreground(styles.colors.faintColor)
-	l.Styles.PaginationStyle = lipgloss.NewStyle().Foreground(styles.colors.faintColor).MarginLeft(1).MarginBottom(1)
+	l.Styles.StatusBarActiveFilter = l.Styles.StatusBarActiveFilter.Foreground(
+		styles.colors.faintColor,
+	)
+	l.Styles.StatusBarFilterCount = l.Styles.StatusBarFilterCount.Foreground(
+		styles.colors.faintColor,
+	)
+	l.Styles.NoItems = l.Styles.NoItems.Width(unfocusedLargePaneWidth).
+		Foreground(styles.colors.faintColor)
+	l.Styles.PaginationStyle = lipgloss.NewStyle().
+		Foreground(styles.colors.faintColor).
+		MarginLeft(1).
+		MarginBottom(1)
 	l.Styles.StatusBar = l.Styles.StatusBar.PaddingLeft(1)
 	l.SetSpinner(spinner.Dot)
 	l.KeyMap.NextPage = key.Binding{}
@@ -1268,7 +1297,8 @@ func (m *model) logsWidth() int {
 
 	scbar := 0
 	ji := m.getSelectedJobItem()
-	if ji != nil && (len(ji.renderedLogs) > 0 || len(ji.renderedText) > 0) && m.isScrollbarVisible() {
+	if ji != nil && (len(ji.renderedLogs) > 0 || len(ji.renderedText) > 0) &&
+		m.isScrollbarVisible() {
 		scbar = lipgloss.Width(m.scrollbar.(scrollbar.Vertical).View())
 	}
 
@@ -1533,12 +1563,16 @@ func (m *model) logsContentView() string {
 				lipgloss.NewStyle().Foreground(m.styles.tint.BrightWhite).Render(art.CheckmarkSign),
 				"",
 				m.styles.faintFgStyle.Bold(true).Render(
-					fmt.Sprintf("No checks reported on the '%s' branch", m.prWithChecks.HeadRefName))))
+					fmt.Sprintf("No checks reported on the '%s' branch", m.prWithChecks.HeadRefName),
+				),
+			))
 	}
 
 	ji := m.getSelectedJobItem()
 	if ji == nil {
-		return m.fullScreenMessageView(m.styles.faintFgStyle.Bold(true).Render("Nothing selected..."))
+		return m.fullScreenMessageView(
+			m.styles.faintFgStyle.Bold(true).Render("Nothing selected..."),
+		)
 	}
 
 	if ji.job.Conclusion == api.ConclusionSkipped {
@@ -1555,7 +1589,9 @@ func (m *model) logsContentView() string {
 			text = "This job is still in progress"
 		}
 
-		return m.fullScreenMessageView(m.renderFullScreenLogsSpinner(text, "view the job on github.com"))
+		return m.fullScreenMessageView(
+			m.renderFullScreenLogsSpinner(text, "view the job on github.com"),
+		)
 	}
 
 	if ji.loadingLogs || (ji.loadingSteps && len(ji.steps) == 0) {
@@ -1569,7 +1605,9 @@ func (m *model) logsContentView() string {
 	}
 
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "HTTP 410:") {
-		return m.fullScreenMessageView("The logs for this run have expired and are no longer available.")
+		return m.fullScreenMessageView(
+			"The logs for this run have expired and are no longer available.",
+		)
 	}
 
 	if ji.logsErr != nil && strings.Contains(ji.logsStderr, "is still in progress;") {
@@ -1717,11 +1755,25 @@ func (m *model) getPaneTitle(l *list.Model) string {
 					m.styles.colors.focusedColor), s.Render(" > Steps"))
 		case PaneSteps:
 			if m.flat {
-				return lipgloss.JoinHorizontal(lipgloss.Top, s.Render("Checks > "),
-					makePill(s.Bold(true).Render("Steps"), l.Styles.Title, m.styles.colors.focusedColor))
+				return lipgloss.JoinHorizontal(
+					lipgloss.Top,
+					s.Render("Checks > "),
+					makePill(
+						s.Bold(true).Render("Steps"),
+						l.Styles.Title,
+						m.styles.colors.focusedColor,
+					),
+				)
 			}
-			return lipgloss.JoinHorizontal(lipgloss.Top, s.Render("Runs > Jobs > "),
-				makePill(s.Bold(true).Render("Steps"), l.Styles.Title, m.styles.colors.focusedColor))
+			return lipgloss.JoinHorizontal(
+				lipgloss.Top,
+				s.Render("Runs > Jobs > "),
+				makePill(
+					s.Bold(true).Render("Steps"),
+					l.Styles.Title,
+					m.styles.colors.focusedColor,
+				),
+			)
 		case PaneLogs:
 			return ""
 		}
@@ -1951,8 +2003,12 @@ func (m *model) viewCommitStatus(bgStyle lipgloss.Style) string {
 	}
 
 	if res != "" {
-		return bgStyle.Padding(0, 1).BorderForeground(m.styles.colors.darkColor).BorderBackground(bgStyle.GetBackground()).Border(
-			lipgloss.ThickBorder(), false, true, false, false).Render(res)
+		return bgStyle.Padding(0, 1).
+			BorderForeground(m.styles.colors.darkColor).
+			BorderBackground(bgStyle.GetBackground()).
+			Border(
+				lipgloss.ThickBorder(), false, true, false, false).
+			Render(res)
 	}
 
 	return string(status)

@@ -130,15 +130,24 @@ func makeStyles() styles {
 
 		faintFgStyle: lipgloss.NewStyle().Foreground(colors.faintColor),
 
-		headerStyle: lipgloss.NewStyle().Foreground(focusedColor).PaddingLeft(1).PaddingTop(1).PaddingRight(1).Border(
-			lipgloss.InnerHalfBlockBorder(), false, false, true,
-			false).BorderForeground(headerBg).Background(headerBg),
+		headerStyle: lipgloss.NewStyle().
+			Foreground(focusedColor).
+			PaddingLeft(1).
+			PaddingTop(1).
+			PaddingRight(1).
+			Border(
+				lipgloss.InnerHalfBlockBorder(), false, false, true,
+				false).
+			BorderForeground(headerBg).
+			Background(headerBg),
 		logoStyle:   lipgloss.NewStyle().Foreground(t.BrightGreen).Background(headerBg),
 		footerStyle: lipgloss.NewStyle().Background(colors.fainterColor).PaddingLeft(1),
 		helpButtonStyle: lipgloss.NewStyle().Background(colors.darkerColor).Foreground(
 			t.BrightWhite).PaddingLeft(1).PaddingRight(1),
 		helpPaneStyle: lipgloss.NewStyle().PaddingLeft(1).PaddingRight(1).PaddingBottom(1).Border(
-			lipgloss.NormalBorder(), true, false, false, false).BorderForeground(colors.fainterColor),
+			lipgloss.NormalBorder(),
+			true, false, false, false).
+			BorderForeground(colors.fainterColor),
 
 		focusedPaneTitleStyle:      baseTitleStyle.Foreground(t.Black),
 		unfocusedPaneTitleStyle:    baseTitleStyle.Foreground(t.Fg),
@@ -165,30 +174,61 @@ func makeStyles() styles {
 				Foreground(unfocusedFg).
 				Background(bg),
 
-			focusedTitleStyle:         lipgloss.NewStyle().Bold(true).Foreground(t.White),
-			focusedSelectedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(focusedColor).Background(brighterBg),
-			unfocusedTitleStyle:       lipgloss.NewStyle().Bold(true).Foreground(colors.subtleWhite),
+			focusedTitleStyle: lipgloss.NewStyle().Bold(true).Foreground(t.White),
+			focusedSelectedTitleStyle: lipgloss.NewStyle().
+				Bold(true).
+				Foreground(focusedColor).
+				Background(brighterBg),
+			unfocusedTitleStyle: lipgloss.NewStyle().
+				Bold(true).
+				Foreground(colors.subtleWhite),
 
-			selectedDescStyle:        lipgloss.NewStyle().Foreground(t.White).PaddingLeft(2).Background(bg),
-			descStyle:                lipgloss.NewStyle().Foreground(colors.faintColor).PaddingLeft(2),
-			focusedSelectedDescStyle: lipgloss.NewStyle().Foreground(t.White).PaddingLeft(2).Background(brighterBg),
+			selectedDescStyle: lipgloss.NewStyle().
+				Foreground(t.White).
+				PaddingLeft(2).
+				Background(bg),
+			descStyle: lipgloss.NewStyle().
+				Foreground(colors.faintColor).
+				PaddingLeft(2),
+			focusedSelectedDescStyle: lipgloss.NewStyle().
+				Foreground(t.White).
+				PaddingLeft(2).
+				Background(brighterBg),
 		},
 
 		paneStyle: lipgloss.NewStyle().BorderRight(true).BorderStyle(
 			lipgloss.NormalBorder()).BorderForeground(colors.faintColor),
 		focusedPaneStyle: lipgloss.NewStyle().BorderRight(true).BorderStyle(
 			lipgloss.NormalBorder()).BorderForeground(colors.focusedColor),
-		lineNumbersStyle:           lipgloss.NewStyle().Foreground(colors.faintColor).Align(lipgloss.Right),
-		canceledGlyph:              lipgloss.NewStyle().Foreground(colors.warnColor).SetString(CanceledIcon),
-		skippedGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(SkippedIcon),
-		neutralGlyph:               lipgloss.NewStyle().Foreground(colors.whiteColor).SetString(NeutralIcon),
-		waitingGlyph:               lipgloss.NewStyle().Foreground(t.Yellow).SetString(WaitingIcon),
-		pendingGlyph:               lipgloss.NewStyle().Foreground(colors.faintColor).SetString(PendingIcon),
-		failureGlyph:               lipgloss.NewStyle().Foreground(t.Red).SetString(FailureIcon),
-		successGlyph:               lipgloss.NewStyle().Foreground(colors.successColor).SetString(SuccessIcon),
-		mergedGlyph:                lipgloss.NewStyle().Foreground(colors.mergedColor).SetString(MergedIcon),
-		draftGlyph:                 lipgloss.NewStyle().Foreground(colors.grayColor).SetString(DraftIcon),
-		closedGlyph:                lipgloss.NewStyle().Foreground(colors.errorColor).SetString(ClosedIcon),
+		lineNumbersStyle: lipgloss.NewStyle().
+			Foreground(colors.faintColor).
+			Align(lipgloss.Right),
+		canceledGlyph: lipgloss.NewStyle().
+			Foreground(colors.warnColor).
+			SetString(CanceledIcon),
+		skippedGlyph: lipgloss.NewStyle().
+			Foreground(colors.faintColor).
+			SetString(SkippedIcon),
+		neutralGlyph: lipgloss.NewStyle().
+			Foreground(colors.whiteColor).
+			SetString(NeutralIcon),
+		waitingGlyph: lipgloss.NewStyle().Foreground(t.Yellow).SetString(WaitingIcon),
+		pendingGlyph: lipgloss.NewStyle().
+			Foreground(colors.faintColor).
+			SetString(PendingIcon),
+		failureGlyph: lipgloss.NewStyle().Foreground(t.Red).SetString(FailureIcon),
+		successGlyph: lipgloss.NewStyle().
+			Foreground(colors.successColor).
+			SetString(SuccessIcon),
+		mergedGlyph: lipgloss.NewStyle().
+			Foreground(colors.mergedColor).
+			SetString(MergedIcon),
+		draftGlyph: lipgloss.NewStyle().
+			Foreground(colors.grayColor).
+			SetString(DraftIcon),
+		closedGlyph: lipgloss.NewStyle().
+			Foreground(colors.errorColor).
+			SetString(ClosedIcon),
 		openGlyph:                  lipgloss.NewStyle().Foreground(t.Blue).SetString(OpenIcon),
 		noLogsStyle:                lipgloss.NewStyle().Foreground(colors.faintColor).Bold(true),
 		watermarkIllustrationStyle: lipgloss.NewStyle().Foreground(t.White),
@@ -205,7 +245,10 @@ func makeStyles() styles {
 		}, true, false, true, false).BorderForeground(colors.darkColor),
 		scrollbarThumbStyle: lipgloss.NewStyle().Foreground(colors.darkColor),
 		scrollbarTrackStyle: lipgloss.NewStyle().Foreground(colors.faintColor),
-		keyStyle:            lipgloss.NewStyle().Background(colors.fainterColor).Background(colors.darkerColor).Padding(0, 1),
+		keyStyle: lipgloss.NewStyle().
+			Background(colors.fainterColor).
+			Background(colors.darkerColor).
+			Padding(0, 1),
 	}
 }
 
@@ -220,6 +263,10 @@ func makePointingBorder(old string) string {
 }
 
 func NewClockSpinner(styles styles) spinner.Model {
-	return spinner.New(spinner.WithSpinner(MoonSpinnerFrames),
-		spinner.WithStyle(lipgloss.NewStyle().Width(1).Margin(0).Padding(0).Foreground(styles.colors.warnColor)))
+	return spinner.New(
+		spinner.WithSpinner(MoonSpinnerFrames),
+		spinner.WithStyle(
+			lipgloss.NewStyle().Width(1).Margin(0).Padding(0).Foreground(styles.colors.warnColor),
+		),
+	)
 }

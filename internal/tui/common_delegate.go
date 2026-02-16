@@ -46,7 +46,13 @@ type commonDelegate struct {
 	styles  styles
 }
 
-func (d *commonDelegate) Render(w io.Writer, m list.Model, index int, item list.DefaultItem, meta *itemMeta) {
+func (d *commonDelegate) Render(
+	w io.Writer,
+	m list.Model,
+	index int,
+	item list.DefaultItem,
+	meta *itemMeta,
+) {
 	isSelected := index == m.Index()
 	meta.focused = d.focused
 	meta.selected = isSelected

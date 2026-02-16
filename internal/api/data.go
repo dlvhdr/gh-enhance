@@ -343,7 +343,9 @@ func FetchJobSteps(repo string, jobID string) (NormalizedJobStepsResponse, error
 		return res, err
 	}
 
-	jobUrl, err := url.Parse(fmt.Sprintf("https://api.github.com/repos/%s/actions/jobs/%s", repo, jobID))
+	jobUrl, err := url.Parse(
+		fmt.Sprintf("https://api.github.com/repos/%s/actions/jobs/%s", repo, jobID),
+	)
 	if err != nil {
 		return res, err
 	}
@@ -424,7 +426,10 @@ func (pr *PRWithChecks) IsStatusCheckInProgress() bool {
 	}
 
 	contexts := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts
-	stats := checks.AccumulatedStats(contexts.CheckRunCountsByState, contexts.StatusContextCountsByState)
+	stats := checks.AccumulatedStats(
+		contexts.CheckRunCountsByState,
+		contexts.StatusContextCountsByState,
+	)
 	return (pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "" ||
 		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING" || stats.InProgress > 0)
 }

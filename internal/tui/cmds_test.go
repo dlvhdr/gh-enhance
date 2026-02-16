@@ -21,12 +21,16 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 		t.Error(err)
 	}
 
-	wfr := makeWorkflowRun(res.Data.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes[0].CheckRun)
+	wfr := makeWorkflowRun(
+		res.Data.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes[0].CheckRun,
+	)
 
 	m := NewModel("dlvhdr/gh-dash", "1", ModelOpts{})
 	m.prWithChecks = res.Data.Resource.PullRequest
 
-	runs := makeWorkflowRuns(m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes)
+	runs := makeWorkflowRuns(
+		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes,
+	)
 	msg1 := workflowRunsFetchedMsg{runs: runs, pr: m.prWithChecks}
 	m.mergeWorkflowRuns(msg1)
 
@@ -70,7 +74,11 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 	m.mergeWorkflowRuns(msg2)
 
 	if len(m.workflowRuns) != 1 {
-		t.Fatalf(`expected workflow runs to have length of 1, got: %d, %+v`, len(m.workflowRuns), m.workflowRuns)
+		t.Fatalf(
+			`expected workflow runs to have length of 1, got: %d, %+v`,
+			len(m.workflowRuns),
+			m.workflowRuns,
+		)
 	}
 
 	if len(m.workflowRuns[0].Jobs) != 2 {
@@ -90,12 +98,16 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 		t.Error(err)
 	}
 
-	wfr := makeWorkflowRun(res.Data.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes[0].CheckRun)
+	wfr := makeWorkflowRun(
+		res.Data.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes[0].CheckRun,
+	)
 
 	m := NewModel("dlvhdr/gh-dash", "1", ModelOpts{})
 	m.prWithChecks = res.Data.Resource.PullRequest
 
-	runs := makeWorkflowRuns(m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes)
+	runs := makeWorkflowRuns(
+		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes,
+	)
 	msg1 := workflowRunsFetchedMsg{runs: runs, pr: m.prWithChecks}
 	m.mergeWorkflowRuns(msg1)
 
