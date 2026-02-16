@@ -44,5 +44,6 @@ formatters:
   enable:
     - gofumpt
     - goimports
+    - golines
   exclusions:
     generated: lax

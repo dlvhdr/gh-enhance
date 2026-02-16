@@ -25,6 +25,16 @@ tasks:
     interactive: true
     desc: Run in debug mode with INFO level logs. Run `task logs` to watch the logs.
 
+  install:
+    desc: Install the application
+    vars:
+      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/dlvhdr/gh-enhance/internal/version.Version={{.VERSION}}"{{end}}'
+    cmds:
+      - go install {{.LDFLAGS}} -v .
+    sources:
+      - ./**/*.go
+      - go.mod
+
   dlv:
     cmds:
       - dlv debug --headless --api-version=2 --listen=127.0.0.1:43000 . -- {{.CLI_ARGS}}

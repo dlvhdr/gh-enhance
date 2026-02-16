@@ -8,7 +8,6 @@ require (
 	charm.land/glamour/v2 v2.0.0-20251110203732-69649f93d3b1
 	charm.land/lipgloss/v2 v2.0.0-beta.3.0.20251205162909-7869489d8971
 	charm.land/log/v2 v2.0.0-20251110204020-529bb77f35da
-	github.com/caarlos0/go-version v0.2.2
 	github.com/charmbracelet/colorprofile v0.4.1
 	github.com/charmbracelet/fang v0.4.4
 	github.com/charmbracelet/x/ansi v0.11.3

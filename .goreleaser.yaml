@@ -30,11 +30,7 @@ builds:
     goarm:
       - "7"
     ldflags:
-      - -s -w # make binary smaller
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.CommitDate}}
-      - -X main.builtBy=goreleaser
+      - -s -w -X github.com/dlvhdr/gh-enhance/internal/version.Version={{.Version}}
     # Skipping builds for Android non-ARM64 architectures as they need CGO enabled
     # https://goreleaser.com/limitations/cgo/
     ignore:

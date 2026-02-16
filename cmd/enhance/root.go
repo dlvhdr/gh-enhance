@@ -3,32 +3,35 @@ package enhance
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	slog "log"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/log/v2"
-	goversion "github.com/caarlos0/go-version"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/cli/go-gh"
 	"github.com/spf13/cobra"
 
 	"github.com/charmbracelet/fang"
 	"github.com/dlvhdr/gh-enhance/internal/tui"
+	"github.com/dlvhdr/gh-enhance/internal/version"
 )
 
 //go:embed logo.txt
 var asciiArt string
+var logoWithTagline = lipgloss.NewStyle().Foreground(lipgloss.Green).Render(asciiArt)
 
 var rootCmd = &cobra.Command{
 	Use:   "gh enhance [<PR URL> | <PR number>] [flags]",
-	Long:  lipgloss.NewStyle().Foreground(lipgloss.Green).Render(asciiArt),
+	Long:  logoWithTagline,
 	Short: "A Blazingly Fast Terminal UI for GitHub Actions",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	Example: `# look up via a full URL to a GitHub PR
  gh enhance https://github.com/dlvhdr/gh-dash/pull/767
 
@@ -37,9 +40,8 @@ var rootCmd = &cobra.Command{
  gh enhance 767`,
 }
 
-func Execute(version goversion.Info) error {
-	rootCmd.Version = version.String()
-	return fang.Execute(context.Background(), rootCmd, fang.WithColorSchemeFunc(func(
+func Execute() error {
+	themeFunc := fang.WithColorSchemeFunc(func(
 		ld lipgloss.LightDarkFunc,
 	) fang.ColorScheme {
 		def := fang.DefaultColorScheme(ld)
@@ -49,7 +51,8 @@ func Execute(version goversion.Info) error {
 		def.Command = lipgloss.Green
 		def.Program = lipgloss.Green
 		return def
-	}))
+	})
+	return fang.Execute(context.Background(), rootCmd, themeFunc, fang.WithVersion(version.Version))
 }
 
 func init() {
@@ -80,6 +83,10 @@ func init() {
 		defer loggerFile.Close()
 	}
 
+	rootCmd.SetVersionTemplate(
+		logoWithTagline + "\n\n" + `enhance {{printf "version %s\n" .Version}}`,
+	)
+
 	var repo string
 	var number string
 
@@ -90,8 +97,6 @@ func init() {
 		"",
 		`[HOST/]OWNER/REPO   Select another repository using the [HOST/]OWNER/REPO format`,
 	)
-
-	rootCmd.SetVersionTemplate(`gh-enhance {{printf "version %s\n" .Version}}`)
 
 	rootCmd.Flags().Bool(
 		"flat",
@@ -109,17 +114,35 @@ func init() {
 		"help",
 		"h",
 		false,
-		"help for gh-enhance",
+		"help for enhance",
 	)
 
-	rootCmd.SetVersionTemplate(`gh-enhance {{printf "version %s\n" .Version}}`)
+	usage := lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.NewStyle().
+			Bold(true).
+			Render("Usage:")+
+			" `"+
+			lipgloss.NewStyle().
+				Foreground(lipgloss.Green).
+				Render("gh enhance")+
+			" https://github.com/owner/repo/pull/15623`.",
+		"Run "+
+			lipgloss.NewStyle().
+				Background(lipgloss.Color("#141417")).
+				Render("`gh enhance --help`")+
+			" for help and examples.\n")
 
-	rootCmd.Run = func(_ *cobra.Command, args []string) {
+	rootCmd.RunE = func(_ *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			fmt.Print(usage)
+			return errors.New("no PR passed")
+		}
 		url, err := url.Parse(args[0])
 		if err == nil && url.Hostname() == "github.com" {
 			parts := strings.Split(url.Path, "/")
 			if len(parts) < 5 {
-				exitWithUsage()
+				fmt.Print(usage)
+				return errors.New("bad PR passed")
 			}
 
 			repo = parts[1] + "/" + parts[2]
@@ -134,12 +157,17 @@ func init() {
 		}
 
 		if number == "" {
-			number = args[0]
+			if _, err := strconv.Atoi(args[0]); err != nil {
+				fmt.Print(usage)
+				return errors.New("PR number is not a number")
+			} else {
+				number = args[0]
+			}
 		}
 
 		flat, err := rootCmd.Flags().GetBool("flat")
 		if err != nil {
-			log.Fatal("Cannot parse the flat flag", err)
+			return err
 		}
 
 		p := tea.NewProgram(tui.NewModel(repo, number, tui.ModelOpts{Flat: flat}))
@@ -148,12 +176,8 @@ func init() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+		return nil
 	}
-}
-
-func exitWithUsage() {
-	fmt.Println("Usage: -R owner/repo 15623 or URL to a PR")
-	os.Exit(1)
 }
 
 func setDebugLogLevel() {
