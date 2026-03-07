@@ -1494,7 +1494,7 @@ func (m *model) onStepChanged() {
 	step := m.stepsList.SelectedItem()
 	cursor := m.stepsList.Cursor()
 
-	if step == nil {
+	if ji == nil || step == nil {
 		return
 	}
 
