@@ -5,5 +5,14 @@ prSections:
     layout:
       author:
         hidden: true
+  - title: Review
+    filters: -author:@me is:open updated:>={{ nowModify "-2.5w" }}
+  - title: All
+issuesSections:
+  - title: Open
+    filters: author:@me is:open -author:@me sort:reactions
+  - title: Creator
+    filters: author:@me is:open
+  - title: All
+    filters: sort:reactions
 showAuthorIcons: true
-smartFilteringAtLaunch: true
