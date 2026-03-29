@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"math"
 	"os"
 	"regexp"
@@ -50,6 +51,7 @@ type model struct {
 	height            int
 	prNumber          string
 	repo              string
+	runID             string // set when viewing a run directly (no PR)
 	pr                api.PR
 	prWithChecks      api.PRWithChecks
 	workflowRuns      []data.WorkflowRun
@@ -81,7 +83,8 @@ type model struct {
 }
 
 type ModelOpts struct {
-	Flat bool
+	Flat  bool
+	RunID string // non-empty when in run mode (no PR context)
 }
 
 func NewModel(repo string, number string, opts ModelOpts) model {
@@ -189,6 +192,7 @@ func NewModel(repo string, number string, opts ModelOpts) model {
 		checksList:        checksList,
 		prNumber:          number,
 		repo:              repo,
+		runID:             opts.RunID,
 		runsDelegate:      runsDelegate,
 		jobsDelegate:      jobsDelegate,
 		stepsDelegate:     stepsDelegate,
@@ -211,6 +215,9 @@ func NewModel(repo string, number string, opts ModelOpts) model {
 }
 
 func (m model) Init() tea.Cmd {
+	if m.runID != "" {
+		return m.makeRunModeInitCmd()
+	}
 	return m.makeInitCmd()
 }
 
@@ -233,6 +240,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// at the `m.makeInitCmd`. The up to date model is received by this `Update` func.
 	case startIntervalFetching:
 		cmds = append(cmds, m.fetchPRChecksWithInterval())
+
+	case startRunIntervalFetching:
+		cmds = append(cmds, m.fetchRunWithInterval())
+
+	case runModeFetchedMsg, runModeIntervalTickMsg:
+		var rmMsg runModeFetchedMsg
+		if tickMsg, ok := msg.(runModeIntervalTickMsg); ok {
+			rmMsg = tickMsg.msg.(runModeFetchedMsg)
+		} else {
+			rmMsg = msg.(runModeFetchedMsg)
+		}
+
+		if rmMsg.err != nil {
+			log.Debug("error when fetching run", "err", rmMsg.err)
+			m.err = rmMsg.err
+			msgCmd := tea.Printf("%s\nrepo=%s, runID=%s\nOriginal error: %v\n",
+				lipgloss.NewStyle().Foreground(m.styles.colors.errorColor).Bold(true).Render(
+					"❌ Workflow run not found."), m.repo, m.runID, rmMsg.err)
+			return m, tea.Sequence(msgCmd, tea.Quit)
+		}
+
+		m.workflowRuns = rmMsg.runs
+		m.lastFetched = time.Now()
+		m.stopSpinners()
+		cmds = append(cmds, m.onWorkflowRunsFetched()...)
 
 	case prFetchedMsg:
 		m.pr = msg.pr
@@ -785,6 +817,10 @@ func (m *model) viewHeader() string {
 				m.styles.faintFgStyle.Render(version),
 			)))
 
+	if m.runID != "" {
+		return m.viewRunModeHeader(bgStyle, logo, logoWidth)
+	}
+
 	status := bgStyle.Render(m.viewCommitStatus(bgStyle))
 	prWidth := m.width - lipgloss.Width(status) - logoWidth -
 		m.styles.headerStyle.GetHorizontalFrameSize()
@@ -842,9 +878,72 @@ func (m *model) viewPRName(width int, bgStyle lipgloss.Style) string {
 	return bgStyle.Width(width).Bold(true).Render(m.pr.Title)
 }
 
+func (m *model) viewRunModeHeader(bgStyle lipgloss.Style, logo string, logoWidth int) string {
+	contentWidth := m.width - logoWidth - m.styles.headerStyle.GetHorizontalFrameSize()
+
+	if len(m.workflowRuns) == 0 {
+		title := bgStyle.Width(contentWidth).
+			Render(fmt.Sprintf("Loading %s run #%s...", m.repo, m.runID))
+		return m.styles.headerStyle.Width(m.width).Render(
+			lipgloss.JoinHorizontal(lipgloss.Left, bgStyle.Render(title), logo))
+	}
+
+	run := m.workflowRuns[0]
+
+	// Show the run status as a pill
+	statusText := ""
+	var statusColor color.Color
+	bucket := run.Bucket
+	switch bucket {
+	case data.CheckBucketPass:
+		statusText = SuccessIcon + " Success"
+		statusColor = m.styles.colors.successColor
+	case data.CheckBucketFail:
+		statusText = FailureIcon + " Failed"
+		statusColor = m.styles.colors.errorColor
+	case data.CheckBucketCancel:
+		statusText = CanceledIcon + " Cancelled"
+		statusColor = m.styles.colors.faintColor
+	case data.CheckBucketPending:
+		statusText = PendingIcon + " In Progress"
+		statusColor = m.styles.colors.warnColor
+	default:
+		statusText = WaitingIcon + " Pending"
+		statusColor = m.styles.colors.warnColor
+	}
+	status := makePill(statusText,
+		lipgloss.NewStyle().Foreground(m.styles.colors.darkerColor), statusColor)
+
+	repoName := bgStyle.Foreground(m.styles.colors.darkColor).Bold(true).Render(m.repo)
+	runIdText := bgStyle.Foreground(m.styles.colors.faintColor).Render(
+		fmt.Sprintf("run #%s", m.runID))
+
+	topLine := bgStyle.Width(contentWidth).Render(lipgloss.JoinHorizontal(lipgloss.Top,
+		bgStyle.Render(status),
+		bgStyle.Render(" "),
+		repoName,
+		bgStyle.Render(" "),
+		runIdText,
+	))
+
+	bottomLine := bgStyle.Width(contentWidth).Bold(true).Render(run.Name)
+
+	title := bgStyle.Width(contentWidth).Render(lipgloss.JoinVertical(lipgloss.Left,
+		topLine,
+		bottomLine,
+	))
+
+	return m.styles.headerStyle.Width(m.width).Render(
+		lipgloss.JoinHorizontal(lipgloss.Left, bgStyle.Render(title), logo))
+}
+
 func (m *model) viewFooter() string {
 	bg := lipgloss.NewStyle().Background(m.styles.footerStyle.GetBackground())
 	sFooter := m.styles.footerStyle.Width(m.width)
+
+	if m.runID != "" {
+		return m.viewRunModeFooter(bg, sFooter)
+	}
 
 	if m.width == 0 || len(m.prWithChecks.Commits.Nodes) == 0 {
 		return sFooter.Inherit(bg).Render("")
@@ -905,6 +1004,89 @@ func (m *model) viewFooter() string {
 
 	return sFooter.Render(
 		lipgloss.JoinHorizontal(lipgloss.Top, totalText, checks, gap, reFetchingIn, help))
+}
+
+func (m *model) viewRunModeFooter(bg lipgloss.Style, sFooter lipgloss.Style) string {
+	if m.width == 0 || len(m.workflowRuns) == 0 {
+		return sFooter.Inherit(bg).Render("")
+	}
+
+	run := m.workflowRuns[0]
+	texts := make([]string, 0)
+
+	totalJobs := len(run.Jobs)
+	totalText := ""
+	if totalJobs > 0 {
+		totalText = bg.Foreground(m.styles.colors.lightColor).Render(
+			fmt.Sprintf("%d jobs: ", totalJobs))
+	}
+
+	var failed, inProgress, succeeded, skipped int
+	for _, job := range run.Jobs {
+		switch job.Bucket {
+		case data.CheckBucketFail:
+			failed++
+		case data.CheckBucketPending:
+			inProgress++
+		case data.CheckBucketPass:
+			succeeded++
+		case data.CheckBucketSkipping:
+			skipped++
+		}
+	}
+
+	if failed > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(
+			fmt.Sprintf("%d failing", failed)))
+	}
+	if inProgress > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.warnColor).Render(
+			fmt.Sprintf("%d in progress", inProgress)))
+	}
+	if succeeded > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.successColor).Render(
+			fmt.Sprintf("%d successful", succeeded)))
+	}
+	if skipped > 0 {
+		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(
+			fmt.Sprintf("%d skipped", skipped)))
+	}
+
+	checksText := bg.Render(strings.Join(texts, bg.Render(", ")))
+
+	reFetchingIn := ""
+	if m.isRunInProgress() {
+		until := time.Until(m.lastFetched.Add(refreshInterval)).Truncate(time.Second).Seconds()
+		untilStr := fmt.Sprintf("in %ds", int(until))
+		if until <= 0 {
+			untilStr = "now..."
+		}
+		reFetchingIn = bg.Padding(0, 1).
+			Foreground(m.styles.colors.faintColor).
+			Render(fmt.Sprintf("refreshing %s", untilStr))
+	}
+
+	help := m.styles.helpButtonStyle.Render("? help")
+
+	gap := bg.Render(
+		strings.Repeat(" ", max(0, m.width-lipgloss.Width(totalText)-lipgloss.Width(checksText)-
+			lipgloss.Width(reFetchingIn)-lipgloss.Width(help)-
+			m.styles.footerStyle.GetHorizontalFrameSize())))
+
+	return sFooter.Render(
+		lipgloss.JoinHorizontal(lipgloss.Top, totalText, checksText, gap, reFetchingIn, help))
+}
+
+func (m *model) isRunInProgress() bool {
+	if len(m.workflowRuns) == 0 {
+		return true
+	}
+	for _, job := range m.workflowRuns[0].Jobs {
+		if job.IsStatusInProgress() {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *model) shouldShowSteps() bool {

@@ -28,7 +28,7 @@ var asciiArt string
 var logoWithTagline = lipgloss.NewStyle().Foreground(lipgloss.Green).Render(asciiArt)
 
 var rootCmd = &cobra.Command{
-	Use:   "gh enhance [<PR URL> | <PR number>] [flags]",
+	Use:   "gh enhance [<PR URL> | <run URL> | <number>] [flags]",
 	Long:  logoWithTagline,
 	Short: "A Blazingly Fast Terminal UI for GitHub Actions",
 	Args:  cobra.MinimumNArgs(1),
@@ -37,7 +37,13 @@ var rootCmd = &cobra.Command{
 
  # look up via a PR number when inside a clone of dlvhdr/gh-dash
  # will look at checks of https://github.com/dlvhdr/gh-dash/pull/767
- gh enhance 767`,
+ gh enhance 767
+
+ # look up via a full URL to a GitHub Actions run
+ gh enhance https://github.com/dlvhdr/gh-dash/actions/runs/23687980056
+
+ # look up via a run ID (--run disambiguates from PR numbers)
+ gh enhance 23687980056 --run`,
 }
 
 func Execute() error {
@@ -105,6 +111,12 @@ func init() {
 	)
 
 	rootCmd.Flags().Bool(
+		"run",
+		false,
+		"treat the numeric argument as a workflow run ID instead of a PR number",
+	)
+
+	rootCmd.Flags().Bool(
 		"debug",
 		false,
 		"passing this flag will allow writing debug output to debug.log",
@@ -137,16 +149,27 @@ func init() {
 			fmt.Print(usage)
 			return errors.New("no PR passed")
 		}
+
+		isRunMode := false
+		var runID string
+
 		url, err := url.Parse(args[0])
 		if err == nil && url.Hostname() == "github.com" {
 			parts := strings.Split(url.Path, "/")
-			if len(parts) < 5 {
-				fmt.Print(usage)
-				return errors.New("bad PR passed")
-			}
 
-			repo = parts[1] + "/" + parts[2]
-			number = parts[4]
+			// Detect /owner/repo/actions/runs/{id} URLs
+			if len(parts) >= 5 && parts[3] == "actions" && parts[4] == "runs" && len(parts) >= 6 {
+				repo = parts[1] + "/" + parts[2]
+				runID = parts[5]
+				isRunMode = true
+			} else if len(parts) >= 5 {
+				// Existing PR URL handling: /owner/repo/pull/{number}
+				repo = parts[1] + "/" + parts[2]
+				number = parts[4]
+			} else {
+				fmt.Print(usage)
+				return errors.New("bad URL passed")
+			}
 		}
 
 		if repo == "" {
@@ -156,7 +179,25 @@ func init() {
 			}
 		}
 
-		if number == "" {
+		// Check --run flag for bare numeric IDs
+		runFlag, _ := rootCmd.Flags().GetBool("run")
+		if runFlag {
+			if isRunMode {
+				// Already parsed a run URL, --run flag is redundant but not an error
+			} else if number != "" {
+				// A PR URL was parsed but --run was also passed
+				return errors.New("cannot use --run flag with a PR URL")
+			} else {
+				if _, err := strconv.Atoi(args[0]); err != nil {
+					fmt.Print(usage)
+					return errors.New("run ID is not a number")
+				}
+				runID = args[0]
+				isRunMode = true
+			}
+		}
+
+		if !isRunMode && number == "" {
 			if _, err := strconv.Atoi(args[0]); err != nil {
 				fmt.Print(usage)
 				return errors.New("PR number is not a number")
@@ -170,7 +211,12 @@ func init() {
 			return err
 		}
 
-		p := tea.NewProgram(tui.NewModel(repo, number, tui.ModelOpts{Flat: flat}))
+		opts := tui.ModelOpts{Flat: flat}
+		if isRunMode {
+			opts.RunID = runID
+		}
+
+		p := tea.NewProgram(tui.NewModel(repo, number, opts))
 		if _, err := p.Run(); err != nil {
 			log.Error("failed starting program", "err", err)
 			fmt.Println(err)
