@@ -11,15 +11,16 @@ import (
 // WorkflowRun holds all the the jobs that were part of it
 // It is defined by a workflow file that defines the jobs to run
 type WorkflowRun struct {
-	Id        string
-	Name      string
-	Link      string
-	Workflow  string
-	Event     string
-	Jobs      []WorkflowJob
-	Bucket    CheckBucket
-	StartedAt time.Time
-	RunNumber int
+	Id           string
+	Name         string
+	DisplayTitle string
+	Link         string
+	Workflow     string
+	Event        string
+	Jobs         []WorkflowJob
+	Bucket       CheckBucket
+	StartedAt    time.Time
+	RunNumber    int
 }
 
 type WorkflowJob struct {

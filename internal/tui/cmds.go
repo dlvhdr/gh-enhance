@@ -286,28 +286,33 @@ func makeOpenUrlCmd(url string) tea.Cmd {
 	}
 }
 
-func (m *model) makeInitCmd() tea.Cmd {
-	return tea.Batch(
+func (m *model) startSpinners() []tea.Cmd {
+	return []tea.Cmd{
 		m.checksList.StartSpinner(),
 		m.runsList.StartSpinner(),
 		m.logsSpinner.Tick,
 		m.jobsList.StartSpinner(),
+	}
+}
+
+func (m *model) makeInitCmd() tea.Cmd {
+	cmds := m.startSpinners()
+	cmds = append(cmds,
 		m.makeFetchPRCmd(),
 		m.makeInitialGetPRChecksCmd(m.prNumber),
 		m.startFetchingPRChecksWithInterval(),
 	)
+	return tea.Batch(cmds...)
 }
 
 // Run mode: fetch the workflow run and its jobs directly via REST API.
 func (m *model) makeRunModeInitCmd() tea.Cmd {
-	return tea.Batch(
-		m.checksList.StartSpinner(),
-		m.runsList.StartSpinner(),
-		m.logsSpinner.Tick,
-		m.jobsList.StartSpinner(),
+	cmds := m.startSpinners()
+	cmds = append(cmds,
 		m.makeFetchRunCmd(),
 		m.startFetchingRunWithInterval(),
 	)
+	return tea.Batch(cmds...)
 }
 
 type runModeFetchedMsg struct {
@@ -334,7 +339,7 @@ func (m *model) fetchRun() tea.Msg {
 		return runModeFetchedMsg{err: err}
 	}
 
-	run := convertActionsRunToWorkflowRun(runResp, jobsResp)
+	run := convertRunResponseToWorkflowRun(runResp, jobsResp)
 	return runModeFetchedMsg{runs: []data.WorkflowRun{run}}
 }
 
@@ -350,7 +355,7 @@ func (m *model) fetchRunWithInterval() tea.Cmd {
 	return tea.Batch(
 		m.makeFetchRunCmd(),
 		tea.Tick(refreshInterval, func(t time.Time) tea.Msg {
-			if !m.isRunInProgress() {
+			if !m.isRunModeInProgress() {
 				log.Info("run has concluded - not refetching anymore")
 				return nil
 			}
@@ -369,9 +374,9 @@ type runModeIntervalTickMsg struct {
 	msg tea.Msg
 }
 
-func convertActionsRunToWorkflowRun(
-	run api.ActionsRunResponse,
-	jobsResp api.ActionsRunJobsResponse,
+func convertRunResponseToWorkflowRun(
+	run api.WorkflowRunResponse,
+	jobsResp api.WorkflowRunJobsResponse,
 ) data.WorkflowRun {
 	jobs := make([]data.WorkflowJob, 0, len(jobsResp.Jobs))
 	for _, j := range jobsResp.Jobs {
@@ -411,15 +416,16 @@ func convertActionsRunToWorkflowRun(
 
 	runConclusion := api.Conclusion(strings.ToUpper(run.Conclusion))
 	wfRun := data.WorkflowRun{
-		Id:        fmt.Sprintf("%d", run.Id),
-		Name:      run.Name,
-		Link:      run.HtmlUrl,
-		Workflow:  run.Name,
-		Event:     run.Event,
-		Jobs:      jobs,
-		Bucket:    data.GetConclusionBucket(runConclusion),
-		StartedAt: run.RunStartedAt,
-		RunNumber: run.RunNumber,
+		Id:           fmt.Sprintf("%d", run.Id),
+		Name:         run.Name,
+		DisplayTitle: run.DisplayTitle,
+		Link:         run.HtmlUrl,
+		Workflow:     run.Name,
+		Event:        run.Event,
+		Jobs:         jobs,
+		Bucket:       data.GetConclusionBucket(runConclusion),
+		StartedAt:    run.RunStartedAt,
+		RunNumber:    run.RunNumber,
 	}
 
 	return wfRun

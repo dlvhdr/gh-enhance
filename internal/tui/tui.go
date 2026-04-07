@@ -915,6 +915,7 @@ func (m *model) viewRunModeHeader(bgStyle lipgloss.Style, logo string, logoWidth
 		lipgloss.NewStyle().Foreground(m.styles.colors.darkerColor), statusColor)
 
 	repoName := bgStyle.Foreground(m.styles.colors.darkColor).Bold(true).Render(m.repo)
+	separator := bgStyle.Foreground(m.styles.colors.faintColor).Render(" ⋅ ")
 	runIdText := bgStyle.Foreground(m.styles.colors.faintColor).Render(
 		fmt.Sprintf("run #%s", m.runID))
 
@@ -922,11 +923,15 @@ func (m *model) viewRunModeHeader(bgStyle lipgloss.Style, logo string, logoWidth
 		bgStyle.Render(status),
 		bgStyle.Render(" "),
 		repoName,
-		bgStyle.Render(" "),
+		separator,
 		runIdText,
 	))
 
-	bottomLine := bgStyle.Width(contentWidth).Bold(true).Render(run.Name)
+	titleText := run.DisplayTitle
+	if titleText == "" {
+		titleText = run.Name
+	}
+	bottomLine := bgStyle.Width(contentWidth).Bold(true).Render(titleText)
 
 	title := bgStyle.Width(contentWidth).Render(lipgloss.JoinVertical(lipgloss.Left,
 		topLine,
@@ -964,46 +969,13 @@ func (m *model) viewFooter() string {
 		contexts.StatusContextCountsByState,
 	)
 
-	if stats.Failed > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(
-			fmt.Sprintf("%d failing", stats.Failed)))
-	}
-	if stats.InProgress > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.warnColor).Render(
-			fmt.Sprintf("%d in progress", stats.InProgress)))
-	}
-	if stats.Succeeded > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.successColor).Render(
-			fmt.Sprintf("%d successful", stats.Succeeded)))
-	}
-	if stats.Skipped > 0 {
-		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(
-			fmt.Sprintf("%d skipped", stats.Skipped)))
-	}
+	texts = m.appendStatTexts(
+		texts, bg, stats.Failed, stats.InProgress, stats.Succeeded, stats.Skipped,
+	)
+	checksText := bg.Render(strings.Join(texts, bg.Render(", ")))
 
-	checks := bg.Render(strings.Join(texts, bg.Render(", ")))
-
-	reFetchingIn := ""
-	if m.prWithChecks.Number != 0 && m.prWithChecks.IsStatusCheckInProgress() {
-		until := time.Until(m.lastFetched.Add(refreshInterval)).Truncate(time.Second).Seconds()
-		untilStr := fmt.Sprintf("in %ds", int(until))
-		if until <= 0 {
-			untilStr = "now..."
-		}
-		reFetchingIn = bg.Padding(0, 1).
-			Foreground(m.styles.colors.faintColor).
-			Render(fmt.Sprintf("refreshing %s", untilStr))
-	}
-
-	help := m.styles.helpButtonStyle.Render("? help")
-
-	gap := bg.Render(
-		strings.Repeat(" ", max(0, m.width-lipgloss.Width(totalText)-lipgloss.Width(checks)-
-			lipgloss.Width(reFetchingIn)-lipgloss.Width(help)-
-			m.styles.footerStyle.GetHorizontalFrameSize())))
-
-	return sFooter.Render(
-		lipgloss.JoinHorizontal(lipgloss.Top, totalText, checks, gap, reFetchingIn, help))
+	isInProgress := m.prWithChecks.Number != 0 && m.prWithChecks.IsStatusCheckInProgress()
+	return m.renderFooterLayout(bg, sFooter, totalText, checksText, isInProgress)
 }
 
 func (m *model) viewRunModeFooter(bg lipgloss.Style, sFooter lipgloss.Style) string {
@@ -1035,6 +1007,16 @@ func (m *model) viewRunModeFooter(bg lipgloss.Style, sFooter lipgloss.Style) str
 		}
 	}
 
+	texts = m.appendStatTexts(texts, bg, failed, inProgress, succeeded, skipped)
+	checksText := bg.Render(strings.Join(texts, bg.Render(", ")))
+
+	return m.renderFooterLayout(bg, sFooter, totalText, checksText, m.isRunModeInProgress())
+}
+
+func (m *model) appendStatTexts(
+	texts []string, bg lipgloss.Style,
+	failed, inProgress, succeeded, skipped int,
+) []string {
 	if failed > 0 {
 		texts = append(texts, bg.Foreground(m.styles.colors.errorColor).Render(
 			fmt.Sprintf("%d failing", failed)))
@@ -1051,11 +1033,16 @@ func (m *model) viewRunModeFooter(bg lipgloss.Style, sFooter lipgloss.Style) str
 		texts = append(texts, bg.Foreground(m.styles.colors.faintColor).Render(
 			fmt.Sprintf("%d skipped", skipped)))
 	}
+	return texts
+}
 
-	checksText := bg.Render(strings.Join(texts, bg.Render(", ")))
-
+func (m *model) renderFooterLayout(
+	bg, sFooter lipgloss.Style,
+	totalText, checksText string,
+	isInProgress bool,
+) string {
 	reFetchingIn := ""
-	if m.isRunInProgress() {
+	if isInProgress {
 		until := time.Until(m.lastFetched.Add(refreshInterval)).Truncate(time.Second).Seconds()
 		untilStr := fmt.Sprintf("in %ds", int(until))
 		if until <= 0 {
@@ -1077,7 +1064,7 @@ func (m *model) viewRunModeFooter(bg lipgloss.Style, sFooter lipgloss.Style) str
 		lipgloss.JoinHorizontal(lipgloss.Top, totalText, checksText, gap, reFetchingIn, help))
 }
 
-func (m *model) isRunInProgress() bool {
+func (m *model) isRunModeInProgress() bool {
 	if len(m.workflowRuns) == 0 {
 		return true
 	}
