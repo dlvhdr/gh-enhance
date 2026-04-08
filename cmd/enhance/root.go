@@ -38,7 +38,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "gh enhance [<PR URL> | <run URL> | <number>] [flags]",
+	Use:   "gh enhance [<PR URL> | <PR number> | <run URL>] [flags]",
 	Long:  logoWithTagline,
 	Short: "A Blazingly Fast Terminal UI for GitHub Actions",
 	Args:  cobra.MinimumNArgs(0),
