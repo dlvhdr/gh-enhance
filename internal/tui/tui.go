@@ -927,11 +927,27 @@ func (m *model) viewRunModeHeader(bgStyle lipgloss.Style, logo string, logoWidth
 		runIdText,
 	))
 
+	// Show PR title and number when the run is against a PR, otherwise show
+	// the run's display title to avoid duplicating the workflow name that
+	// already appears in the run list.
 	titleText := run.DisplayTitle
 	if titleText == "" {
 		titleText = run.Name
 	}
-	bottomLine := bgStyle.Width(contentWidth).Bold(true).Render(titleText)
+
+	var bottomLine string
+	if run.PRNumber > 0 {
+		prLabel := bgStyle.Foreground(m.styles.colors.faintColor).Render(
+			fmt.Sprintf("#%d", run.PRNumber))
+		bottomLine = bgStyle.Width(contentWidth).Render(
+			lipgloss.JoinHorizontal(lipgloss.Top,
+				bgStyle.Bold(true).Render(titleText),
+				bgStyle.Render(" "),
+				prLabel,
+			))
+	} else {
+		bottomLine = bgStyle.Width(contentWidth).Bold(true).Render(titleText)
+	}
 
 	title := bgStyle.Width(contentWidth).Render(lipgloss.JoinVertical(lipgloss.Left,
 		topLine,

@@ -465,7 +465,11 @@ type WorkflowRunResponse struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 	RunStartedAt time.Time `json:"run_started_at"`
 	DisplayTitle string    `json:"display_title"`
-	Repository   struct {
+	PullRequests []struct {
+		Number int    `json:"number"`
+		Url    string `json:"url"`
+	} `json:"pull_requests"`
+	Repository struct {
 		FullName string `json:"full_name"`
 	} `json:"repository"`
 }

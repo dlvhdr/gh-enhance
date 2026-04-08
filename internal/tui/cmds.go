@@ -415,6 +415,12 @@ func convertRunResponseToWorkflowRun(
 	data.SortJobs(jobs)
 
 	runConclusion := api.Conclusion(strings.ToUpper(run.Conclusion))
+
+	var prNumber int
+	if len(run.PullRequests) > 0 {
+		prNumber = run.PullRequests[0].Number
+	}
+
 	wfRun := data.WorkflowRun{
 		Id:           fmt.Sprintf("%d", run.Id),
 		Name:         run.Name,
@@ -426,6 +432,7 @@ func convertRunResponseToWorkflowRun(
 		Bucket:       data.GetConclusionBucket(runConclusion),
 		StartedAt:    run.RunStartedAt,
 		RunNumber:    run.RunNumber,
+		PRNumber:     prNumber,
 	}
 
 	return wfRun

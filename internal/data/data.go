@@ -21,6 +21,7 @@ type WorkflowRun struct {
 	Bucket       CheckBucket
 	StartedAt    time.Time
 	RunNumber    int
+	PRNumber     int
 }
 
 type WorkflowJob struct {

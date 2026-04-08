@@ -8,8 +8,8 @@ import (
 	slog "log"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -27,11 +27,21 @@ import (
 var asciiArt string
 var logoWithTagline = lipgloss.NewStyle().Foreground(lipgloss.Green).Render(asciiArt)
 
+// Regex patterns for GitHub URL parsing
+var (
+	prURLPattern = regexp.MustCompile(
+		`^/(?P<owner>[^/]+)/(?P<repo>[^/]+)/pull/(?P<number>\d+)`,
+	)
+	runURLPattern = regexp.MustCompile(
+		`^/(?P<owner>[^/]+)/(?P<repo>[^/]+)/actions/runs/(?P<runID>\d+)`,
+	)
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "gh enhance [<PR URL> | <run URL> | <number>] [flags]",
 	Long:  logoWithTagline,
 	Short: "A Blazingly Fast Terminal UI for GitHub Actions",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(0),
 	Example: `# look up via a full URL to a GitHub PR
  gh enhance https://github.com/dlvhdr/gh-dash/pull/767
 
@@ -43,7 +53,7 @@ var rootCmd = &cobra.Command{
  gh enhance https://github.com/dlvhdr/gh-dash/actions/runs/23687980056
 
  # look up via a run ID (--run disambiguates from PR numbers)
- gh enhance 23687980056 --run`,
+ gh enhance --run 23687980056`,
 }
 
 func Execute() error {
@@ -110,10 +120,10 @@ func init() {
 		"passing this flag will present checks as a flat list",
 	)
 
-	rootCmd.Flags().Bool(
+	rootCmd.Flags().String(
 		"run",
-		false,
-		"treat the numeric argument as a workflow run ID instead of a PR number",
+		"",
+		"look up a workflow run by its numeric ID",
 	)
 
 	rootCmd.Flags().Bool(
@@ -145,30 +155,54 @@ func init() {
 			" for help and examples.\n")
 
 	rootCmd.RunE = func(_ *cobra.Command, args []string) error {
-		if len(args) == 0 {
+		isRunMode := false
+		var runID string
+
+		// Check --run flag first (string flag takes the run ID directly)
+		runFlagVal, _ := rootCmd.Flags().GetString("run")
+		if runFlagVal != "" {
+			if _, err := strconv.Atoi(runFlagVal); err != nil {
+				fmt.Print(usage)
+				return errors.New("run ID is not a number")
+			}
+			runID = runFlagVal
+			isRunMode = true
+
+			if len(args) > 0 {
+				return errors.New("cannot pass both --run and a positional argument")
+			}
+		}
+
+		if !isRunMode && len(args) == 0 {
 			fmt.Print(usage)
 			return errors.New("no PR passed")
 		}
 
-		isRunMode := false
-		var runID string
-
-		url, err := url.Parse(args[0])
-		if err == nil && url.Hostname() == "github.com" {
-			parts := strings.Split(url.Path, "/")
-
-			// Detect /owner/repo/actions/runs/{id} URLs
-			if len(parts) >= 5 && parts[3] == "actions" && parts[4] == "runs" && len(parts) >= 6 {
-				repo = parts[1] + "/" + parts[2]
-				runID = parts[5]
-				isRunMode = true
-			} else if len(parts) >= 5 {
-				// Existing PR URL handling: /owner/repo/pull/{number}
-				repo = parts[1] + "/" + parts[2]
-				number = parts[4]
+		// Parse positional argument (URL or bare number)
+		if !isRunMode && len(args) > 0 {
+			arg := args[0]
+			u, err := url.Parse(arg)
+			if err == nil && u.Hostname() == "github.com" {
+				if m := runURLPattern.FindStringSubmatch(u.Path); m != nil {
+					repo = m[runURLPattern.SubexpIndex("owner")] + "/" +
+						m[runURLPattern.SubexpIndex("repo")]
+					runID = m[runURLPattern.SubexpIndex("runID")]
+					isRunMode = true
+				} else if m := prURLPattern.FindStringSubmatch(u.Path); m != nil {
+					repo = m[prURLPattern.SubexpIndex("owner")] + "/" +
+						m[prURLPattern.SubexpIndex("repo")]
+					number = m[prURLPattern.SubexpIndex("number")]
+				} else {
+					fmt.Print(usage)
+					return errors.New("bad URL passed")
+				}
 			} else {
-				fmt.Print(usage)
-				return errors.New("bad URL passed")
+				// Bare number — must be a PR number
+				if _, err := strconv.Atoi(arg); err != nil {
+					fmt.Print(usage)
+					return errors.New("PR number is not a number")
+				}
+				number = arg
 			}
 		}
 
@@ -179,31 +213,14 @@ func init() {
 			}
 		}
 
-		// Check --run flag for bare numeric IDs
-		runFlag, _ := rootCmd.Flags().GetBool("run")
-		if runFlag {
-			if isRunMode {
-				// Already parsed a run URL, --run flag is redundant but not an error
-			} else if number != "" {
-				// A PR URL was parsed but --run was also passed
-				return errors.New("cannot use --run flag with a PR URL")
-			} else {
-				if _, err := strconv.Atoi(args[0]); err != nil {
-					fmt.Print(usage)
-					return errors.New("run ID is not a number")
-				}
-				runID = args[0]
-				isRunMode = true
-			}
+		if repo == "" {
+			fmt.Print(usage)
+			return errors.New("could not determine repository; use -R owner/repo")
 		}
 
 		if !isRunMode && number == "" {
-			if _, err := strconv.Atoi(args[0]); err != nil {
-				fmt.Print(usage)
-				return errors.New("PR number is not a number")
-			} else {
-				number = args[0]
-			}
+			fmt.Print(usage)
+			return errors.New("no PR or run ID provided")
 		}
 
 		flat, err := rootCmd.Flags().GetBool("flat")
