@@ -87,11 +87,6 @@ Thank you to all past and existing sponsors! 🙏🏽
 
 `ENHANCE` has an extensive docs site at [https://www.gh-dash.dev/companions/enhance/getting-started/](https://www.gh-dash.dev/companions/enhance/getting-started/).
 
-## ❤️ Donating
-
-If you enjoy `ENHANCE` and want to help, consider supporting the project with a
-donation at the [sponsors page](https://github.com/sponsors/dlvhdr).
-
 ## 👥 Discord
 
 Have questions? Join our [Discord community](https://discord.gg/SXNXp9NctV)!
