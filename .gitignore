@@ -2,5 +2,7 @@ coverage.txt
 dist/
 .killgrave.log
 debug.log
-.crush
+.crush/
 gh-enhance
+/sponsors.json
+.task/
