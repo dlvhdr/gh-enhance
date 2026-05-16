@@ -8,6 +8,7 @@ prSections:
   - title: Review
     filters: -author:@me is:open updated:>={{ nowModify "-2.5w" }}
   - title: All
+    filters: ""
 issuesSections:
   - title: Open
     filters: author:@me is:open -author:@me sort:reactions

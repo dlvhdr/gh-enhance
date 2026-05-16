@@ -455,6 +455,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key.Matches(msg, refreshAllKey) {
 			newModel := NewModel(m.repo, m.prNumber, ModelOpts{})
 			newModel.flat = m.flat
+			newModel.focusedPane = m.focusedPane
 			newModel.width = m.width
 			newModel.height = m.height
 			newModel.setHeights()
