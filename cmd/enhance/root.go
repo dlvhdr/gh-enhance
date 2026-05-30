@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/charmbracelet/fang"
+	appconfig "github.com/dlvhdr/gh-enhance/internal/config"
 	"github.com/dlvhdr/gh-enhance/internal/tui"
 	"github.com/dlvhdr/gh-enhance/internal/version"
 )
@@ -223,12 +224,32 @@ func init() {
 			return errors.New("no PR or run ID provided")
 		}
 
-		flat, err := rootCmd.Flags().GetBool("flat")
+		cfg, err := appconfig.Load()
 		if err != nil {
 			return err
 		}
 
-		opts := tui.ModelOpts{Flat: flat}
+		if err := tui.ApplyKeybindings(cfg.Keybindings); err != nil {
+			return err
+		}
+
+		flat := false
+		if cfg.Flat != nil {
+			flat = *cfg.Flat
+		}
+		if rootCmd.Flags().Changed("flat") {
+			flat, err = rootCmd.Flags().GetBool("flat")
+			if err != nil {
+				return err
+			}
+		}
+
+		theme := cfg.Theme
+		if envTheme := os.Getenv("ENHANCE_THEME"); envTheme != "" {
+			theme = envTheme
+		}
+
+		opts := tui.ModelOpts{Flat: flat, Theme: theme}
 		if isRunMode {
 			opts.RunID = runID
 		}

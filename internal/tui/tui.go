@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"os"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -74,6 +73,7 @@ type model struct {
 	logsInput         textinput.Model
 	inProgressSpinner spinner.Model
 	flat              bool
+	theme             string
 	lastTick          time.Time
 	version           string
 	rateLimit         api.RateLimit
@@ -85,14 +85,14 @@ type model struct {
 type ModelOpts struct {
 	Flat  bool
 	RunID string // non-empty when in run mode (no PR context)
+	Theme string
 }
 
 func NewModel(repo string, number string, opts ModelOpts) model {
 	tint.NewDefaultRegistry()
 	tint.SetTintID(tint.TintTokyoNightStorm.ID)
-	theme := os.Getenv("ENHANCE_THEME")
-	if theme != "" {
-		tint.SetTintID(theme)
+	if opts.Theme != "" {
+		tint.SetTintID(opts.Theme)
 	}
 
 	version := "dev"
@@ -134,6 +134,8 @@ func NewModel(repo string, number string, opts ModelOpts) model {
 	}
 	vp.KeyMap.Right = rightKey
 	vp.KeyMap.Left = leftKey
+	vp.KeyMap.Down = nextRowKey
+	vp.KeyMap.Up = prevRowKey
 
 	vp.HighlightStyle = lipgloss.NewStyle().Foreground(s.tint.Black).Background(s.tint.Blue)
 	vp.SelectedHighlightStyle = lipgloss.NewStyle().
@@ -206,6 +208,7 @@ func NewModel(repo string, number string, opts ModelOpts) model {
 		version:           version,
 		inProgressSpinner: ips,
 		flat:              opts.Flat,
+		theme:             opts.Theme,
 		focusedPane:       focusedPane,
 		lastFetched:       time.Now(),
 	}
@@ -453,7 +456,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if key.Matches(msg, refreshAllKey) {
-			newModel := NewModel(m.repo, m.prNumber, ModelOpts{})
+			newModel := NewModel(m.repo, m.prNumber, ModelOpts{Theme: m.theme})
 			newModel.flat = m.flat
 			newModel.focusedPane = m.focusedPane
 			newModel.width = m.width
@@ -1251,6 +1254,10 @@ func newChecksDefaultList(styles styles) (list.Model, list.ItemDelegate) {
 func newList(styles styles, delegate list.ItemDelegate) list.Model {
 	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.KeyMap.Quit = quitKey
+	l.KeyMap.CursorDown = nextRowKey
+	l.KeyMap.CursorUp = prevRowKey
+	l.KeyMap.GoToStart = gotoTopKey
+	l.KeyMap.GoToEnd = gotoBottomKey
 	l.Paginator.Type = paginator.Arabic
 	l.Styles.StatusBar = l.Styles.StatusBar.Foreground(styles.colors.faintColor)
 	l.Styles.StatusEmpty = l.Styles.StatusEmpty.Foreground(styles.colors.faintColor)
@@ -2045,7 +2052,7 @@ func (m *model) renderFullScreenLogsSpinner(message string, cta string) string {
 		m.styles.faintFgStyle.Render("(logs will be available when it is complete)"),
 		"",
 		lipgloss.JoinHorizontal(lipgloss.Top, m.styles.faintFgStyle.Render("Press "),
-			m.styles.keyStyle.Render("o"),
+			m.styles.keyStyle.Render(openUrlKey.Help().Key),
 			m.styles.faintFgStyle.Render(" to "),
 			m.styles.faintFgStyle.Render(cta)),
 	)

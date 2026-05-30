@@ -86,6 +86,26 @@ Thank you to all past and existing sponsors! 🙏🏽
 
 `ENHANCE` has an extensive docs site at [https://www.gh-dash.dev/companions/enhance/getting-started/](https://www.gh-dash.dev/companions/enhance/getting-started/).
 
+## Configuration
+
+`ENHANCE` reads configuration from `$XDG_CONFIG_HOME/gh-enhance/config.yml`, or `~/.config/gh-enhance/config.yml` when `$XDG_CONFIG_HOME` is not set.
+
+```yaml
+theme: dracula
+flat: true
+
+keybindings:
+  universal:
+    - builtin: openUrl
+      key: enter
+    - builtin: nextPane
+      key: tab
+    - builtin: quit
+      key: q
+```
+
+Supported built-in keybindings are `openUrl`, `openPR`, `quit`, `nextRow`, `prevRow`, `zoomPane`, `nextPane`, `prevPane`, `gotoTop`, `gotoBottom`, `right`, `left`, `search`, `mode`, `cancelSearch`, `applySearch`, `nextSearchMatch`, `prevSearchMatch`, `refreshAll`, `rerun`, and `help`.
+
 ## 👥 Discord
 
 Have questions? Join our [Discord community](https://discord.gg/SXNXp9NctV)!

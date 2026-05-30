@@ -19,6 +19,7 @@ require (
 	github.com/lrstanley/bubbletint/v2 v2.0.1
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
 	github.com/spf13/cobra v1.10.2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -36,7 +37,6 @@ require (
 	github.com/cli/safeexec v1.0.1 // indirect
 	github.com/cli/shurcooL-graphql v0.0.4 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
-	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/coder/websocket v1.8.13 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
@@ -72,5 +72,4 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/term v0.41.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
