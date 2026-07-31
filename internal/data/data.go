@@ -22,6 +22,8 @@ type WorkflowRun struct {
 	StartedAt    time.Time
 	RunNumber    int
 	PRNumber     int
+	Status       string
+	Conclusion   string
 }
 
 type WorkflowJob struct {
@@ -80,6 +82,7 @@ const (
 	CheckBucketSkipping
 	CheckBucketFail
 	CheckBucketCancel
+	CheckBucketActionRequired
 	CheckBucketPending
 	CheckBucketNeutral
 )
@@ -92,10 +95,12 @@ func GetConclusionBucket(conclusion api.Conclusion) CheckBucket {
 		return CheckBucketSkipping
 	case "NEUTRAL":
 		return CheckBucketNeutral
-	case "ERROR", "FAILURE", "TIMED_OUT", "ACTION_REQUIRED":
+	case "ERROR", "FAILURE", "TIMED_OUT":
 		return CheckBucketFail
 	case "CANCELLED":
 		return CheckBucketCancel
+	case "ACTION_REQUIRED":
+		return CheckBucketActionRequired
 	default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
 		return CheckBucketPending
 	}

@@ -26,6 +26,7 @@ const (
 	PendingIcon  = ""
 	FailureIcon  = "󰅙"
 	SuccessIcon  = ""
+	WarningIcon  = ""
 	MergedIcon   = ""
 	DraftIcon    = ""
 	OpenIcon     = ""

@@ -13,15 +13,22 @@ tasks:
   debug:
     cmds:
       - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
-      - DEBUG=true LOG_LEVEL={{.LOG_LEVEL}} go run . {{.CLI_ARGS}}
+      - LOG_LEVEL={{.LOG_LEVEL}} go run . {{.CLI_ARGS}}
     interactive: true
     desc: Run in debug mode. Run `task logs` to watch the logs.
+    vars:
+      LOG_LEVEL: debug
+    env:
+      LOG_LEVEL: "{{ .LOG_LEVEL }}"
+      DEBUG: true
 
   debug:info:
     cmds:
-      - task: debug
-        vars:
-          LOG_LEVEL: info
+      - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
+      - go run . --debug {{.CLI_ARGS}}
+    env:
+      DEBUG: true
+      LOG_LEVEL: info
     interactive: true
     desc: Run in debug mode with INFO level logs. Run `task logs` to watch the logs.
 
@@ -94,6 +101,11 @@ tasks:
       - git checkout main
       - git tag $(svu next)
       - git push --tags
+
+  resterm:
+    desc: Run Resterm (a postman alternative)
+    cmds:
+      - resterm --file ./testdata/graphql.http
 
   docs-sponsors:
     desc: Update OpenCollective and GitHub sponsors list

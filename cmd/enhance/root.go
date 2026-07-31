@@ -38,7 +38,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "gh enhance [<PR URL> | <PR number> | <run URL>] [flags]",
+	Use:   "gh enhance [<pr-url> | <pr-number> | <run-url>] [flags]",
 	Long:  logoWithTagline,
 	Short: "A Blazingly Fast Terminal UI for GitHub Actions",
 	Args:  cobra.MinimumNArgs(0),
@@ -104,7 +104,6 @@ func init() {
 	)
 
 	var repo string
-	var number string
 
 	rootCmd.PersistentFlags().StringVarP(
 		&repo,
@@ -173,16 +172,11 @@ func init() {
 			}
 		}
 
-		if !isRunMode && len(args) == 0 {
-			fmt.Print(usage)
-			return errors.New("no PR passed")
-		}
+		opts := tui.ModelOpts{}
 
-		// Parse positional argument (URL or bare number)
 		if !isRunMode && len(args) > 0 {
 			arg := args[0]
-			u, err := url.Parse(arg)
-			if err == nil && u.Hostname() == "github.com" {
+			if u, err := url.Parse(arg); err == nil && u.Hostname() == "github.com" {
 				if m := runURLPattern.FindStringSubmatch(u.Path); m != nil {
 					repo = m[runURLPattern.SubexpIndex("owner")] + "/" +
 						m[runURLPattern.SubexpIndex("repo")]
@@ -191,18 +185,18 @@ func init() {
 				} else if m := prURLPattern.FindStringSubmatch(u.Path); m != nil {
 					repo = m[prURLPattern.SubexpIndex("owner")] + "/" +
 						m[prURLPattern.SubexpIndex("repo")]
-					number = m[prURLPattern.SubexpIndex("number")]
+					opts.PRNumber = m[prURLPattern.SubexpIndex("number")]
 				} else {
 					fmt.Print(usage)
 					return errors.New("bad URL passed")
 				}
 			} else {
-				// Bare number — must be a PR number
+				// Bare number - must be a PR number
 				if _, err := strconv.Atoi(arg); err != nil {
 					fmt.Print(usage)
 					return errors.New("PR number is not a number")
 				}
-				number = arg
+				opts.PRNumber = arg
 			}
 		}
 
@@ -215,25 +209,21 @@ func init() {
 
 		if repo == "" {
 			fmt.Print(usage)
-			return errors.New("could not determine repository; use -R owner/repo")
+			return errors.New("could not determine repository; use -R owner/repo to specify it")
 		}
-
-		if !isRunMode && number == "" {
-			fmt.Print(usage)
-			return errors.New("no PR or run ID provided")
-		}
+		opts.Repo = repo
 
 		flat, err := rootCmd.Flags().GetBool("flat")
 		if err != nil {
 			return err
 		}
+		opts.Flat = flat
 
-		opts := tui.ModelOpts{Flat: flat}
 		if isRunMode {
 			opts.RunID = runID
 		}
 
-		p := tea.NewProgram(tui.NewModel(repo, number, opts))
+		p := tea.NewProgram(tui.NewModel(opts))
 		if _, err := p.Run(); err != nil {
 			log.Error("failed starting program", "err", err)
 			fmt.Println(err)

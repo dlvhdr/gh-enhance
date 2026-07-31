@@ -1,0 +1,111 @@
+# @auth file command argv=["gh","auth","token"] cache_key=github-cli
+
+### PR Checks    
+# @graphql
+# @operation PRChecks
+# @name PR Checks
+# @tag PR
+POST {{graphql.endpoint}}
+Accept: application/json
+
+query PRChecks($url: URI!){
+  resource(url: $url) {
+    ... on PullRequest {
+      lastCommit: commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              state
+            }
+          }
+        }
+      }
+      allCommits: commits(last: 100) {
+        nodes {
+          commit {
+            abbreviatedOid
+            committedDate
+            messageHeadline
+            author {
+              name
+              user {
+                login
+              }
+            }
+            statusCheckRollup {
+              state
+              contexts(last: 1) {
+                checkRunCount
+                checkRunCountsByState {
+                  count
+                  state
+                }
+              }
+            }
+            checkSuites {
+              totalCount
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+### Repo Checks    
+# @graphql
+# @operation RepoChecks
+# @name Repo Checks
+# @tag Repo
+POST {{graphql.endpoint}}
+Accept: application/json
+
+query RepoChecks($url: URI!){
+  resource(url: $url) {
+    ... on PullRequest {
+      lastCommit: commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              state
+            }
+          }
+        }
+      }
+      allCommits: commits(last: 100) {
+        nodes {
+          commit {
+            abbreviatedOid
+            committedDate
+            messageHeadline
+            author {
+              name
+              user {
+                login
+              }
+            }
+            statusCheckRollup {
+              state
+              contexts(last: 1) {
+                checkRunCount
+                checkRunCountsByState {
+                  count
+                  state
+                }
+              }
+            }
+            checkSuites {
+              totalCount
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+### Repo Checks (REST)
+# @name Repo Checks (REST)
+# @tag PR
+GET {{rest.endpoint}}/repos/block/buzz/actions/runs
+Accept: application/json
