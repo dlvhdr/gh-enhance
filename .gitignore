@@ -6,3 +6,5 @@ debug.log
 gh-enhance
 /sponsors.json
 .task/
+testdata/api.github.com.graphql-schema.json
+testdata/gh-schema.graphql

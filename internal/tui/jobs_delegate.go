@@ -48,6 +48,9 @@ func (i *jobItem) Title() string {
 
 // Description implements charm.land/bubbles.list.DefaultItem.Description
 func (i *jobItem) Description() string {
+	if i.job.Bucket == data.CheckBucketActionRequired {
+		return "Action required"
+	}
 	if i.job.Bucket == data.CheckBucketSkipping {
 		return "Skipped"
 	}

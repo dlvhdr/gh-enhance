@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,12 @@ func (m *model) makeFetchPRCmd() tea.Cmd {
 func (m *model) makeInitialGetPRChecksCmd(prNumber string) tea.Cmd {
 	return func() tea.Msg {
 		return m.fetchPRChecksWithCursor(prNumber, "")
+	}
+}
+
+func (m *model) makeInitialGetRepoChecksCmd() tea.Cmd {
+	return func() tea.Msg {
+		return m.fetchRepoChecksWithCursor("")
 	}
 }
 
@@ -73,6 +80,22 @@ func (m *model) fetchPRChecksWithInterval() tea.Cmd {
 	)
 }
 
+type repoModeIntervalFetchMsg struct {
+	msg tea.Msg
+}
+
+func (m *model) makeFetchRepoChecksWithInterval() tea.Cmd {
+	return tea.Tick(refreshInterval, func(t time.Time) tea.Msg {
+		if m.rateLimit.Remaining == 0 && time.Now().Before(m.rateLimit.ResetAt) {
+			log.Warn("rate limit reached, waiting", "m.rateLimit", m.rateLimit)
+			return nil
+		}
+
+		log.Info("refreshing repo checks on interval", "time", t)
+		return repoModeIntervalFetchMsg{msg: m.fetchRepoChecksWithCursor("")}
+	})
+}
+
 type startIntervalFetching struct{}
 
 func (m *model) startFetchingPRChecksWithInterval() tea.Cmd {
@@ -87,7 +110,7 @@ func (m *model) fetchPRChecks(prNumber string) tea.Msg {
 }
 
 func (m model) fetchPRChecksWithCursor(prNumber string, cursor string) tea.Msg {
-	resp, err := api.FetchPRCheckRuns(m.repo, prNumber, cursor)
+	resp, err := m.client.FetchPRCheckRuns(m.repo, prNumber, cursor)
 	if err != nil {
 		log.Error("error fetching pr checks", "err", err)
 		return workflowRunsFetchedMsg{err: err, rateLimit: resp.RateLimit}
@@ -104,6 +127,90 @@ func (m model) fetchPRChecksWithCursor(prNumber string, cursor string) tea.Msg {
 		rateLimit: resp.RateLimit,
 		pr:        resp.Resource.PullRequest,
 		runs:      runs,
+	}
+}
+
+type repoModeRunsFetchedMsg struct {
+	Repo string
+	Runs []data.WorkflowRun
+	Err  error
+}
+
+func (m model) fetchRepoChecksWithCursor(cursor string) tea.Msg {
+	resp, err := m.client.FetchRepoWorkflowRuns(m.repo, cursor)
+	if err != nil {
+		log.Error("error fetching repo checks", "err", err)
+		return repoModeRunsFetchedMsg{Err: err}
+	}
+
+	wfRuns := make([]data.WorkflowRun, 0)
+	for i, run := range resp.WorkflowRuns {
+		jobsResp := api.WorkflowRunJobsResponse{}
+		if i == len(resp.WorkflowRuns)-1 {
+			jobsResp, err = m.client.FetchWorkflowRunJobs(m.repo, strconv.Itoa(run.Id))
+			if err != nil {
+				log.Error(
+					"error fetching workflow run jobs",
+					"runId",
+					run.Id,
+					"runUrl",
+					run.HtmlUrl,
+					"err",
+					err,
+				)
+				return runModeFetchedMsg{err: err}
+			}
+		}
+		run.Name = fmt.Sprintf("%s #%s", run.Name, strconv.Itoa(run.RunNumber))
+		convertedRun := convertRunResponseToWorkflowRun(run, jobsResp)
+		wfRuns = append(wfRuns, convertedRun)
+	}
+
+	return repoModeRunsFetchedMsg{
+		Repo: m.repo,
+		Runs: wfRuns,
+	}
+}
+
+type runJobsFetchedMsg struct {
+	runId string
+	jobs  []data.WorkflowJob
+	err   error
+}
+
+func (m model) makeFetchWorkflowRunJobsCmd(run data.WorkflowRun) tea.Cmd {
+	return func() tea.Msg {
+		jobsResp, err := m.client.FetchWorkflowRunJobs(m.repo, run.Id)
+		if err != nil {
+			log.Error(
+				"error fetching workflow run jobs",
+				"runId",
+				run,
+				"link",
+				run.Link,
+				"err",
+				err,
+			)
+			return runJobsFetchedMsg{runId: run.Id, err: err}
+		}
+
+		jobs := make([]data.WorkflowJob, jobsResp.TotalCount)
+		for i, job := range jobsResp.Jobs {
+			jobs[i] = convertJobResponseToWorkflowJob(job, jobRelatedRun{
+				name:      run.Name,
+				event:     run.Event,
+				runNumber: run.RunNumber,
+			})
+		}
+		log.Info(
+			"fetched workflow run jobs",
+			"len(jobs)",
+			len(jobs),
+			"total count",
+			jobsResp.TotalCount,
+		)
+		data.SortJobs(jobs)
+		return runJobsFetchedMsg{runId: run.Id, jobs: jobs}
 	}
 }
 
@@ -164,6 +271,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		defer utils.TimeTrack(time.Now(), "fetching job logs")
 		if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun ||
 			ji.job.Kind == data.JobKindExternal {
+			log.Debug("job is not JobKindGithubActions", "job", ji.job.Kind)
 			output, err := api.FetchCheckRunOutput(m.repo, ji.job.Id)
 			if err != nil {
 				log.Error("error fetching check run output", "link", ji.job.Link, "err", err)
@@ -191,6 +299,8 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		}
 
 		// Kind is JobKindGithubActions
+		log.Debug("job is JobKindGithubActions", "job", ji.job.Kind)
+		log.Debug(fmt.Sprintf("executing gh run view -R %s --log --job %s", m.repo, ji.job.Id))
 		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", ji.job.Id)
 		if err != nil {
 			// TODO: fetch with gh api
@@ -232,7 +342,7 @@ type workflowRunStepsFetchedMsg struct {
 func (m *model) makeFetchWorkflowRunStepsCmd(runId string) tea.Cmd {
 	return func() tea.Msg {
 		log.Debug("fetching all workflow run steps", "repo", m.repo, "runId", runId)
-		jobsWithStepsRes, err := api.FetchWorkflowRunSteps(m.repo, runId)
+		jobsWithStepsRes, err := m.client.FetchWorkflowRunSteps(m.repo, runId)
 		if err != nil {
 			log.Error("error fetching all workflow run steps", "repo", m.repo,
 				"prNumber", m.prNumber, "runId", runId, "err", err)
@@ -254,7 +364,7 @@ type checkStepsFetchedMsg struct {
 func (m *model) makeFetchCheckStepsCmd(jobId string) tea.Cmd {
 	return func() tea.Msg {
 		log.Debug("fetching check steps", "repo", m.repo, "jobId", jobId)
-		stepsRes, err := api.FetchJobSteps(m.repo, jobId)
+		stepsRes, err := m.client.FetchJobSteps(m.repo, jobId)
 		if err != nil {
 			log.Error(
 				"error fetching job steps",
@@ -295,7 +405,7 @@ func (m *model) startSpinners() []tea.Cmd {
 	}
 }
 
-func (m *model) makeInitCmd() tea.Cmd {
+func (m *model) makeInitPRCmd() tea.Cmd {
 	cmds := m.startSpinners()
 	cmds = append(cmds,
 		m.makeFetchPRCmd(),
@@ -305,8 +415,17 @@ func (m *model) makeInitCmd() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *model) makeInitRepoModeCmd() tea.Cmd {
+	cmds := m.startSpinners()
+	cmds = append(cmds,
+		m.makeInitialGetRepoChecksCmd(),
+		m.makeFetchRepoChecksWithInterval(),
+	)
+	return tea.Batch(cmds...)
+}
+
 // Run mode: fetch the workflow run and its jobs directly via REST API.
-func (m *model) makeRunModeInitCmd() tea.Cmd {
+func (m *model) makeInitRunModeCmd() tea.Cmd {
 	cmds := m.startSpinners()
 	cmds = append(cmds,
 		m.makeFetchRunCmd(),
@@ -327,13 +446,13 @@ func (m *model) makeFetchRunCmd() tea.Cmd {
 }
 
 func (m *model) fetchRun() tea.Msg {
-	runResp, err := api.FetchWorkflowRunByID(m.repo, m.runID)
+	runResp, err := m.client.FetchWorkflowRunByID(m.repo, m.runID)
 	if err != nil {
 		log.Error("error fetching workflow run", "err", err)
 		return runModeFetchedMsg{err: err}
 	}
 
-	jobsResp, err := api.FetchWorkflowRunJobs(m.repo, m.runID)
+	jobsResp, err := m.client.FetchWorkflowRunJobs(m.repo, m.runID)
 	if err != nil {
 		log.Error("error fetching workflow run jobs", "err", err)
 		return runModeFetchedMsg{err: err}
@@ -351,21 +470,28 @@ func (m *model) startFetchingRunWithInterval() tea.Cmd {
 
 type startRunIntervalFetching struct{}
 
+func (m *model) makeFetchRunIntervalTickCmd() tea.Cmd {
+	return func() tea.Msg {
+		if !m.isRunModeInProgress() {
+			log.Info("run has concluded - not refetching anymore")
+			return nil
+		}
+
+		if m.rateLimit.Remaining == 0 && time.Now().Before(m.rateLimit.ResetAt) {
+			log.Warn("rate limit reached, waiting", "m.rateLimit", m.rateLimit)
+			return nil
+		}
+
+		return runModeIntervalTickMsg{msg: m.fetchRun()}
+	}
+}
+
 func (m *model) fetchRunWithInterval() tea.Cmd {
 	return tea.Batch(
 		m.makeFetchRunCmd(),
 		tea.Tick(refreshInterval, func(t time.Time) tea.Msg {
-			if !m.isRunModeInProgress() {
-				log.Info("run has concluded - not refetching anymore")
-				return nil
-			}
-
-			if m.rateLimit.Remaining == 0 && time.Now().Before(m.rateLimit.ResetAt) {
-				log.Warn("rate limit reached, waiting", "m.rateLimit", m.rateLimit)
-				return nil
-			}
-
-			return runModeIntervalTickMsg{msg: m.fetchRun()}
+			cmd := m.makeFetchRunIntervalTickCmd()
+			return cmd()
 		}),
 	)
 }
@@ -374,43 +500,60 @@ type runModeIntervalTickMsg struct {
 	msg tea.Msg
 }
 
+type jobRelatedRun struct {
+	name      string
+	event     string
+	runNumber int
+}
+
+func convertJobResponseToWorkflowJob(
+	j api.WorkflowRunJob,
+	relatedRun jobRelatedRun,
+) data.WorkflowJob {
+	conclusion := api.Conclusion(strings.ToUpper(j.Conclusion))
+	status := api.Status(strings.ToUpper(j.Status))
+
+	steps := make([]api.Step, 0, len(j.Steps))
+	for _, s := range j.Steps {
+		steps = append(steps, api.Step{
+			Conclusion:  api.Conclusion(strings.ToUpper(s.Conclusion)),
+			Name:        s.Name,
+			Number:      s.Number,
+			StartedAt:   s.StartedAt,
+			CompletedAt: s.CompletedAt,
+			Status:      api.Status(strings.ToUpper(s.Status)),
+		})
+	}
+
+	return data.WorkflowJob{
+		Id:          fmt.Sprintf("%d", j.Id),
+		State:       status,
+		Conclusion:  conclusion,
+		Name:        j.Name,
+		Workflow:    relatedRun.name,
+		Event:       relatedRun.event,
+		Logs:        []data.LogsWithTime{},
+		Link:        j.HtmlUrl,
+		Steps:       steps,
+		StartedAt:   j.StartedAt,
+		CompletedAt: j.CompletedAt,
+		Bucket:      data.GetConclusionBucket(conclusion),
+		Kind:        data.JobKindGithubActions,
+		RunNumber:   relatedRun.runNumber,
+	}
+}
+
 func convertRunResponseToWorkflowRun(
 	run api.WorkflowRunResponse,
 	jobsResp api.WorkflowRunJobsResponse,
 ) data.WorkflowRun {
 	jobs := make([]data.WorkflowJob, 0, len(jobsResp.Jobs))
 	for _, j := range jobsResp.Jobs {
-		conclusion := api.Conclusion(strings.ToUpper(j.Conclusion))
-		status := api.Status(strings.ToUpper(j.Status))
-
-		steps := make([]api.Step, 0, len(j.Steps))
-		for _, s := range j.Steps {
-			steps = append(steps, api.Step{
-				Conclusion:  api.Conclusion(strings.ToUpper(s.Conclusion)),
-				Name:        s.Name,
-				Number:      s.Number,
-				StartedAt:   s.StartedAt,
-				CompletedAt: s.CompletedAt,
-				Status:      api.Status(strings.ToUpper(s.Status)),
-			})
-		}
-
-		jobs = append(jobs, data.WorkflowJob{
-			Id:          fmt.Sprintf("%d", j.Id),
-			State:       status,
-			Conclusion:  conclusion,
-			Name:        j.Name,
-			Workflow:    run.Name,
-			Event:       run.Event,
-			Logs:        []data.LogsWithTime{},
-			Link:        j.HtmlUrl,
-			Steps:       steps,
-			StartedAt:   j.StartedAt,
-			CompletedAt: j.CompletedAt,
-			Bucket:      data.GetConclusionBucket(conclusion),
-			Kind:        data.JobKindGithubActions,
-			RunNumber:   run.RunNumber,
-		})
+		jobs = append(jobs, convertJobResponseToWorkflowJob(j, jobRelatedRun{
+			name:      run.Name,
+			event:     run.Event,
+			runNumber: run.RunNumber,
+		}))
 	}
 	data.SortJobs(jobs)
 
@@ -433,6 +576,8 @@ func convertRunResponseToWorkflowRun(
 		StartedAt:    run.RunStartedAt,
 		RunNumber:    run.RunNumber,
 		PRNumber:     prNumber,
+		Status:       run.Status,
+		Conclusion:   run.Conclusion,
 	}
 
 	return wfRun
@@ -727,7 +872,7 @@ type prFetchedMsg struct {
 }
 
 func (m model) fetchPR() tea.Msg {
-	resp, err := api.FetchPR(m.repo, m.prNumber)
+	resp, err := m.client.FetchPR(m.repo, m.prNumber)
 	if err != nil {
 		log.Error("error fetching pr", "err", err)
 		return prFetchedMsg{err: err}

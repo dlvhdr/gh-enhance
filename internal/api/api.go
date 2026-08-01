@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -60,6 +61,34 @@ type Status string
 type Conclusion string
 
 type CheckRunState string
+
+type API struct {
+	url        string
+	gqlClient  *gh.GraphQLClient
+	httpClient *http.Client
+}
+
+const (
+	defaultAPIURL    = "https://api.github.com"
+	defaultServerURL = "https://github.com"
+)
+
+func New() API {
+	apiURL := os.Getenv("GITHUB_API_URL")
+	if apiURL == "" {
+		apiURL = defaultAPIURL
+	}
+
+	a := API{}
+
+	// initialize singletons
+	a.getHTTPClient()
+	a.getGraphQLClient()
+
+	a.url = apiURL
+
+	return a
+}
 
 func IsFailureConclusion(c Conclusion) bool {
 	switch c {
@@ -213,37 +242,65 @@ type PRCheckRunsQuery struct {
 	} `graphql:"resource(url: $url)"`
 }
 
-var (
-	gqlClient  *gh.GraphQLClient
-	httpClient *http.Client
-)
-
-func SetClient(c *gh.GraphQLClient) {
-	gqlClient = c
+type RepoWorkflowRunsResponse struct {
+	TotalCount   int                   `json:"total_count"`
+	WorkflowRuns []WorkflowRunResponse `json:"workflow_runs"`
 }
 
-func getGraphQLClient() (*gh.GraphQLClient, error) {
+type NormalizedRepoCheckRunsResponse struct {
+	Repo       string
+	TotalCount int
+	CheckRuns  []CheckRun
+}
+
+func (a *API) SetClient(c *gh.GraphQLClient) {
+	a.gqlClient = c
+}
+
+func (a *API) getGraphQLClient() (*gh.GraphQLClient, error) {
 	var err error
-	if gqlClient != nil {
-		return gqlClient, nil
+	if a.gqlClient != nil {
+		return a.gqlClient, nil
 	}
-	gqlClient, err = gh.DefaultGraphQLClient()
-	return gqlClient, err
+
+	level := os.Getenv("LOG_LEVEL")
+	opts := gh.ClientOptions{}
+	if level == "debug" {
+		logger := NewHTTPLogger(0)
+		opts.Log = &logger
+		opts.LogVerboseHTTP = true
+		opts.LogColorize = true
+	}
+	a.gqlClient, err = gh.NewGraphQLClient(opts)
+	return a.gqlClient, err
 }
 
-func getHTTPClient() (*http.Client, error) {
+func (a *API) getHTTPClient() (*http.Client, error) {
 	var err error
-	if httpClient != nil {
-		return httpClient, nil
+	if a.httpClient != nil {
+		return a.httpClient, nil
 	}
-	httpClient, err = gh.DefaultHTTPClient()
-	return httpClient, err
+	level := os.Getenv("LOG_LEVEL")
+	opts := gh.ClientOptions{}
+	if level == "debug" {
+		logger := NewHTTPLogger(0)
+		opts.Log = &logger
+		opts.LogVerboseHTTP = true
+		opts.LogColorize = true
+	}
+
+	a.httpClient, err = gh.NewHTTPClient(opts)
+	return a.httpClient, err
 }
 
-func FetchPRCheckRuns(repo string, prNumber string, cursor string) (PRCheckRunsQuery, error) {
+func (a *API) FetchPRCheckRuns(
+	repo string,
+	prNumber string,
+	cursor string,
+) (PRCheckRunsQuery, error) {
 	var err error
 	var res PRCheckRunsQuery
-	c, err := getGraphQLClient()
+	c, err := a.getGraphQLClient()
 	if err != nil {
 		return res, err
 	}
@@ -267,6 +324,62 @@ func FetchPRCheckRuns(repo string, prNumber string, cursor string) (PRCheckRunsQ
 	return res, nil
 }
 
+func (a *API) FetchRepoWorkflowRuns(
+	repo string,
+	cursor string,
+) (RepoWorkflowRunsResponse, error) {
+	var err error
+	res := RepoWorkflowRunsResponse{}
+	c, err := a.getHTTPClient()
+	if err != nil {
+		return res, err
+	}
+
+	parsedUrl, err := url.Parse(fmt.Sprintf("%s/repos/%s/actions/runs", a.url, repo))
+	if err != nil {
+		return res, err
+	}
+
+	log.Debug("fetching repo action runs", "url", parsedUrl)
+	startTime := time.Now()
+	resp, err := c.Get(parsedUrl.String())
+	if err != nil {
+		log.Error("error fetching repo action runs", "err", err)
+		return res, err
+	}
+	log.Debug("FetchRepoActionRuns request completed", "duration", time.Since(startTime))
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return res, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return res, fmt.Errorf(
+			"failed to fetch repo actions for repo %s: %s %s",
+			repo,
+			resp.Status,
+			string(body),
+		)
+	}
+
+	err = json.Unmarshal(body, &res)
+	if err != nil {
+		log.Error("error fetching repo action runs", "err", err)
+		return res, err
+	}
+	log.Debug(
+		"FetchRepoActionRuns data",
+		"TotalCount",
+		res.TotalCount,
+		"fetched",
+		len(res.WorkflowRuns),
+	)
+
+	return res, nil
+}
+
 type WorkflowRunStepsQuery struct {
 	Resource struct {
 		WorkflowRun struct {
@@ -286,9 +399,9 @@ type WorkflowRunStepsQuery struct {
 	} `graphql:"resource(url: $url)"`
 }
 
-func FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunStepsQuery, error) {
+func (a *API) FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunStepsQuery, error) {
 	res := WorkflowRunStepsQuery{}
-	c, err := getGraphQLClient()
+	c, err := a.getGraphQLClient()
 	if err != nil {
 		return res, err
 	}
@@ -336,9 +449,9 @@ type NormalizedJobStepsResponse struct {
 	Steps        []Step
 }
 
-func FetchJobSteps(repo string, jobID string) (NormalizedJobStepsResponse, error) {
+func (a *API) FetchJobSteps(repo string, jobID string) (NormalizedJobStepsResponse, error) {
 	res := NormalizedJobStepsResponse{}
-	c, err := getHTTPClient()
+	c, err := a.getHTTPClient()
 	if err != nil {
 		return res, err
 	}
@@ -494,9 +607,9 @@ type WorkflowRunJob struct {
 	Steps       []httpStep `json:"steps"`
 }
 
-func FetchWorkflowRunByID(repo string, runID string) (WorkflowRunResponse, error) {
+func (a *API) FetchWorkflowRunByID(repo string, runID string) (WorkflowRunResponse, error) {
 	res := WorkflowRunResponse{}
-	c, err := getHTTPClient()
+	c, err := a.getHTTPClient()
 	if err != nil {
 		return res, err
 	}
@@ -541,9 +654,9 @@ func FetchWorkflowRunByID(repo string, runID string) (WorkflowRunResponse, error
 	return res, nil
 }
 
-func FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsResponse, error) {
+func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsResponse, error) {
 	res := WorkflowRunJobsResponse{}
-	c, err := getHTTPClient()
+	c, err := a.getHTTPClient()
 	if err != nil {
 		return res, err
 	}
@@ -629,10 +742,10 @@ type PRQuery struct {
 	} `graphql:"resource(url: $url)"`
 }
 
-func FetchPR(repo string, prNumber string) (PRQuery, error) {
+func (a *API) FetchPR(repo string, prNumber string) (PRQuery, error) {
 	var err error
 	var res PRQuery
-	c, err := getGraphQLClient()
+	c, err := a.getGraphQLClient()
 	if err != nil {
 		return res, err
 	}

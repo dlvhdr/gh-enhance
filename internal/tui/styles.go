@@ -64,6 +64,7 @@ type styles struct {
 	pendingGlyph               lipgloss.Style
 	failureGlyph               lipgloss.Style
 	successGlyph               lipgloss.Style
+	warningGlyph               lipgloss.Style
 	mergedGlyph                lipgloss.Style
 	draftGlyph                 lipgloss.Style
 	closedGlyph                lipgloss.Style
@@ -220,6 +221,9 @@ func makeStyles() styles {
 		successGlyph: lipgloss.NewStyle().
 			Foreground(colors.successColor).
 			SetString(SuccessIcon),
+		warningGlyph: lipgloss.NewStyle().
+			Foreground(colors.warnColor).
+			SetString(WarningIcon),
 		mergedGlyph: lipgloss.NewStyle().
 			Foreground(colors.mergedColor).
 			SetString(MergedIcon),

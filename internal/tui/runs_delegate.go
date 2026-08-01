@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
@@ -16,11 +17,14 @@ import (
 )
 
 type runItem struct {
-	meta      itemMeta
-	run       *data.WorkflowRun
-	jobsItems []*jobItem
-	loading   bool
-	spinner   spinner.Model
+	meta           itemMeta
+	run            *data.WorkflowRun
+	jobsItems      []*jobItem
+	loadingJobs    bool
+	lastFetchJobs  time.Time
+	loadingSteps   bool
+	lastFetchSteps time.Time
+	spinner        spinner.Model
 }
 
 // Title implements /charm.land/bubbles.list.DefaultItem.Title
@@ -41,26 +45,59 @@ func (i *runItem) Description() string {
 		return i.run.Workflow
 	}
 
-	return fmt.Sprintf("on: %s", i.run.Event)
+	startedAt := ""
+	if !i.run.StartedAt.IsZero() {
+		if time.Since(i.run.StartedAt) >= time.Hour*24 {
+			startedAt = fmt.Sprintf(
+				" at %s",
+				i.run.StartedAt.Local().Local().Format("Jan 02, 15:04 MST-07"),
+			)
+		} else {
+			startedAt = fmt.Sprintf(
+				" · %s ago",
+				TimeElapsed(i.run.StartedAt),
+			)
+		}
+	}
+
+	return fmt.Sprintf("on %s%s", i.run.Event, startedAt)
 }
 
 // FilterValue implements /charm.land/bubbles.list.Item.FilterValue
 func (i *runItem) FilterValue() string { return i.run.Name }
 
 func (i *runItem) IsInProgress() bool {
+	return i.run.Status == "in_progress"
+}
+
+func (i *runItem) HasNotConcluded() bool {
 	numPending := 0
 	for _, ji := range i.jobsItems {
 		if ji.isStatusInProgress() {
 			numPending++
 		}
 	}
-	return numPending > 0
+	if numPending > 0 {
+		return true
+	}
+
+	return i.run.Conclusion == "action_required" ||
+		i.run.Status == "in_progress" ||
+		i.run.Status == "queued" ||
+		i.run.Status == "requested" ||
+		i.run.Status == "waiting" ||
+		i.run.Status == "pending"
+}
+
+func (i *runItem) ShouldFetchJobs() bool {
+	return !i.loadingJobs &&
+		(i.lastFetchJobs.IsZero() || (time.Since(i.lastFetchJobs) > refreshInterval && i.HasNotConcluded()))
 }
 
 func (i *runItem) viewStatus() string {
 	s := i.meta.TitleStyle()
 
-	if i.IsInProgress() {
+	if i.run.Status == "in_progress" {
 		return i.spinner.View()
 	}
 
@@ -138,10 +175,11 @@ func NewRunItem(run data.WorkflowRun, styles styles) runItem {
 	}
 
 	return runItem{
-		meta:      itemMeta{styles: styles},
-		run:       &run,
-		jobsItems: jobs,
-		loading:   true,
-		spinner:   NewClockSpinner(styles),
+		meta:         itemMeta{styles: styles},
+		run:          &run,
+		jobsItems:    jobs,
+		loadingSteps: false,
+		loadingJobs:  false,
+		spinner:      NewClockSpinner(styles),
 	}
 }
