@@ -42,8 +42,14 @@ var rootCmd = &cobra.Command{
 	Long:  logoWithTagline,
 	Short: "A Blazingly Fast Terminal UI for GitHub Actions",
 	Args:  cobra.MinimumNArgs(0),
-	Example: `# look up via a full URL to a GitHub PR
- gh enhance https://github.com/dlvhdr/gh-dash/pull/767
+	Example: `# watch all recent runs of the current git repo
+	gh enhance
+
+	# watch all recent runs of the specified repo
+  gh enhance -R neovim/neovim 
+
+	# look up via a full URL to a GitHub PR
+  gh enhance https://github.com/dlvhdr/gh-dash/pull/767
 
  # look up via a PR number when inside a clone of dlvhdr/gh-dash
  # will look at checks of https://github.com/dlvhdr/gh-dash/pull/767
