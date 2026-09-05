@@ -7,13 +7,13 @@ import (
 )
 
 const (
-	headerHeight    = 4
-	footerHeight    = 1
-	smallScreen     = 130
-	paneTitleHeight = 1
+	headerHeight       = 4
+	footerHeight       = 1
+	defaultSmallScreen = 130
+	paneTitleHeight    = 1
 
-	unfocusedLargePaneWidth = 20
-	focusedLargePaneWidth   = 40
+	defaultUnfocusedLargePaneWidth = 20
+	defaultFocusedLargePaneWidth   = 40
 
 	focusedSmallPaneWidth = 25
 )
@@ -27,6 +27,7 @@ const (
 	FailureIcon  = "󰅙"
 	SuccessIcon  = ""
 	WarningIcon  = ""
+	QueuedIcon   = ""
 	MergedIcon   = ""
 	DraftIcon    = ""
 	OpenIcon     = ""

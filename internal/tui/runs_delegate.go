@@ -7,7 +7,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
-	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/log/v2"
@@ -24,7 +23,6 @@ type runItem struct {
 	lastFetchJobs  time.Time
 	loadingSteps   bool
 	lastFetchSteps time.Time
-	spinner        spinner.Model
 }
 
 // Title implements /charm.land/bubbles.list.DefaultItem.Title
@@ -98,15 +96,15 @@ func (i *runItem) viewStatus() string {
 	s := i.meta.TitleStyle()
 
 	if i.run.Status == "in_progress" {
-		return i.spinner.View()
+		return cachedSpinner.View()
 	}
 
-	return bucketToIcon(i.run.Bucket, s, i.meta.styles)
+	return bucketToIcon(i.run.Bucket, i.run.Status, s, i.meta.styles)
 }
 
 func (ri *runItem) Tick() tea.Cmd {
 	if ri.IsInProgress() {
-		return ri.spinner.Tick
+		return cachedSpinner.Tick
 	}
 
 	return nil
@@ -180,6 +178,5 @@ func NewRunItem(run data.WorkflowRun, styles styles) runItem {
 		jobsItems:    jobs,
 		loadingSteps: false,
 		loadingJobs:  false,
-		spinner:      NewClockSpinner(styles),
 	}
 }

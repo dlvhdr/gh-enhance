@@ -21,10 +21,11 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
-type workflowRunsFetchedMsg struct {
+type prChecksFetchedMsg struct {
 	pr        api.PRWithChecks
 	runs      []data.WorkflowRun
 	rateLimit api.RateLimit
+	cursor    string
 	err       error
 }
 
@@ -113,20 +114,21 @@ func (m model) fetchPRChecksWithCursor(prNumber string, cursor string) tea.Msg {
 	resp, err := m.client.FetchPRCheckRuns(m.repo, prNumber, cursor)
 	if err != nil {
 		log.Error("error fetching pr checks", "err", err)
-		return workflowRunsFetchedMsg{err: err, rateLimit: resp.RateLimit}
+		return prChecksFetchedMsg{err: err, rateLimit: resp.RateLimit, cursor: cursor}
 	}
 
 	if resp.Resource.PullRequest.Number == 0 {
-		return workflowRunsFetchedMsg{err: errors.New("pull request not found")}
+		return prChecksFetchedMsg{err: errors.New("pull request not found")}
 	}
 
 	nodes := resp.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 	runs := makeWorkflowRuns(nodes)
 
-	return workflowRunsFetchedMsg{
-		rateLimit: resp.RateLimit,
+	return prChecksFetchedMsg{
 		pr:        resp.Resource.PullRequest,
 		runs:      runs,
+		rateLimit: resp.RateLimit,
+		cursor:    cursor,
 	}
 }
 
@@ -380,6 +382,8 @@ func (m *model) makeFetchCheckStepsCmd(jobId string) tea.Cmd {
 			return nil
 		}
 
+		log.Info("job steps fetched", "jobId", jobId, "len(steps)", len(stepsRes.Steps))
+
 		return checkStepsFetchedMsg{
 			checkId: jobId,
 			steps:   stepsRes.Steps,
@@ -402,6 +406,7 @@ func (m *model) startSpinners() []tea.Cmd {
 		m.runsList.StartSpinner(),
 		m.logsSpinner.Tick,
 		m.jobsList.StartSpinner(),
+		cachedSpinner.Tick,
 	}
 }
 
@@ -612,12 +617,15 @@ func jobKind(cr api.CheckRun) data.JobKind {
 	return kind
 }
 
-func (m *model) mergeWorkflowRuns(msg workflowRunsFetchedMsg) {
+func (m *model) mergeWorkflowRuns(
+	msg prChecksFetchedMsg,
+	runsSoFar []data.WorkflowRun,
+) []data.WorkflowRun {
 	runsMap := make(map[int]data.WorkflowRun)
 
 	// start with existing workflow runs to keep order and
 	// prevent the UI from jumping
-	for _, run := range m.workflowRuns {
+	for _, run := range runsSoFar {
 		runsMap[run.RunNumber] = run
 	}
 
@@ -635,17 +643,16 @@ func (m *model) mergeWorkflowRuns(msg workflowRunsFetchedMsg) {
 		runsMap[run.RunNumber] = existing
 	}
 
-	runs := make([]data.WorkflowRun, 0)
+	merged := make([]data.WorkflowRun, 0)
 	for _, run := range runsMap {
 		latestJobs := takeOnlyLatestRunAttempts(run.Jobs)
 		run.Jobs = latestJobs
 		run.SortJobs()
-		runs = append(runs, run)
+		merged = append(merged, run)
 	}
 
-	data.SortRuns(runs)
-
-	m.workflowRuns = runs
+	data.SortRuns(merged)
+	return merged
 }
 
 // Create workflow runs and their jobs under data the tui can work with
@@ -705,15 +712,20 @@ func makeWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
 		)
 	}
 
+	log.Error("wat", "checkRun", checkRun)
+
 	run := data.WorkflowRun{
-		Id:        fmt.Sprintf("%d", id),
-		Name:      wfName,
-		Link:      link,
-		Workflow:  checkRun.CheckSuite.WorkflowRun.Workflow.Name,
-		Event:     checkRun.CheckSuite.WorkflowRun.Event,
-		Bucket:    data.GetConclusionBucket(checkRun.CheckSuite.Conclusion),
-		StartedAt: checkRun.StartedAt,
-		RunNumber: checkRun.CheckSuite.WorkflowRun.RunNumber,
+		Id:           fmt.Sprintf("%d", id),
+		Name:         wfName,
+		DisplayTitle: checkRun.Title,
+		Link:         link,
+		Workflow:     checkRun.CheckSuite.WorkflowRun.Workflow.Name,
+		Event:        checkRun.CheckSuite.WorkflowRun.Event,
+		Bucket:       data.GetConclusionBucket(checkRun.CheckSuite.Conclusion),
+		StartedAt:    checkRun.StartedAt,
+		RunNumber:    checkRun.CheckSuite.WorkflowRun.RunNumber,
+		Status:       strings.ToLower(string(checkRun.Status)),
+		Conclusion:   strings.ToLower(string(checkRun.Conclusion)),
 	}
 	return run
 }
@@ -831,7 +843,7 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 	if ri != nil {
 		cmds = append(cmds, ri.Tick())
 	}
-	cmds = append(cmds, ji.Tick(), m.inProgressSpinner.Tick, func() tea.Msg {
+	cmds = append(cmds, m.inProgressSpinner.Tick, func() tea.Msg {
 		return reRunJobMsg{jobId: jobId, err: api.ReRunJob(m.repo, jobId)}
 	})
 	return cmds

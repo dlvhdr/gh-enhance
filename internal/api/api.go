@@ -253,8 +253,12 @@ type NormalizedRepoCheckRunsResponse struct {
 	CheckRuns  []CheckRun
 }
 
-func (a *API) SetClient(c *gh.GraphQLClient) {
+func (a *API) SetGQLClient(c *gh.GraphQLClient) {
 	a.gqlClient = c
+}
+
+func (a *API) SetHTTPClient(c *http.Client) {
+	a.httpClient = c
 }
 
 func (a *API) getGraphQLClient() (*gh.GraphQLClient, error) {

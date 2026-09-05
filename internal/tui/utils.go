@@ -9,7 +9,12 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/data"
 )
 
-func bucketToIcon(bucket data.CheckBucket, initialStyle lipgloss.Style, styles styles) string {
+func bucketToIcon(
+	bucket data.CheckBucket,
+	status string,
+	initialStyle lipgloss.Style,
+	styles styles,
+) string {
 	switch bucket {
 	case data.CheckBucketPass:
 		return styles.successGlyph.Inherit(initialStyle).Render()
@@ -23,7 +28,18 @@ func bucketToIcon(bucket data.CheckBucket, initialStyle lipgloss.Style, styles s
 		return styles.canceledGlyph.Inherit(initialStyle).Render()
 	case data.CheckBucketActionRequired:
 		return styles.warningGlyph.Inherit(initialStyle).Render()
+	case data.CheckBucketQueued:
+		return styles.queuedGlyph.Inherit(initialStyle).Render()
+	case data.CheckBucketPending:
+		if status == "queued" {
+			return styles.queuedGlyph.Inherit(initialStyle).Render()
+		}
+		return styles.pendingGlyph.Inherit(initialStyle).Render()
 	default:
+		if status == "completed" {
+			return styles.successGlyph.Inherit(initialStyle).Render()
+		}
+
 		return styles.pendingGlyph.Inherit(initialStyle).Render()
 	}
 }

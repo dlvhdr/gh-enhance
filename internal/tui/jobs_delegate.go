@@ -7,7 +7,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
-	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/log/v2"
@@ -33,7 +32,6 @@ type jobItem struct {
 	loadingLogs        bool
 	loadingSteps       bool
 	steps              []*stepItem
-	spinner            spinner.Model
 	styles             styles
 }
 
@@ -79,9 +77,9 @@ func (i *jobItem) FilterValue() string {
 func (i *jobItem) viewStatus() string {
 	s := i.meta.TitleStyle()
 	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
-		return i.spinner.View()
+		return cachedSpinner.View()
 	}
-	return bucketToIcon(i.job.Bucket, s, i.meta.styles)
+	return bucketToIcon(i.job.Bucket, strings.ToLower(string(i.job.State)), s, i.meta.styles)
 }
 
 // jobsDelegate implements charm.land/bubbles.list.ItemDelegate
@@ -146,7 +144,7 @@ func (ji *jobItem) hasInProgressSteps() bool {
 
 func (ji *jobItem) Tick() tea.Cmd {
 	if ji.isStatusInProgress() {
-		return ji.spinner.Tick
+		return cachedSpinner.Tick
 	}
 
 	return nil
@@ -161,6 +159,5 @@ func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
 		loadingLogs:  false,
 		loadingSteps: loadingSteps,
 		steps:        make([]*stepItem, 0),
-		spinner:      NewClockSpinner(styles),
 	}
 }

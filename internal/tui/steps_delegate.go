@@ -7,7 +7,6 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
-	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/log/v2"
@@ -18,10 +17,9 @@ import (
 )
 
 type stepItem struct {
-	meta    itemMeta
-	step    *api.Step
-	spinner spinner.Model
-	jobUrl  string
+	meta   itemMeta
+	step   *api.Step
+	jobUrl string
 }
 
 // Title implements /charm.land/bubbles.list.DefaultItem.Title
@@ -63,7 +61,7 @@ func (i *stepItem) viewConclusion() string {
 	}
 
 	if i.IsInProgress() {
-		return i.spinner.View()
+		return cachedSpinner.View()
 	}
 
 	if i.step.Status == api.StatusPending {
@@ -79,7 +77,7 @@ func (i *stepItem) viewConclusion() string {
 
 func (si *stepItem) Tick() tea.Cmd {
 	if si.IsInProgress() {
-		return si.spinner.Tick
+		return cachedSpinner.Tick
 	}
 
 	return nil
@@ -133,9 +131,8 @@ func (si *stepItem) IsInProgress() bool {
 
 func NewStepItem(step api.Step, url string, styles styles) stepItem {
 	return stepItem{
-		meta:    itemMeta{styles: styles},
-		jobUrl:  url,
-		step:    &step,
-		spinner: NewClockSpinner(styles),
+		meta:   itemMeta{styles: styles},
+		jobUrl: url,
+		step:   &step,
 	}
 }
