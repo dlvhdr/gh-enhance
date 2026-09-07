@@ -509,6 +509,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if key.Matches(msg, softQuitKey) {
+			log.Info("quitting", "msg", msg)
+			return m, tea.Quit
+		}
+
 		if key.Matches(msg, modeKey) {
 			// TODO: block if we're in repo mode
 			m.flat = !m.flat
