@@ -1,0 +1,90 @@
+{
+  "id": 44932094595,
+  "run_id": 44932094595,
+  "workflow_name": "lint-commits",
+  "head_branch": "dlvhdr/docs-update",
+  "run_url": "https://api.github.com/repos/dlvhdr/gh-enhance/actions/runs/30700402333",
+  "run_attempt": 1,
+  "node_id": "CR_kwDOP6__jc8AAAAVRhgelQ",
+  "head_sha": "52ca3a054856ccee75d831e9d2c2f2fe072acb5c",
+  "url": "https://api.github.com/repos/dlvhdr/gh-enhance/actions/jobs/91370299029",
+  "html_url": "https://github.com/dlvhdr/gh-enhance/actions/runs/30700402333/job/91370299029",
+  "status": "completed",
+  "conclusion": "success",
+  "created_at": "2026-08-01T12:47:11Z",
+  "started_at": "2026-08-01T12:47:13Z",
+  "completed_at": "2026-08-01T12:47:54Z",
+  "name": "Build",
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1,
+      "started_at": "2026-08-01T12:47:14Z",
+      "completed_at": "2026-08-01T12:47:16Z"
+    },
+    {
+      "name": "Checkout code",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2,
+      "started_at": "2026-08-01T12:47:16Z",
+      "completed_at": "2026-08-01T12:47:18Z"
+    },
+    {
+      "name": "Install Go",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3,
+      "started_at": "2026-08-01T12:47:18Z",
+      "completed_at": "2026-08-01T12:47:28Z"
+    },
+    {
+      "name": "Download Go modules",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4,
+      "started_at": "2026-08-01T12:47:28Z",
+      "completed_at": "2026-08-01T12:47:31Z"
+    },
+    {
+      "name": "Build",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 5,
+      "started_at": "2026-08-01T12:47:31Z",
+      "completed_at": "2026-08-01T12:47:49Z"
+    },
+    {
+      "name": "Post Install Go",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9,
+      "started_at": "2026-08-01T12:47:49Z",
+      "completed_at": "2026-08-01T12:47:52Z"
+    },
+    {
+      "name": "Post Checkout code",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 10,
+      "started_at": "2026-08-01T12:47:52Z",
+      "completed_at": "2026-08-01T12:47:52Z"
+    },
+    {
+      "name": "Complete job",
+      "status": "in_progress",
+      "conclusion": "pending",
+      "number": 11,
+      "started_at": "2026-08-01T12:47:52Z",
+      "completed_at": "2026-08-01T12:47:52Z"
+    }
+  ],
+  "check_run_url": "https://api.github.com/repos/dlvhdr/gh-enhance/check-runs/91370299029",
+  "labels": ["ubuntu-latest"],
+  "runner_id": 1000021896,
+  "runner_name": "GitHub Actions 1000021896",
+  "runner_group_id": 0,
+  "runner_group_name": "GitHub Actions"
+}

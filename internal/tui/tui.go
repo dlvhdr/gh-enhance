@@ -34,8 +34,6 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/utils"
 )
 
-type errMsg error
-
 type pane int
 
 const (
@@ -47,41 +45,45 @@ const (
 )
 
 type model struct {
-	client            api.API
-	width             int
-	height            int
-	prNumber          string
-	repo              string
-	runID             string // set when viewing a run directly (no PR)
-	pr                api.PR
-	prWithChecks      api.PRWithChecks
-	workflowRuns      []data.WorkflowRun
-	runsList          list.Model
-	jobsListRunId     string
-	jobsList          list.Model
-	stepsList         list.Model
-	checksList        list.Model
-	logsViewport      viewport.Model
-	numHighlights     int
-	scrollbar         util.Model
-	focusedPane       pane
-	zoomedPane        *pane
-	err               error
-	runsDelegate      list.ItemDelegate
-	jobsDelegate      list.ItemDelegate
-	stepsDelegate     list.ItemDelegate
-	checksDelegate    list.ItemDelegate
-	styles            styles
-	logsSpinner       spinner.Model
-	logsInput         textinput.Model
-	inProgressSpinner spinner.Model
-	flat              bool
-	lastTick          time.Time
-	version           string
-	rateLimit         api.RateLimit
-	lastFetched       time.Time
-	helpOpen          bool
-	help              help.Model
+	client                  api.API
+	width                   int
+	height                  int
+	prNumber                string
+	repo                    string
+	runID                   string // set when viewing a run directly (no PR)
+	pr                      api.PR
+	prWithChecks            api.PRWithChecks
+	workflowRuns            []data.WorkflowRun
+	accumulatedWorkflowRuns []data.WorkflowRun
+	runsList                list.Model
+	jobsListRunId           string
+	jobsList                list.Model
+	stepsList               list.Model
+	checksList              list.Model
+	logsViewport            viewport.Model
+	numHighlights           int
+	scrollbar               util.Model
+	focusedPane             pane
+	zoomedPane              *pane
+	err                     error
+	runsDelegate            list.ItemDelegate
+	jobsDelegate            list.ItemDelegate
+	stepsDelegate           list.ItemDelegate
+	checksDelegate          list.ItemDelegate
+	styles                  styles
+	logsSpinner             spinner.Model
+	logsInput               textinput.Model
+	inProgressSpinner       spinner.Model
+	flat                    bool
+	lastTick                time.Time
+	version                 string
+	rateLimit               api.RateLimit
+	lastFetched             time.Time
+	helpOpen                bool
+	help                    help.Model
+	unfocusedLargePaneWidth int
+	focusedLargePaneWidth   int
+	smallScreenWidth        int
 }
 
 type ModelOpts struct {
@@ -89,6 +91,12 @@ type ModelOpts struct {
 	Repo     string
 	PRNumber string // non-empty when in PR context
 	RunID    string // non-empty when in run mode (no PR context)
+
+	// For testing
+	API                     api.API
+	UnfocusedLargePaneWidth int
+	FocusedLargePaneWidth   int
+	SmallScreenWidth        int
 }
 
 func NewModel(opts ModelOpts) model {
@@ -110,25 +118,25 @@ func NewModel(opts ModelOpts) model {
 	runsList.Title = makePill(ListSymbol+" Runs", s.focusedPaneTitleStyle,
 		s.colors.focusedColor)
 	runsList.SetStatusBarItemName("run", "runs")
-	runsList.SetWidth(focusedLargePaneWidth)
+	runsList.SetWidth(defaultFocusedLargePaneWidth)
 
 	jobsList, jobsDelegate := newJobsDefaultList(s)
 	jobsList.Title = makePill(ListSymbol+" Jobs", s.unfocusedPaneTitleStyle,
 		s.colors.unfocusedColor)
 	jobsList.SetStatusBarItemName("job", "jobs")
-	jobsList.SetWidth(unfocusedLargePaneWidth)
+	jobsList.SetWidth(defaultUnfocusedLargePaneWidth)
 
 	stepsList, stepsDelegate := newStepsDefaultList(s)
 	stepsList.Title = makePill(ListSymbol+" Steps", s.unfocusedPaneTitleStyle,
 		s.colors.unfocusedColor)
 	stepsList.SetStatusBarItemName("step", "steps")
-	stepsList.SetWidth(unfocusedLargePaneWidth)
+	stepsList.SetWidth(defaultUnfocusedLargePaneWidth)
 
 	checksList, checksDelegate := newChecksDefaultList(s)
 	checksList.Title = makePill(ListSymbol+" checks", s.unfocusedPaneTitleStyle,
 		s.colors.unfocusedColor)
 	checksList.SetStatusBarItemName("step", "checks")
-	checksList.SetWidth(unfocusedLargePaneWidth)
+	checksList.SetWidth(defaultUnfocusedLargePaneWidth)
 
 	vp := viewport.New()
 	vp.LeftGutterFunc = func(info viewport.GutterContext) string {
@@ -151,6 +159,8 @@ func NewModel(opts ModelOpts) model {
 
 	ls := spinner.New(spinner.WithSpinner(LogsFrames))
 	ls.Style = s.faintFgStyle
+
+	cachedSpinner = NewClockSpinner(s)
 
 	li := textinput.New()
 	li.SetWidth(20)
@@ -193,30 +203,51 @@ func NewModel(opts ModelOpts) model {
 		focusedPane = PaneChecks
 	}
 
+	client := opts.API
+	if opts.API == (api.API{}) {
+		client = api.New()
+	}
+
+	unfocusedLargePaneWidth := opts.UnfocusedLargePaneWidth
+	if unfocusedLargePaneWidth == 0 {
+		unfocusedLargePaneWidth = defaultUnfocusedLargePaneWidth
+	}
+	focusedLargePaneWidth := opts.FocusedLargePaneWidth
+	if focusedLargePaneWidth == 0 {
+		focusedLargePaneWidth = defaultFocusedLargePaneWidth
+	}
+	smallScreenWidth := opts.SmallScreenWidth
+	if smallScreenWidth == 0 {
+		smallScreenWidth = defaultSmallScreen
+	}
+
 	m := model{
-		client:            api.New(),
-		jobsList:          jobsList,
-		runsList:          runsList,
-		stepsList:         stepsList,
-		checksList:        checksList,
-		prNumber:          opts.PRNumber,
-		repo:              opts.Repo,
-		runID:             opts.RunID,
-		runsDelegate:      runsDelegate,
-		jobsDelegate:      jobsDelegate,
-		stepsDelegate:     stepsDelegate,
-		checksDelegate:    checksDelegate,
-		logsViewport:      vp,
-		scrollbar:         sb,
-		styles:            s,
-		logsSpinner:       ls,
-		logsInput:         li,
-		help:              h,
-		version:           version,
-		inProgressSpinner: ips,
-		flat:              flat,
-		focusedPane:       focusedPane,
-		lastFetched:       time.Now(),
+		client:                  client,
+		jobsList:                jobsList,
+		runsList:                runsList,
+		stepsList:               stepsList,
+		checksList:              checksList,
+		prNumber:                opts.PRNumber,
+		repo:                    opts.Repo,
+		runID:                   opts.RunID,
+		runsDelegate:            runsDelegate,
+		jobsDelegate:            jobsDelegate,
+		stepsDelegate:           stepsDelegate,
+		checksDelegate:          checksDelegate,
+		logsViewport:            vp,
+		scrollbar:               sb,
+		styles:                  s,
+		logsSpinner:             ls,
+		logsInput:               li,
+		help:                    h,
+		version:                 version,
+		inProgressSpinner:       ips,
+		flat:                    flat,
+		focusedPane:             focusedPane,
+		lastFetched:             time.Now(),
+		focusedLargePaneWidth:   focusedLargePaneWidth,
+		unfocusedLargePaneWidth: unfocusedLargePaneWidth,
+		smallScreenWidth:        smallScreenWidth,
 	}
 	m.help.SetKeys(keys.FullHelp())
 	m.setFocusedPaneStyles()
@@ -314,12 +345,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case prFetchedMsg:
 		m.pr = msg.pr
 
-	case workflowRunsFetchedMsg, prChecksIntervalTickMsg:
-		var wrMsg workflowRunsFetchedMsg
+	case prChecksFetchedMsg, prChecksIntervalTickMsg:
+		var wrMsg prChecksFetchedMsg
 		if tickMsg, ok := msg.(prChecksIntervalTickMsg); ok {
-			wrMsg = tickMsg.msg.(workflowRunsFetchedMsg)
+			wrMsg = tickMsg.msg.(prChecksFetchedMsg)
 		} else {
-			wrMsg = msg.(workflowRunsFetchedMsg)
+			wrMsg = msg.(prChecksFetchedMsg)
 		}
 		m.rateLimit = wrMsg.rateLimit
 		if wrMsg.err != nil && wrMsg.rateLimit.Remaining == 0 {
@@ -340,15 +371,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(wrMsg.pr.Commits.Nodes) > 0 {
 			pageInfo := wrMsg.pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo
 			if !pageInfo.HasPreviousPage {
-				m.workflowRuns = make([]data.WorkflowRun, 0)
+				m.accumulatedWorkflowRuns = make([]data.WorkflowRun, 0)
 			}
 
-			m.mergeWorkflowRuns(wrMsg)
-
 			if pageInfo.HasNextPage {
+				m.accumulatedWorkflowRuns = m.mergeWorkflowRuns(wrMsg, m.accumulatedWorkflowRuns)
 				log.Info("fetching next checks page", "pageInfo", pageInfo)
 				cmds = append(cmds, m.makeGetNextPagePRChecksCmd(pageInfo.EndCursor))
 			} else {
+				m.workflowRuns = m.mergeWorkflowRuns(wrMsg, m.accumulatedWorkflowRuns)
 				m.lastFetched = time.Now()
 				m.stopSpinners()
 				log.Info("fetched all checks", "pageInfo", pageInfo)
@@ -454,6 +485,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.runsList.FilterState() == list.Filtering ||
 			m.jobsList.FilterState() == list.Filtering ||
 			m.stepsList.FilterState() == list.Filtering {
+			// handled at the list Update func
 			break
 		}
 
@@ -575,41 +607,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case spinner.TickMsg:
-		checks := m.checksList.Items()
-		for _, run := range checks {
-			ci := run.(*checkItem)
-			if ci != nil && ci.isStatusInProgress() {
-				ci.spinner, cmd = ci.spinner.Update(msg)
-				cmds = append(cmds, cmd)
-			}
-		}
-
-		runs := m.runsList.Items()
-		for _, run := range runs {
-			ri := run.(*runItem)
-			if ri != nil && ri.IsInProgress() {
-				ri.spinner, cmd = ri.spinner.Update(msg)
-				cmds = append(cmds, cmd)
-			}
-		}
-
-		jobs := m.jobsList.Items()
-		for _, job := range jobs {
-			ji := job.(*jobItem)
-			if ji != nil && ji.isStatusInProgress() {
-				ji.spinner, cmd = ji.spinner.Update(msg)
-				cmds = append(cmds, cmd)
-			}
-		}
-
-		steps := m.stepsList.Items()
-		for _, step := range steps {
-			si := step.(*stepItem)
-			if si != nil && si.IsInProgress() {
-				si.spinner, cmd = si.spinner.Update(msg)
-				cmds = append(cmds, cmd)
-			}
-		}
+		cachedSpinner, cmd = cachedSpinner.Update(msg)
+		cmds = append(cmds, cmd)
 
 		ji := m.getSelectedJobItem()
 		if ji == nil || ji.loadingLogs {
@@ -638,10 +637,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.stepsList, cmd = m.stepsList.Update(msg)
 		cmds = append(cmds, cmd)
 		return m, tea.Batch(cmds...)
-
-	case errMsg:
-		m.err = msg
-		return m, tea.Quit
 	}
 
 	switch m.focusedPane {
@@ -800,7 +795,7 @@ func (m *model) viewHierarchicalChecks() string {
 		case PaneLogs:
 			panes = append(panes, m.viewLogs())
 		}
-	} else if m.width != 0 && m.width <= smallScreen {
+	} else if m.width != 0 && m.width <= m.smallScreenWidth {
 		switch m.focusedPane {
 		case PaneRuns:
 			panes = append(panes, runsPane)
@@ -842,7 +837,7 @@ func (m *model) viewFlatChecks() string {
 		case PaneLogs:
 			panes = append(panes, m.viewLogs())
 		}
-	} else if m.width != 0 && m.width <= smallScreen {
+	} else if m.width != 0 && m.width <= m.smallScreenWidth {
 		switch m.focusedPane {
 		case PaneChecks:
 			panes = append(panes, checksPane)
@@ -1203,14 +1198,18 @@ func (m *model) shouldShowSteps() bool {
 	if m.flat {
 		check := m.checksList.SelectedItem()
 		if check != nil {
-			ci := check.(*checkItem)
-			loadingSteps = ci.loadingSteps
+			ci, ok := check.(*checkItem)
+			if ok {
+				loadingSteps = ci.loadingSteps
+			}
 		}
 	} else {
 		job := m.jobsList.SelectedItem()
 		if job != nil {
-			ji := job.(*jobItem)
-			loadingSteps = ji.loadingSteps
+			ji, ok := job.(*jobItem)
+			if ok {
+				loadingSteps = ji.loadingSteps
+			}
 		}
 	}
 
@@ -1305,7 +1304,7 @@ func (m *model) setFocusedPaneStyles() {
 }
 
 func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate, p pane) {
-	if m.width != 0 && m.width <= smallScreen {
+	if m.width != 0 && m.width <= m.smallScreenWidth {
 		l.Styles.Title = m.styles.focusedPaneTitleStyle.Bold(false)
 		l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle.Bold(false)
 		l.Title = m.getPaneTitle(l)
@@ -1322,7 +1321,7 @@ func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate,
 }
 
 func (m *model) setListUnfocusedStyles(l *list.Model, delegate *list.ItemDelegate) {
-	if m.width > smallScreen {
+	if m.width > m.smallScreenWidth {
 		l.Styles.Title = m.styles.unfocusedPaneTitleStyle
 		l.Title = makePill(m.getPaneTitle(l), l.Styles.Title, m.styles.colors.unfocusedColor)
 		l.Styles.TitleBar = m.styles.unfocusedPaneTitleBarStyle
@@ -1369,7 +1368,7 @@ func newList(styles styles, delegate list.ItemDelegate) list.Model {
 	l.Styles.StatusBarFilterCount = l.Styles.StatusBarFilterCount.Foreground(
 		styles.colors.faintColor,
 	)
-	l.Styles.NoItems = l.Styles.NoItems.Width(unfocusedLargePaneWidth).
+	l.Styles.NoItems = l.Styles.NoItems.Width(defaultUnfocusedLargePaneWidth).
 		Foreground(styles.colors.faintColor)
 	l.Styles.PaginationStyle = lipgloss.NewStyle().
 		Foreground(styles.colors.faintColor).
@@ -1484,14 +1483,6 @@ func (m *model) updateJobsList() []tea.Cmd {
 		jobs = append(jobs, ji)
 	}
 
-	// beforeRunId := m.jobsListRunId
-	// m.jobsListRunId = ri.run.Id
-	//
-	// log.Info("updateJobsList", "beforeRunId", beforeRunId, "now", m.jobsListRunId)
-	// if beforeRunId != m.jobsListRunId {
-	// 	log.Info("updateJobsList", "setting items - len(jobs)", len(jobs))
-	// 	cmds = append(cmds, m.jobsList.SetItems(jobs))
-	// }
 	log.Info("updateJobsList", "setting items - len(jobs)", len(jobs))
 	cmds = append(cmds, m.jobsList.SetItems(jobs))
 	if len(m.jobsList.VisibleItems()) > 0 || m.jobsList.FilterState() == list.FilterApplied {
@@ -1535,7 +1526,6 @@ func (m *model) updateStepsList() []tea.Cmd {
 	} else {
 		m.stepsList.SetShowStatusBar(false)
 	}
-	cmds = append(cmds, m.tickSteps()...)
 
 	return cmds
 }
@@ -1600,7 +1590,7 @@ func (m *model) logsWidth() int {
 	}
 
 	var borders int
-	if m.width != 0 && m.width <= smallScreen {
+	if m.width != 0 && m.width <= m.smallScreenWidth {
 		borders = 1
 	} else if m.flat {
 		borders = 1
@@ -1683,7 +1673,6 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.C
 		return cmds
 	}
 
-	selectedJob := m.getSelectedJobItem()
 	ri.loadingSteps = false
 	for jIdx, ji := range ri.jobsItems {
 		ri.jobsItems[jIdx].loadingSteps = false
@@ -1695,9 +1684,6 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.C
 		steps := make([]*stepItem, 0)
 		for _, step := range jobWithSteps.Steps.Nodes {
 			si := NewStepItem(step, jobWithSteps.Url, m.styles)
-			if selectedJob != nil && selectedJob.job.Id == ji.job.Id {
-				cmds = append(cmds, si.Tick())
-			}
 
 			steps = append(steps, &si)
 		}
@@ -1749,7 +1735,6 @@ func (m *model) onCheckChanged() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 	m.resetStepsState()
 	cmds = append(cmds, m.updateStepsList()...)
-	cmds = append(cmds, m.tickSteps()...)
 	cmds = append(cmds, m.logsSpinner.Tick, m.inProgressSpinner.Tick)
 
 	currCheck := m.getSelectedCheckItem()
@@ -1799,13 +1784,6 @@ func (m *model) onRunChanged() []tea.Cmd {
 	cmds = append(cmds, m.updateLists()...)
 	cmds = append(cmds, m.onJobChanged()...)
 
-	jobs := m.jobsList.Items()
-
-	for _, job := range jobs {
-		ji := job.(*jobItem)
-		cmds = append(cmds, ji.Tick())
-	}
-
 	m.logsViewport.GotoTop()
 
 	return cmds
@@ -1815,7 +1793,6 @@ func (m *model) onJobChanged() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 	m.resetStepsState()
 	cmds = append(cmds, m.updateStepsList()...)
-	cmds = append(cmds, m.tickSteps()...)
 	cmds = append(cmds, m.logsSpinner.Tick, m.inProgressSpinner.Tick)
 
 	currJob := m.getSelectedJobItem()
@@ -2080,18 +2057,18 @@ func (m *model) getFocusedPaneWidth(l *list.Model, p pane) int {
 	if m.zoomedPane != nil && p == *m.zoomedPane {
 		return m.width - 1
 	}
-	if m.width > smallScreen {
+	if m.width > m.smallScreenWidth {
 		if len(l.Items()) == 0 {
-			return unfocusedLargePaneWidth
+			return m.unfocusedLargePaneWidth
 		}
-		return focusedLargePaneWidth
+		return m.focusedLargePaneWidth
 	}
 
 	return focusedSmallPaneWidth
 }
 
 func (m *model) getPaneTitle(l *list.Model) string {
-	if m.width != 0 && m.width <= smallScreen {
+	if m.width != 0 && m.width <= m.smallScreenWidth {
 		s := m.styles.focusedPaneTitleStyle.Bold(false).UnsetBackground()
 		switch m.focusedPane {
 		case PaneChecks:
@@ -2137,11 +2114,11 @@ func (m *model) getPaneTitle(l *list.Model) string {
 }
 
 func (m *model) getUnfocusedPaneWidth() int {
-	if m.width != 0 && m.width <= smallScreen {
+	if m.width != 0 && m.width <= m.smallScreenWidth {
 		return 0
 	}
 
-	return unfocusedLargePaneWidth
+	return m.unfocusedLargePaneWidth
 }
 
 func (m *model) goToErrorInLogs() {
@@ -2224,7 +2201,7 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 	if m.flat {
 		before := m.getSelectedCheckItem()
 
-		cmds = append(cmds, m.buildFlatChecksLists()...)
+		cmds = append(cmds, m.setChecksListItems()...)
 
 		if before == nil && len(m.checksList.Items()) > 0 {
 			cmds = append(cmds, m.onCheckChanged()...)
@@ -2290,7 +2267,7 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 	return cmds
 }
 
-func (m *model) buildFlatChecksLists() []tea.Cmd {
+func (m *model) setChecksListItems() []tea.Cmd {
 	existingChecks := map[string]*checkItem{}
 	for _, ci := range m.checksList.Items() {
 		ci := ci.(*checkItem)
@@ -2316,9 +2293,8 @@ func (m *model) buildFlatChecksLists() []tea.Cmd {
 			ci.job = newJobData
 		}
 		items = append(items, &ci)
-		cmds = append(cmds, ci.Tick())
 	}
-	m.checksList.SetItems(items)
+	cmds = append(cmds, m.checksList.SetItems(items))
 	return cmds
 }
 
@@ -2331,17 +2307,16 @@ func (m *model) buildHierachicalChecksLists() []tea.Cmd {
 			nr := NewRunItem(run, m.styles)
 			ri = &nr
 
-			cmds = append(cmds, ri.Tick())
 			cmds = append(cmds, m.runsList.InsertItem(i, ri))
 		}
 		ri.run = &run
 
 		jobs := make([]*jobItem, 0)
+		cmds = append(cmds, m.inProgressSpinner.Tick)
 		for _, job := range run.Jobs {
 			ji := m.getJobItemById(job.Id)
 			if ji == nil {
 				nji := NewJobItem(job, m.styles)
-				cmds = append(cmds, nji.Tick(), m.inProgressSpinner.Tick)
 				ji = &nji
 			}
 			ji.job = &job
@@ -2414,16 +2389,6 @@ func (m *model) resetStepsState() {
 	m.stepsList.ResetFilter()
 }
 
-func (m *model) tickSteps() []tea.Cmd {
-	cmds := make([]tea.Cmd, 0)
-	steps := m.stepsList.Items()
-	for _, step := range steps {
-		si := step.(*stepItem)
-		cmds = append(cmds, si.Tick())
-	}
-	return cmds
-}
-
 type mode int
 
 const (
@@ -2441,6 +2406,8 @@ func (m *model) mode() mode {
 
 	return ModeRepo
 }
+
+var cachedSpinner spinner.Model
 
 func (m *model) enrichRepoModeFetchedRunsWithExistingJobs(
 	msg repoModeRunsFetchedMsg,

@@ -32,6 +32,16 @@ tasks:
     interactive: true
     desc: Run in debug mode with INFO level logs. Run `task logs` to watch the logs.
 
+  debug:error:
+    cmds:
+      - printf "~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n~\n―――――――――――――――――――――――――――――――――――――――――――――――\n" > ./debug.log
+      - go run . --debug {{.CLI_ARGS}}
+    env:
+      DEBUG: true
+      LOG_LEVEL: error
+    interactive: true
+    desc: Run in debug mode with ERROR level logs. Run `task logs` to watch the logs.
+
   install:
     desc: Install the application
     vars:
@@ -41,6 +51,19 @@ tasks:
     sources:
       - ./**/*.go
       - go.mod
+
+  install:prod:
+    desc: Install the latest available version as a gh extension
+    cmds:
+      - task: uninstall
+      - echo "🕐 Installing latest version..." && gh ext install dlvhdr/gh-enhance
+      - gh enhance --version
+
+  uninstall:
+    desc: Uninstall from the gh extensions
+    cmd: |
+      if gh ext list | grep --quiet 'gh enhance'; then echo "🕐 Uninstalling..."; gh ext remove enhance; fi
+      exit 0
 
   dlv:
     cmds:
@@ -78,7 +101,7 @@ tasks:
 
   test:
     cmds:
-      - go test -v ./...
+      - go test -v ./... -count=1
     desc: Run tests
 
   fmt:

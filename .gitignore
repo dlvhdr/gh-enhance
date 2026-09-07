@@ -8,3 +8,6 @@ gh-enhance
 .task/
 testdata/api.github.com.graphql-schema.json
 testdata/gh-schema.graphql
+/testdata/schema.docs.graphql
+.debug
+/internal/tui/testdata/fakeapp/fakeapp

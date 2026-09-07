@@ -31,8 +31,8 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 	runs := makeWorkflowRuns(
 		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes,
 	)
-	msg1 := workflowRunsFetchedMsg{runs: runs, pr: m.prWithChecks}
-	m.mergeWorkflowRuns(msg1)
+	msg1 := prChecksFetchedMsg{runs: runs, pr: m.prWithChecks}
+	m.workflowRuns = m.mergeWorkflowRuns(msg1, m.workflowRuns)
 
 	if len(m.workflowRuns) != 1 {
 		t.Fatalf(`expected workflow runs to have length of 1, got: %d`, len(m.workflowRuns))
@@ -70,8 +70,8 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 			Bucket: wfr.Bucket,
 		},
 	}
-	msg2 := workflowRunsFetchedMsg{runs: next}
-	m.mergeWorkflowRuns(msg2)
+	msg2 := prChecksFetchedMsg{runs: next}
+	m.workflowRuns = m.mergeWorkflowRuns(msg2, m.workflowRuns)
 
 	if len(m.workflowRuns) != 1 {
 		t.Fatalf(
@@ -108,8 +108,8 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 	runs := makeWorkflowRuns(
 		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes,
 	)
-	msg1 := workflowRunsFetchedMsg{runs: runs, pr: m.prWithChecks}
-	m.mergeWorkflowRuns(msg1)
+	msg1 := prChecksFetchedMsg{runs: runs, pr: m.prWithChecks}
+	m.workflowRuns = m.mergeWorkflowRuns(msg1, m.workflowRuns)
 
 	if len(m.workflowRuns) != 1 {
 		t.Fatalf(`expected workflow runs to have length of 1, got: %d`, len(m.workflowRuns))
@@ -145,8 +145,8 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 			Bucket: wfr.Bucket,
 		},
 	}
-	msg2 := workflowRunsFetchedMsg{runs: next}
-	m.mergeWorkflowRuns(msg2)
+	msg2 := prChecksFetchedMsg{runs: next}
+	m.workflowRuns = m.mergeWorkflowRuns(msg2, m.workflowRuns)
 
 	if len(m.workflowRuns) != 2 {
 		t.Errorf(`expected workflow runs to have length of 2, got: %d`, len(m.workflowRuns))
