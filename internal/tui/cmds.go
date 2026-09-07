@@ -712,8 +712,6 @@ func makeWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
 		)
 	}
 
-	log.Error("wat", "checkRun", checkRun)
-
 	run := data.WorkflowRun{
 		Id:           fmt.Sprintf("%d", id),
 		Name:         wfName,

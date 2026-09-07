@@ -28,8 +28,6 @@ func bucketToIcon(
 		return styles.canceledGlyph.Inherit(initialStyle).Render()
 	case data.CheckBucketActionRequired:
 		return styles.warningGlyph.Inherit(initialStyle).Render()
-	case data.CheckBucketQueued:
-		return styles.queuedGlyph.Inherit(initialStyle).Render()
 	case data.CheckBucketPending:
 		if status == "queued" {
 			return styles.queuedGlyph.Inherit(initialStyle).Render()

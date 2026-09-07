@@ -84,7 +84,7 @@ func makeFakeClient() api.API {
 		}
 		switch {
 		case strings.Contains(body, "query FetchPR"):
-			d, err := os.ReadFile("./testdata/fetchPR.json")
+			d, err := os.ReadFile("../fetchPR.json")
 			if err != nil {
 				panic(err)
 			}
@@ -103,7 +103,7 @@ func makeFakeClient() api.API {
 
 			mustWrite(w, string(d))
 		case strings.Contains(body, "query FetchCheckRunSteps"):
-			d, err := os.ReadFile("./testdata/fetchCheckRunSteps.json")
+			d, err := os.ReadFile("../fetchCheckRunSteps.json")
 			if err != nil {
 				panic(err)
 			}
