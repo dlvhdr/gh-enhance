@@ -26,51 +26,51 @@ type runItem struct {
 }
 
 // Title implements /charm.land/bubbles.list.DefaultItem.Title
-func (i *runItem) Title() string {
-	status := i.viewStatus()
-	s := i.meta.TitleStyle()
-	w := i.meta.width - lipgloss.Width(status) - 2
+func (ri *runItem) Title() string {
+	status := ri.viewStatus()
+	s := ri.meta.TitleStyle()
+	w := ri.meta.width - lipgloss.Width(status) - 2
 	return lipgloss.JoinHorizontal(lipgloss.Top, s.Render(status), s.Render(" "),
-		s.Width(w).Render(ansi.Truncate(s.Render(i.run.Name), w, Ellipsis)))
+		s.Width(w).Render(ansi.Truncate(s.Render(ri.run.Name), w, Ellipsis)))
 }
 
 // Description implements /charm.land/bubbles.list.DefaultItem.Description
-func (i *runItem) Description() string {
-	if i.run.Event == "" {
-		if i.run.Workflow == "" {
+func (ri *runItem) Description() string {
+	if ri.run.Event == "" {
+		if ri.run.Workflow == "" {
 			return "status check"
 		}
-		return i.run.Workflow
+		return ri.run.Workflow
 	}
 
 	startedAt := ""
-	if !i.run.StartedAt.IsZero() {
-		if time.Since(i.run.StartedAt) >= time.Hour*24 {
+	if !ri.run.StartedAt.IsZero() {
+		if time.Since(ri.run.StartedAt) >= time.Hour*24 {
 			startedAt = fmt.Sprintf(
 				" at %s",
-				i.run.StartedAt.Local().Local().Format("Jan 02, 15:04 MST-07"),
+				ri.run.StartedAt.Local().Local().Format("Jan 02, 15:04 MST-07"),
 			)
 		} else {
 			startedAt = fmt.Sprintf(
 				" · %s ago",
-				TimeElapsed(i.run.StartedAt),
+				TimeElapsed(ri.run.StartedAt),
 			)
 		}
 	}
 
-	return fmt.Sprintf("on %s%s", i.run.Event, startedAt)
+	return fmt.Sprintf("on %s%s", ri.run.Event, startedAt)
 }
 
 // FilterValue implements /charm.land/bubbles.list.Item.FilterValue
-func (i *runItem) FilterValue() string { return i.run.Name }
+func (ri *runItem) FilterValue() string { return ri.run.Name }
 
-func (i *runItem) IsInProgress() bool {
-	return i.run.Status == "in_progress"
+func (ri *runItem) IsInProgress() bool {
+	return ri.run.Status == "in_progress"
 }
 
-func (i *runItem) HasNotConcluded() bool {
+func (ri *runItem) HasNotConcluded() bool {
 	numPending := 0
-	for _, ji := range i.jobsItems {
+	for _, ji := range ri.jobsItems {
 		if ji.isStatusInProgress() {
 			numPending++
 		}
@@ -79,27 +79,27 @@ func (i *runItem) HasNotConcluded() bool {
 		return true
 	}
 
-	return i.run.Conclusion == "action_required" ||
-		i.run.Status == "in_progress" ||
-		i.run.Status == "queued" ||
-		i.run.Status == "requested" ||
-		i.run.Status == "waiting" ||
-		i.run.Status == "pending"
+	return ri.run.Conclusion == "action_required" ||
+		ri.run.Status == "in_progress" ||
+		ri.run.Status == "queued" ||
+		ri.run.Status == "requested" ||
+		ri.run.Status == "waiting" ||
+		ri.run.Status == "pending"
 }
 
-func (i *runItem) ShouldFetchJobs() bool {
-	return !i.loadingJobs &&
-		(i.lastFetchJobs.IsZero() || (time.Since(i.lastFetchJobs) > refreshInterval && i.HasNotConcluded()))
+func (ri *runItem) ShouldFetchJobs() bool {
+	return !ri.loadingJobs &&
+		(ri.lastFetchJobs.IsZero() || (time.Since(ri.lastFetchJobs) > refreshInterval && ri.HasNotConcluded()))
 }
 
-func (i *runItem) viewStatus() string {
-	s := i.meta.TitleStyle()
+func (ri *runItem) viewStatus() string {
+	s := ri.meta.TitleStyle()
 
-	if i.run.Status == "in_progress" {
+	if ri.run.Status == "in_progress" {
 		return cachedSpinner.View()
 	}
 
-	return bucketToIcon(i.run.Bucket, i.run.Status, s, i.meta.styles)
+	return bucketToIcon(ri.run.Bucket, ri.run.Status, s, ri.meta.styles)
 }
 
 func (ri *runItem) Tick() tea.Cmd {
@@ -173,10 +173,11 @@ func NewRunItem(run data.WorkflowRun, styles styles) runItem {
 	}
 
 	return runItem{
-		meta:         itemMeta{styles: styles},
-		run:          &run,
-		jobsItems:    jobs,
-		loadingSteps: false,
-		loadingJobs:  false,
+		meta:          itemMeta{styles: styles},
+		run:           &run,
+		jobsItems:     jobs,
+		loadingSteps:  false,
+		loadingJobs:   false,
+		lastFetchJobs: time.Now(),
 	}
 }

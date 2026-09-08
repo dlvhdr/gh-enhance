@@ -187,7 +187,7 @@ func (m model) makeFetchWorkflowRunJobsCmd(run data.WorkflowRun) tea.Cmd {
 			log.Error(
 				"error fetching workflow run jobs",
 				"runId",
-				run,
+				run.Id,
 				"link",
 				run.Link,
 				"err",
@@ -344,7 +344,7 @@ type workflowRunStepsFetchedMsg struct {
 func (m *model) makeFetchWorkflowRunStepsCmd(runId string) tea.Cmd {
 	return func() tea.Msg {
 		log.Debug("fetching all workflow run steps", "repo", m.repo, "runId", runId)
-		jobsWithStepsRes, err := m.client.FetchWorkflowRunSteps(m.repo, runId)
+		stepsRes, err := m.client.FetchWorkflowRunSteps(m.repo, runId)
 		if err != nil {
 			log.Error("error fetching all workflow run steps", "repo", m.repo,
 				"prNumber", m.prNumber, "runId", runId, "err", err)
@@ -353,7 +353,7 @@ func (m *model) makeFetchWorkflowRunStepsCmd(runId string) tea.Cmd {
 
 		return workflowRunStepsFetchedMsg{
 			runId: runId,
-			data:  jobsWithStepsRes,
+			data:  stepsRes,
 		}
 	}
 }
@@ -821,7 +821,7 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 	log.Info("re-running job", "runId", runId, "jobId", jobId)
 	cmds := make([]tea.Cmd, 0)
 	ri := m.getRunItemById(runId)
-	ji := m.getJobItemById(jobId)
+	ji, _ := m.getJobItemById(jobId)
 	if ri == nil && ji == nil {
 		return cmds
 	}

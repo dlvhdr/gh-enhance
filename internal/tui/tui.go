@@ -339,7 +339,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.workflowRuns = rmMsg.runs
 		m.lastFetched = time.Now()
-		m.stopSpinners()
+		m.runsList.StopSpinner()
 		cmds = append(cmds, m.onWorkflowRunsFetched()...)
 
 	case prFetchedMsg:
@@ -381,7 +381,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.workflowRuns = m.mergeWorkflowRuns(wrMsg, m.accumulatedWorkflowRuns)
 				m.lastFetched = time.Now()
-				m.stopSpinners()
+				m.checksList.StopSpinner()
+				m.runsList.StopSpinner()
 				log.Info("fetched all checks", "pageInfo", pageInfo)
 				cmds = append(cmds, m.onWorkflowRunsFetched()...)
 			}
@@ -400,7 +401,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case runJobsFetchedMsg:
 		m.enrichRunWithJobs(msg)
-		cmds = append(cmds, m.onRunChanged()...)
+		cmds = append(cmds, m.onRunChanged(rcOpts{resetFilters: false})...)
 
 	case workflowRunStepsFetchedMsg:
 		cmds = append(cmds, m.enrichRunWithJobsStepsV2(msg)...)
@@ -411,7 +412,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.updateLists()...)
 
 	case jobLogsFetchedMsg:
-		ji := m.getJobItemById(msg.jobId)
+		ji, _ := m.getJobItemById(msg.jobId)
 		if ji != nil {
 			ji.logs = msg.logs
 			ji.logsErr = msg.err
@@ -427,7 +428,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case checkRunOutputFetchedMsg:
-		ji := m.getJobItemById(msg.jobId)
+		ji, _ := m.getJobItemById(msg.jobId)
 		if ji != nil {
 			if ji.job.Id == msg.jobId {
 				ji.renderedText = msg.renderedText
@@ -446,7 +447,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			log.Error("error rerunning job", "jobId", msg.jobId, "err", msg.err)
 		}
-		ji := m.getJobItemById(msg.jobId)
+		ji, _ := m.getJobItemById(msg.jobId)
 		if ji == nil {
 			break
 		}
@@ -480,7 +481,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-		log.Info("key pressed", "key", msg.String())
 		if m.checksList.FilterState() == list.Filtering ||
 			m.runsList.FilterState() == list.Filtering ||
 			m.jobsList.FilterState() == list.Filtering ||
@@ -521,7 +521,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.flat {
 				cmds = append(cmds, m.onCheckChanged()...)
 			} else {
-				cmds = append(cmds, m.onRunChanged()...)
+				cmds = append(cmds, m.onRunChanged(rcOpts{resetFilters: true})...)
 			}
 		}
 
@@ -645,34 +645,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.checksList, cmd = m.checksList.Update(msg)
 		cmds = append(cmds, cmd)
 		after := m.getSelectedCheckItem()
-		if (before == nil && after != nil) || (after == nil && before != nil) ||
-			(before != nil && after != nil && before.job.Id != after.job.Id) {
+		if !areCheckItemsEqual(before, after) {
 			cmds = append(cmds, m.onCheckChanged()...)
 			cmds = append(cmds, m.updateLists()...)
 		}
 	case PaneRuns:
-		before := m.runsList.GlobalIndex()
+		before := m.getSelectedRunItem()
 		m.runsList, cmd = m.runsList.Update(msg)
 		cmds = append(cmds, cmd)
-		after := m.runsList.GlobalIndex()
-		if before != after {
-			cmds = append(cmds, m.onRunChanged()...)
+		after := m.getSelectedRunItem()
+		if !areRunItemsEqual(before, after) {
+			cmds = append(cmds, m.onRunChanged(rcOpts{resetFilters: true})...)
 			cmds = append(cmds, m.updateLists()...)
 		}
 	case PaneJobs:
-		before := m.jobsList.GlobalIndex()
+		before := m.getSelectedJobItem()
 		m.jobsList, cmd = m.jobsList.Update(msg)
 		cmds = append(cmds, cmd)
-		after := m.jobsList.GlobalIndex()
-		if before != after {
+		after := m.getSelectedJobItem()
+		if !areJobItemsEqual(before, after) {
 			cmds = append(cmds, m.onJobChanged()...)
 		}
 	case PaneSteps:
-		before := m.stepsList.GlobalIndex()
+		before := m.getSelectedStepItem()
 		m.stepsList, cmd = m.stepsList.Update(msg)
 		cmds = append(cmds, cmd)
-		after := m.stepsList.GlobalIndex()
-		if before != after {
+		after := m.getSelectedStepItem()
+		if !areStepItemsEqual(before, after) {
 			m.onStepChanged()
 		}
 
@@ -719,6 +718,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.scrollbar, cmd = m.scrollbar.Update(m.logsViewport)
 	cmds = append(cmds, cmd)
+
+	m.updateListsFiltersStates()
 
 	return m, tea.Batch(cmds...)
 }
@@ -1425,11 +1426,6 @@ func (m *model) updateChecksList() []tea.Cmd {
 	} else {
 		m.stepsList.StopSpinner()
 	}
-	if len(m.checksList.VisibleItems()) > 0 || m.checksList.FilterState() == list.FilterApplied {
-		m.checksList.SetShowStatusBar(true)
-	} else {
-		m.checksList.SetShowStatusBar(false)
-	}
 
 	return cmds
 }
@@ -1461,12 +1457,6 @@ func (m *model) updateRunsList() []tea.Cmd {
 		m.jobsList.StopSpinner()
 	}
 
-	if len(m.runsList.VisibleItems()) > 0 || m.runsList.FilterState() == list.FilterApplied {
-		m.runsList.SetShowStatusBar(true)
-	} else {
-		m.runsList.SetShowStatusBar(false)
-	}
-
 	return cmds
 }
 
@@ -1475,6 +1465,7 @@ func (m *model) updateJobsList() []tea.Cmd {
 	cmds := make([]tea.Cmd, 0)
 	ri := m.getSelectedRunItem()
 	if ri == nil {
+		log.Warn("updateJobsList", "msg", "no selected run")
 		return cmds
 	}
 
@@ -1485,12 +1476,6 @@ func (m *model) updateJobsList() []tea.Cmd {
 
 	log.Info("updateJobsList", "setting items - len(jobs)", len(jobs))
 	cmds = append(cmds, m.jobsList.SetItems(jobs))
-	if len(m.jobsList.VisibleItems()) > 0 || m.jobsList.FilterState() == list.FilterApplied {
-		m.jobsList.SetShowStatusBar(true)
-	} else {
-		m.jobsList.SetShowStatusBar(false)
-	}
-
 	return cmds
 }
 
@@ -1519,12 +1504,6 @@ func (m *model) updateStepsList() []tea.Cmd {
 		for i := existingCount; i >= len(selectedJobItem.steps); i-- {
 			m.stepsList.RemoveItem(i)
 		}
-	}
-
-	if len(m.stepsList.VisibleItems()) > 0 || m.stepsList.FilterState() == list.FilterApplied {
-		m.stepsList.SetShowStatusBar(true)
-	} else {
-		m.stepsList.SetShowStatusBar(false)
 	}
 
 	return cmds
@@ -1578,6 +1557,19 @@ func (m *model) getSelectedJobItem() *jobItem {
 		}
 		return ji
 	}
+}
+
+func (m *model) getSelectedStepItem() *stepItem {
+	step := m.stepsList.SelectedItem()
+	if step == nil {
+		return nil
+	}
+	si, ok := step.(*stepItem)
+	if !ok {
+		return nil
+	}
+
+	return si
 }
 
 func (m *model) logsWidth() int {
@@ -1755,15 +1747,19 @@ func (m *model) onCheckChanged() []tea.Cmd {
 	return cmds
 }
 
-func (m *model) onRunChanged() []tea.Cmd {
-	cmds := make([]tea.Cmd, 0)
-	m.jobsList.ResetSelected()
-	m.jobsList.ResetFilter()
-	newRun := m.runsList.SelectedItem()
+type rcOpts struct {
+	resetFilters bool
+}
 
-	ri, ok := newRun.(*runItem)
-	if !ok {
-		log.Error("run changed but there is no run", "newRun", newRun)
+func (m *model) onRunChanged(opts rcOpts) []tea.Cmd {
+	cmds := make([]tea.Cmd, 0)
+	if opts.resetFilters {
+		m.jobsList.ResetSelected()
+		m.jobsList.ResetFilter()
+	}
+	ri := m.getSelectedRunItem()
+	if ri == nil {
+		log.Error("run changed but there is no run")
 		return cmds
 	}
 
@@ -1778,6 +1774,7 @@ func (m *model) onRunChanged() []tea.Cmd {
 			"run changed - fetching jobs", "runId", ri.run.Id)
 		ri.loadingJobs = true
 		ri.lastFetchJobs = time.Now()
+		cmds = append(cmds, m.jobsList.StartSpinner())
 		cmds = append(cmds, m.makeFetchWorkflowRunJobsCmd(*ri.run))
 	}
 
@@ -1984,12 +1981,12 @@ func (m *model) getCheckItemById(checkId string) *checkItem {
 	return nil
 }
 
-func (m *model) getJobItemById(jobId string) *jobItem {
+func (m *model) getJobItemById(jobId string) (*jobItem, int) {
 	if m.flat {
-		for _, check := range m.checksList.Items() {
+		for i, check := range m.checksList.Items() {
 			ci := check.(*checkItem)
 			if ci.job.Id == jobId {
-				return &ci.jobItem
+				return &ci.jobItem, i
 			}
 		}
 	} else {
@@ -1997,12 +1994,12 @@ func (m *model) getJobItemById(jobId string) *jobItem {
 			ri := run.(*runItem)
 			for i := range ri.jobsItems {
 				if ri.jobsItems[i].job.Id == jobId {
-					return ri.jobsItems[i]
+					return ri.jobsItems[i], i
 				}
 			}
 		}
 	}
-	return nil
+	return nil, 0
 }
 
 func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
@@ -2216,7 +2213,7 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 		if before != nil {
 			for i, ci := range m.checksList.VisibleItems() {
 				ci := ci.(*checkItem)
-				if ci.job.Id == before.job.Id {
+				if areCheckItemsEqual(before, ci) {
 					m.checksList.Select(i)
 					break
 				}
@@ -2227,17 +2224,12 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 			cmds = append(cmds, m.logsSpinner.Tick, m.makeFetchJobLogsCmd())
 		}
 	} else {
-		selectedRun := m.runsList.SelectedItem()
-		var before *runItem
-		if selectedRun != nil {
-			before = selectedRun.(*runItem)
-		}
-
+		before := m.getSelectedRunItem()
 		cmds = append(cmds, m.buildHierachicalChecksLists()...)
 
 		if len(m.runsList.Items()) > 0 {
 			ri := m.getSelectedRunItem()
-			if ri.ShouldFetchJobs() {
+			if ri != nil && ri.ShouldFetchJobs() {
 				ri.loadingJobs = true
 				ri.lastFetchJobs = time.Now()
 				log.Info(
@@ -2246,12 +2238,12 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 					ri.run.Id,
 				)
 				cmds = append(cmds, m.makeFetchWorkflowRunJobsCmd(*ri.run))
-			} else if ri.run != nil && !ri.loadingSteps && (ri.lastFetchSteps.IsZero() || time.Since(ri.lastFetchSteps) > refreshInterval) {
+			} else if ri != nil && ri.run != nil && !ri.loadingSteps && (ri.lastFetchSteps.IsZero() || time.Since(ri.lastFetchSteps) > refreshInterval) {
 				ri.loadingSteps = true
 				ri.lastFetchSteps = time.Now()
 				cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(ri.run.Id))
-				if before == nil || before.run.Id != ri.run.Id {
-					cmds = append(cmds, m.onRunChanged()...)
+				if !areRunItemsEqual(before, ri) {
+					cmds = append(cmds, m.onRunChanged(rcOpts{resetFilters: true})...)
 				}
 			}
 		}
@@ -2314,7 +2306,7 @@ func (m *model) buildHierachicalChecksLists() []tea.Cmd {
 		jobs := make([]*jobItem, 0)
 		cmds = append(cmds, m.inProgressSpinner.Tick)
 		for _, job := range run.Jobs {
-			ji := m.getJobItemById(job.Id)
+			ji, _ := m.getJobItemById(job.Id)
 			if ji == nil {
 				nji := NewJobItem(job, m.styles)
 				ji = &nji
@@ -2326,10 +2318,11 @@ func (m *model) buildHierachicalChecksLists() []tea.Cmd {
 		ri.jobsItems = jobs
 	}
 
-	for i, item := range m.runsList.Items() {
-		ri := item.(*runItem)
-		if selectedRun != nil && ri.run.Id == selectedRun.run.Id {
+	for i, item := range m.runsList.VisibleItems() {
+		ri, ok := item.(*runItem)
+		if ok && selectedRun != nil && ri.run.Id == selectedRun.run.Id {
 			m.runsList.Select(i)
+			break
 		}
 	}
 
@@ -2440,5 +2433,31 @@ func (m *model) enrichRepoModeFetchedRunsWithExistingJobs(
 	return repoModeRunsFetchedMsg{
 		Repo: msg.Repo,
 		Runs: enriched,
+	}
+}
+
+func (m *model) updateListsFiltersStates() {
+	if len(m.checksList.VisibleItems()) > 0 || m.checksList.FilterState() == list.FilterApplied {
+		m.checksList.SetShowStatusBar(true)
+	} else {
+		m.checksList.SetShowStatusBar(false)
+	}
+
+	if len(m.runsList.VisibleItems()) > 0 || m.runsList.FilterState() == list.FilterApplied {
+		m.runsList.SetShowStatusBar(true)
+	} else {
+		m.runsList.SetShowStatusBar(false)
+	}
+
+	if len(m.jobsList.VisibleItems()) > 0 || m.jobsList.FilterState() == list.FilterApplied {
+		m.jobsList.SetShowStatusBar(true)
+	} else {
+		m.jobsList.SetShowStatusBar(false)
+	}
+
+	if len(m.stepsList.VisibleItems()) > 0 || m.stepsList.FilterState() == list.FilterApplied {
+		m.stepsList.SetShowStatusBar(true)
+	} else {
+		m.stepsList.SetShowStatusBar(false)
 	}
 }
