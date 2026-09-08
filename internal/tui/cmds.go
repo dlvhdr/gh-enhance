@@ -12,7 +12,6 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/log/v2"
-	"github.com/cli/go-gh"
 	"github.com/cli/go-gh/pkg/browser"
 
 	"github.com/dlvhdr/gh-enhance/internal/api"
@@ -180,42 +179,6 @@ type runJobsFetchedMsg struct {
 	err   error
 }
 
-func (m model) makeFetchWorkflowRunJobsCmd(run data.WorkflowRun) tea.Cmd {
-	return func() tea.Msg {
-		jobsResp, err := m.client.FetchWorkflowRunJobs(m.repo, run.Id)
-		if err != nil {
-			log.Error(
-				"error fetching workflow run jobs",
-				"runId",
-				run,
-				"link",
-				run.Link,
-				"err",
-				err,
-			)
-			return runJobsFetchedMsg{runId: run.Id, err: err}
-		}
-
-		jobs := make([]data.WorkflowJob, jobsResp.TotalCount)
-		for i, job := range jobsResp.Jobs {
-			jobs[i] = convertJobResponseToWorkflowJob(job, jobRelatedRun{
-				name:      run.Name,
-				event:     run.Event,
-				runNumber: run.RunNumber,
-			})
-		}
-		log.Info(
-			"fetched workflow run jobs",
-			"len(jobs)",
-			len(jobs),
-			"total count",
-			jobsResp.TotalCount,
-		)
-		data.SortJobs(jobs)
-		return runJobsFetchedMsg{runId: run.Id, jobs: jobs}
-	}
-}
-
 type jobLogsFetchedMsg struct {
 	jobId  string
 	logs   []data.LogsWithTime
@@ -239,29 +202,7 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		return nil
 	}
 
-	var ji *jobItem
-	if m.flat {
-		ci := m.checksList.SelectedItem().(*checkItem)
-		if ci == nil {
-			return nil
-		}
-		ji = &ci.jobItem
-	} else {
-		ri := m.runsList.SelectedItem().(*runItem)
-		if len(ri.jobsItems) == 0 {
-			return nil
-		}
-		job := m.jobsList.SelectedItem()
-		if job == nil {
-			return nil
-		}
-		j, ok := job.(*jobItem)
-		if !ok {
-			return nil
-		}
-		ji = j
-	}
-
+	ji := m.getSelectedJobItem()
 	if ji.isStatusInProgress() {
 		return nil
 	}
@@ -303,35 +244,19 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 		// Kind is JobKindGithubActions
 		log.Debug("job is JobKindGithubActions", "job", ji.job.Kind)
 		log.Debug(fmt.Sprintf("executing gh run view -R %s --log --job %s", m.repo, ji.job.Id))
-		jobLogsRes, stderr, err := gh.Exec("run", "view", "-R", m.repo, "--log", "--job", ji.job.Id)
+		jobLogsRes, err := m.client.FetchJobLogs(m.repo, ji.job.Id)
 		if err != nil {
-			// TODO: fetch with gh api
-			// if run is still in progress, gh CLI will not fetch the logs (why???)
-			// e.g.
-			// gh api \
-			//   -H "Accept: application/vnd.github+json" \
-			//   -H "X-GitHub-Api-Version: 2022-11-28" \
-			//   /repos/rapidsai/cuml/actions/jobs/46882393014/logs
 			log.Error("error fetching job logs", "kind", ji.job.Kind, "link",
-				ji.job.Link, "err", err, "stderr", stderr.String())
+				ji.job.Link, "err", err, "stderr", jobLogsRes)
 			return jobLogsFetchedMsg{
 				jobId:  ji.job.Id,
 				err:    err,
-				stderr: stderr.String(),
+				stderr: jobLogsRes,
 			}
 		}
-		jobLogs := jobLogsRes.String()
-		log.Debug(
-			"success fetching job logs",
-			"link",
-			ji.job.Link,
-			"bytes",
-			len(jobLogsRes.Bytes()),
-		)
-
 		return jobLogsFetchedMsg{
 			jobId: ji.job.Id,
-			logs:  parser.ParseJobLogs(jobLogs),
+			logs:  parser.ParseJobLogs(jobLogsRes),
 		}
 	}
 }
@@ -344,7 +269,7 @@ type workflowRunStepsFetchedMsg struct {
 func (m *model) makeFetchWorkflowRunStepsCmd(runId string) tea.Cmd {
 	return func() tea.Msg {
 		log.Debug("fetching all workflow run steps", "repo", m.repo, "runId", runId)
-		jobsWithStepsRes, err := m.client.FetchWorkflowRunSteps(m.repo, runId)
+		stepsRes, err := m.client.FetchWorkflowRunSteps(m.repo, runId)
 		if err != nil {
 			log.Error("error fetching all workflow run steps", "repo", m.repo,
 				"prNumber", m.prNumber, "runId", runId, "err", err)
@@ -353,7 +278,7 @@ func (m *model) makeFetchWorkflowRunStepsCmd(runId string) tea.Cmd {
 
 		return workflowRunStepsFetchedMsg{
 			runId: runId,
-			data:  jobsWithStepsRes,
+			data:  stepsRes,
 		}
 	}
 }
@@ -385,7 +310,7 @@ func (m *model) makeFetchCheckStepsCmd(jobId string) tea.Cmd {
 		log.Info("job steps fetched", "jobId", jobId, "len(steps)", len(stepsRes.Steps))
 
 		return checkStepsFetchedMsg{
-			checkId: jobId,
+			checkId: fmt.Sprintf("%d", stepsRes.Id),
 			steps:   stepsRes.Steps,
 		}
 	}
@@ -506,9 +431,10 @@ type runModeIntervalTickMsg struct {
 }
 
 type jobRelatedRun struct {
-	name      string
-	event     string
-	runNumber int
+	name    string
+	event   string
+	attempt int
+	runId   string
 }
 
 func convertJobResponseToWorkflowJob(
@@ -531,20 +457,22 @@ func convertJobResponseToWorkflowJob(
 	}
 
 	return data.WorkflowJob{
-		Id:          fmt.Sprintf("%d", j.Id),
-		State:       status,
-		Conclusion:  conclusion,
-		Name:        j.Name,
-		Workflow:    relatedRun.name,
-		Event:       relatedRun.event,
-		Logs:        []data.LogsWithTime{},
-		Link:        j.HtmlUrl,
-		Steps:       steps,
-		StartedAt:   j.StartedAt,
-		CompletedAt: j.CompletedAt,
-		Bucket:      data.GetConclusionBucket(conclusion),
-		Kind:        data.JobKindGithubActions,
-		RunNumber:   relatedRun.runNumber,
+		Id:            fmt.Sprintf("%d", j.Id),
+		State:         status,
+		Conclusion:    conclusion,
+		Name:          j.Name,
+		WorkflowName:  relatedRun.name,
+		WorkflowRunId: relatedRun.runId,
+		Event:         relatedRun.event,
+		Logs:          []data.LogsWithTime{},
+		Link:          j.HtmlUrl,
+		Steps:         steps,
+		StartedAt:     j.StartedAt,
+		CompletedAt:   j.CompletedAt,
+		Bucket:        data.GetConclusionBucket(conclusion),
+		Kind:          data.JobKindGithubActions,
+		RunAttempt:    relatedRun.attempt,
+		CheckSuiteId:  relatedRun.runId,
 	}
 }
 
@@ -552,13 +480,13 @@ func convertRunResponseToWorkflowRun(
 	run api.WorkflowRunResponse,
 	jobsResp api.WorkflowRunJobsResponse,
 ) data.WorkflowRun {
-	jobs := make([]data.WorkflowJob, 0, len(jobsResp.Jobs))
-	for _, j := range jobsResp.Jobs {
-		jobs = append(jobs, convertJobResponseToWorkflowJob(j, jobRelatedRun{
-			name:      run.Name,
-			event:     run.Event,
-			runNumber: run.RunNumber,
-		}))
+	jobs := make([]data.WorkflowJob, len(jobsResp.Jobs))
+	for i, j := range jobsResp.Jobs {
+		jobs[i] = convertJobResponseToWorkflowJob(j, jobRelatedRun{
+			name:    run.Name,
+			event:   run.Event,
+			attempt: run.RunNumber,
+		})
 	}
 	data.SortJobs(jobs)
 
@@ -571,6 +499,8 @@ func convertRunResponseToWorkflowRun(
 
 	wfRun := data.WorkflowRun{
 		Id:           fmt.Sprintf("%d", run.Id),
+		CheckSuiteId: run.CheckSuiteId,
+		HeadSha:      run.HeadSha,
 		Name:         run.Name,
 		DisplayTitle: run.DisplayTitle,
 		Link:         run.HtmlUrl,
@@ -581,6 +511,7 @@ func convertRunResponseToWorkflowRun(
 		StartedAt:    run.RunStartedAt,
 		RunNumber:    run.RunNumber,
 		PRNumber:     prNumber,
+		RunAttempt:   run.RunAttempt,
 		Status:       run.Status,
 		Conclusion:   run.Conclusion,
 	}
@@ -617,37 +548,35 @@ func jobKind(cr api.CheckRun) data.JobKind {
 	return kind
 }
 
-func (m *model) mergeWorkflowRuns(
+func (m *model) mergeFetchedWorkflowRuns(
 	msg prChecksFetchedMsg,
 	runsSoFar []data.WorkflowRun,
 ) []data.WorkflowRun {
-	runsMap := make(map[int]data.WorkflowRun)
+	runsMap := make(map[string]data.WorkflowRun)
 
 	// start with existing workflow runs to keep order and
 	// prevent the UI from jumping
 	for _, run := range runsSoFar {
-		runsMap[run.RunNumber] = run
+		runsMap[run.Id] = run
 	}
 
 	for _, run := range msg.runs {
-		existing, ok := runsMap[run.RunNumber]
+		existing, ok := runsMap[run.Id]
 
 		// run is new, no need to merge its jobs with the existing one
 		if !ok {
-			runsMap[run.RunNumber] = run
+			log.Debug("new run")
+			runsMap[run.Id] = run
 			continue
 		}
 
 		// run already exists, merge its jobs with the existing one
-		existing.Jobs = append(existing.Jobs, run.Jobs...)
-		runsMap[run.RunNumber] = existing
+		existing.Jobs = takeNewestJobs(existing.Jobs, run.Jobs)
+		runsMap[run.Id] = existing
 	}
 
 	merged := make([]data.WorkflowRun, 0)
 	for _, run := range runsMap {
-		latestJobs := takeOnlyLatestRunAttempts(run.Jobs)
-		run.Jobs = latestJobs
-		run.SortJobs()
 		merged = append(merged, run)
 	}
 
@@ -660,49 +589,44 @@ func (m *model) mergeWorkflowRuns(
 // sort jobs by their status and creation time etc.
 func makeWorkflowRuns(nodes []api.ContextNode) []data.WorkflowRun {
 	checkRuns := filterForCheckRuns(nodes)
-	runsMap := make(map[int]data.WorkflowRun)
+	runsMap := make(map[string]data.WorkflowRun)
 
 	for _, checkRun := range checkRuns {
 		job := makeWorkflowJob(checkRun)
-
-		wfRunNumber := checkRun.CheckSuite.WorkflowRun.RunNumber
-		// wfName := workflowName(checkRun)
-		run, ok := runsMap[wfRunNumber]
+		run, ok := runsMap[job.Id]
 		if ok {
 			run.Jobs = append(run.Jobs, job)
 		} else {
-			run = makeWorkflowRun(checkRun)
+			run = extractWorkflowRun(checkRun)
 			run.Jobs = []data.WorkflowJob{job}
 		}
 
-		runsMap[wfRunNumber] = run
+		runsMap[job.Id] = run
 	}
 
 	runs := make([]data.WorkflowRun, 0)
 	for _, run := range runsMap {
-		latestJobs := takeOnlyLatestRunAttempts(run.Jobs)
-		run.Jobs = latestJobs
-		run.SortJobs()
 		runs = append(runs, run)
 	}
 
 	return runs
 }
 
-func makeWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
+func extractWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
 	wfName := workflowName(checkRun)
 	link := checkRun.CheckSuite.WorkflowRun.Url
 	if link == "" {
 		link = checkRun.Url
 	}
-	var id int
-	if checkRun.CheckSuite.WorkflowRun.DatabaseId == 0 {
-		id = checkRun.CheckSuite.DatabaseId
+
+	var id string
+	if checkRun.CheckSuite.WorkflowRun.DatabaseId != 0 {
+		id = fmt.Sprintf("%d", checkRun.CheckSuite.WorkflowRun.DatabaseId)
 	} else {
-		id = checkRun.CheckSuite.WorkflowRun.DatabaseId
+		id = fmt.Sprintf("%d", checkRun.CheckSuite.DatabaseId)
 	}
 
-	if id == 0 {
+	if id == "" {
 		log.Error(
 			"run has no ID",
 			"workflowRun",
@@ -712,17 +636,23 @@ func makeWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
 		)
 	}
 
+	// This is a bit hacky, since a check run belongs to a check suite and not necessarily to a workflow run.
+	// They can be associated though.
+	// A workflow run is a run of a GitHub Actions workflow file, while a Check Suite is a grouping of check runs for a commit.
 	run := data.WorkflowRun{
-		Id:           fmt.Sprintf("%d", id),
+		Id:           id,
 		Name:         wfName,
-		DisplayTitle: checkRun.Title,
+		CheckSuiteId: fmt.Sprintf("%d", checkRun.CheckSuite.DatabaseId),
+		HeadSha:      checkRun.CheckSuite.Commit.Oid,
+		DisplayTitle: wfName,
 		Link:         link,
 		Workflow:     checkRun.CheckSuite.WorkflowRun.Workflow.Name,
 		Event:        checkRun.CheckSuite.WorkflowRun.Event,
 		Bucket:       data.GetConclusionBucket(checkRun.CheckSuite.Conclusion),
 		StartedAt:    checkRun.StartedAt,
-		RunNumber:    checkRun.CheckSuite.WorkflowRun.RunNumber,
-		Status:       strings.ToLower(string(checkRun.Status)),
+		RunNumber:    checkRun.CheckSuite.WorkflowRun.RunNumber,  // might be 0 if not associated with a workflow run
+		RunAttempt:   checkRun.CheckSuite.WorkflowRun.RunAttempt, // might be 0 if not associated with a workflow run
+		Status:       strings.ToLower(string(checkRun.CheckSuite.Status)),
 		Conclusion:   strings.ToLower(string(checkRun.Conclusion)),
 	}
 	return run
@@ -737,79 +667,49 @@ func makeWorkflowJob(checkRun api.CheckRun) data.WorkflowJob {
 
 	kind := jobKind(checkRun)
 	job := data.WorkflowJob{
-		Id:          fmt.Sprintf("%d", checkRun.DatabaseId),
-		Title:       checkRun.Title,
-		State:       checkRun.Status,
-		Conclusion:  checkRun.Conclusion,
-		Name:        checkRun.Name,
-		Workflow:    wfr.Workflow.Name,
-		PendingEnv:  pendingEnv,
-		Event:       wfr.Event,
-		Logs:        []data.LogsWithTime{},
-		Link:        checkRun.Url,
-		Steps:       []api.Step{},
-		StartedAt:   checkRun.StartedAt,
-		CompletedAt: checkRun.CompletedAt,
-		Bucket:      data.GetConclusionBucket(checkRun.Conclusion),
-		Kind:        kind,
-		RunNumber:   wfr.RunNumber,
+		Id:            fmt.Sprintf("%d", checkRun.DatabaseId),
+		Title:         checkRun.Title,
+		State:         checkRun.Status,
+		Conclusion:    checkRun.Conclusion,
+		Name:          checkRun.Name,
+		WorkflowName:  wfr.Workflow.Name,
+		WorkflowRunId: fmt.Sprintf("%d", wfr.DatabaseId),
+		PendingEnv:    pendingEnv,
+		Event:         wfr.Event,
+		Logs:          []data.LogsWithTime{},
+		Link:          checkRun.Url,
+		Steps:         []api.Step{},
+		StartedAt:     checkRun.StartedAt,
+		CompletedAt:   checkRun.CompletedAt,
+		Bucket:        data.GetConclusionBucket(checkRun.Conclusion),
+		Kind:          kind,
+		RunAttempt:    wfr.RunAttempt,
+		CheckSuiteId:  fmt.Sprintf("%d", checkRun.CheckSuite.DatabaseId),
 	}
 	return job
 }
 
-// Clean duplicate check runs because of old attempts.
-func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
-	type latestMap struct {
-		jobs      []data.WorkflowJob
-		runNumber int
+// Clean duplicate jobs
+func takeNewestJobs(
+	oldJobs []data.WorkflowJob,
+	newJobs []data.WorkflowJob,
+) []data.WorkflowJob {
+	merged := make([]data.WorkflowJob, 0)
+	oldJobsIndexes := map[string]int{}
+	for idx, oldJob := range oldJobs {
+		merged = append(merged, oldJob)
+		oldJobsIndexes[oldJob.Id] = idx
 	}
 
-	jobIds := map[string]bool{}
-	wfNameToJobs := map[string]latestMap{}
-	for _, job := range jobs {
-		wfName := job.Workflow
-		existing, ok := wfNameToJobs[wfName]
-
-		// if the job's wf isn't yet set in the map
-		if !ok {
-			onlyJob := make([]data.WorkflowJob, 0)
-			onlyJob = append(onlyJob, job)
-			wfNameToJobs[wfName] = latestMap{
-				jobs:      onlyJob,
-				runNumber: job.RunNumber,
-			}
-
-			// job is part of a wf that we already met
-			// and it's a later attempt of the same job
-			// override the existing job with the later attempt
-		} else if job.RunNumber > existing.runNumber {
-			found := 0
-			for i, ej := range existing.jobs {
-				if ej.Name == job.Name {
-					found = i
-					break
-				}
-			}
-			existing.jobs[found] = job
-			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, runNumber: job.RunNumber}
-
-			// the job isn't a later attempt - it's a job we haven't met before, append it
+	for _, newJob := range newJobs {
+		if idx, ok := oldJobsIndexes[newJob.Id]; ok {
+			merged[idx] = newJob
 		} else {
-			_, ok := jobIds[job.Id]
-			if !ok {
-				existing.jobs = append(existing.jobs, job)
-			}
-			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, runNumber: existing.runNumber}
+			merged = append(merged, newJob)
 		}
-
-		jobIds[job.Id] = true
 	}
 
-	flat := make([]data.WorkflowJob, 0)
-	for _, checkRun := range wfNameToJobs {
-		flat = append(flat, checkRun.jobs...)
-	}
-	return flat
+	return merged
 }
 
 type reRunJobMsg struct {
@@ -826,30 +726,33 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 		return cmds
 	}
 
-	commits := m.prWithChecks.Commits.Nodes
-	if len(commits) > 0 {
-		commits[0].Commit.StatusCheckRollup.State = api.CommitStatePending
-	}
+	m.setPRInProgress()
+	ji.job.Event = "manual rerun"
 	ji.job.Bucket = data.CheckBucketPending
+	ji.job.Conclusion = ""
 	ji.job.State = api.StatusPending
 	ji.job.StartedAt = time.Now()
 	ji.job.CompletedAt = time.Time{}
-	ji.steps = make([]*stepItem, 0)
+	ji.stepsItems = make([]*stepItem, 0)
+	ji.loadingSteps = true
 	m.stepsList.ResetSelected()
+	m.stepsList.ResetFilter()
 	m.stepsList.SetItems(make([]list.Item, 0))
 
 	if ri != nil {
 		cmds = append(cmds, ri.Tick())
 	}
 	cmds = append(cmds, m.inProgressSpinner.Tick, func() tea.Msg {
-		return reRunJobMsg{jobId: jobId, err: api.ReRunJob(m.repo, jobId)}
+		// don't return too fast as gh might not have even created the job yet
+		time.Sleep(2 * time.Second)
+		return reRunJobMsg{jobId: jobId, err: m.client.ReRunJob(m.repo, jobId)}
 	})
 	return cmds
 }
 
 type reRunRunMsg struct {
-	runId string
-	err   error
+	oldRunId string
+	err      error
 }
 
 func (m *model) rerunRun(runId string) []tea.Cmd {
@@ -859,19 +762,30 @@ func (m *model) rerunRun(runId string) []tea.Cmd {
 		return cmds
 	}
 
-	commits := m.prWithChecks.Commits.Nodes
-	if len(commits) > 0 {
-		commits[0].Commit.StatusCheckRollup.State = api.CommitStatePending
-	}
+	m.setPRInProgress()
 	ri.run.Event = "manual rerun"
 	ri.run.Bucket = data.CheckBucketPending
-	ri.run.Jobs = make([]data.WorkflowJob, 0)
-	ri.jobsItems = make([]*jobItem, 0)
+	ri.run.Jobs = nil
+	ri.run.StartedAt = time.Now()
+	ri.run.Conclusion = ""
+	ri.run.Status = "pending"
+	ri.jobsItems = nil
+	ri.lastFetchJobs = time.Time{}
+	ri.lastFetchSteps = time.Time{}
+	m.jobsList.ResetFilter()
+	m.stepsList.ResetFilter()
 	m.jobsList.SetItems(make([]list.Item, 0))
 	m.stepsList.SetItems(make([]list.Item, 0))
 
 	cmds = append(cmds, ri.Tick(), func() tea.Msg {
-		return reRunRunMsg{runId: runId, err: api.ReRunRun(m.repo, runId)}
+		err := m.client.ReRunRun(m.repo, runId)
+
+		// don't return too fast as gh might not have even created the run yet
+		time.Sleep(2 * time.Second)
+		return reRunRunMsg{
+			oldRunId: ri.run.Id,
+			err:      err,
+		}
 	})
 	return cmds
 }
@@ -957,6 +871,9 @@ func (m *model) previousPane() pane {
 		if showSteps {
 			return PaneSteps
 		}
+		if m.flat {
+			return PaneChecks
+		}
 		return PaneJobs
 	}
 
@@ -964,4 +881,14 @@ func (m *model) previousPane() pane {
 		return PaneChecks
 	}
 	return PaneRuns
+}
+
+func (m *model) setPRInProgress() {
+	if m.mode() != ModePR {
+		return
+	}
+
+	if len(m.prWithChecks.Commits.Nodes) > 0 {
+		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.State = api.CommitStatePending
+	}
 }

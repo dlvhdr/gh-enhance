@@ -76,7 +76,7 @@ func mustWrite(t *testing.T, w io.Writer, s string) {
 	}
 }
 
-func makeMockClient(t *testing.T) api.API {
+func makeMockClient(t *testing.T) *api.API {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
@@ -133,7 +133,7 @@ func makeMockClient(t *testing.T) api.API {
 
 	tAPI := api.New()
 	tAPI.SetGQLClient(client)
-	return tAPI
+	return &tAPI
 }
 
 func bytesContains(t *testing.T, bts []byte, str string) bool {

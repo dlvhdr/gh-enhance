@@ -12,6 +12,8 @@ import (
 // It is defined by a workflow file that defines the jobs to run
 type WorkflowRun struct {
 	Id           string
+	CheckSuiteId string
+	HeadSha      string
 	Name         string
 	DisplayTitle string
 	Link         string
@@ -22,29 +24,31 @@ type WorkflowRun struct {
 	StartedAt    time.Time
 	RunNumber    int
 	PRNumber     int
+	RunAttempt   int
 	Status       string
 	Conclusion   string
 }
 
 type WorkflowJob struct {
-	Id          string
-	State       api.Status
-	Conclusion  api.Conclusion
-	Name        string
-	Title       string
-	Workflow    string
-	PendingEnv  string
-	Event       string
-	Logs        []LogsWithTime
-	Link        string
-	Steps       []api.Step
-	StartedAt   time.Time
-	CompletedAt time.Time
-	Bucket      CheckBucket
-	Kind        JobKind
+	Id            string
+	State         api.Status
+	Conclusion    api.Conclusion
+	Name          string
+	Title         string
+	WorkflowName  string
+	WorkflowRunId string
+	PendingEnv    string
+	Event         string
+	Logs          []LogsWithTime
+	Link          string
+	Steps         []api.Step
+	StartedAt     time.Time
+	CompletedAt   time.Time
+	Bucket        CheckBucket
+	Kind          JobKind
 
-	// A number that uniquely identifies this workflow run in its parent workflow.
-	RunNumber int
+	RunAttempt   int
+	CheckSuiteId string
 }
 
 type LogKind int
@@ -104,10 +108,6 @@ func GetConclusionBucket(conclusion api.Conclusion) CheckBucket {
 	default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
 		return CheckBucketPending
 	}
-}
-
-func (run WorkflowRun) SortJobs() {
-	SortJobs(run.Jobs)
 }
 
 // Order: failed -> in progress -> skipped -> neutral -> haven't started -> started at -> name

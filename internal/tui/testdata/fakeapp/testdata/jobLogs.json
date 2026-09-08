@@ -1,0 +1,281 @@
+Lint	Set up job	﻿2026-09-12T12:48:40.4964449Z Current runner version: '2.337.0'
+Lint	Set up job	2026-09-12T12:48:40.4986512Z ##[group]Runner Image Provisioner
+Lint	Set up job	2026-09-12T12:48:40.4987242Z Hosted Compute Agent
+Lint	Set up job	2026-09-12T12:48:40.4987730Z Version: 20260828.587
+Lint	Set up job	2026-09-12T12:48:40.4988313Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+Lint	Set up job	2026-09-12T12:48:40.4988914Z Build Date: 2026-08-28T16:44:25Z
+Lint	Set up job	2026-09-12T12:48:40.4989451Z Worker ID: {f843fe89-944d-4264-bc6c-57da80664b67}
+Lint	Set up job	2026-09-12T12:48:40.4990081Z Azure Region: westus
+Lint	Set up job	2026-09-12T12:48:40.4990581Z ##[endgroup]
+Lint	Set up job	2026-09-12T12:48:40.4991749Z ##[group]Operating System
+Lint	Set up job	2026-09-12T12:48:40.4992257Z Ubuntu
+Lint	Set up job	2026-09-12T12:48:40.4992672Z 24.04.5
+Lint	Set up job	2026-09-12T12:48:40.4993149Z LTS
+Lint	Set up job	2026-09-12T12:48:40.4993572Z ##[endgroup]
+Lint	Set up job	2026-09-12T12:48:40.4994082Z ##[group]Runner Image
+Lint	Set up job	2026-09-12T12:48:40.4994575Z Image: ubuntu-24.04
+Lint	Set up job	2026-09-12T12:48:40.4995034Z Version: 20260907.300.1
+Lint	Set up job	2026-09-12T12:48:40.4995921Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260907.300/images/ubuntu/Ubuntu2404-Readme.md
+Lint	Set up job	2026-09-12T12:48:40.4997518Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260907.300
+Lint	Set up job	2026-09-12T12:48:40.4998341Z ##[endgroup]
+Lint	Set up job	2026-09-12T12:48:40.4999279Z ##[group]GITHUB_TOKEN Permissions
+Lint	Set up job	2026-09-12T12:48:40.5000991Z Contents: read
+Lint	Set up job	2026-09-12T12:48:40.5001540Z Metadata: read
+Lint	Set up job	2026-09-12T12:48:40.5002067Z ##[endgroup]
+Lint	Set up job	2026-09-12T12:48:40.5003715Z Secret source: Actions
+Lint	Set up job	2026-09-12T12:48:40.5004559Z Cache mode: write
+Lint	Set up job	2026-09-12T12:48:40.5005333Z Prepare workflow directory
+Lint	Set up job	2026-09-12T12:48:40.5263721Z Prepare all required actions
+Lint	Set up job	2026-09-12T12:48:40.5302732Z Getting action download info
+Lint	Set up job	2026-09-12T12:48:40.9039611Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Lint	Set up job	2026-09-12T12:48:41.0305874Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+Lint	Set up job	2026-09-12T12:48:41.5019957Z Download action repository 'golangci/golangci-lint-action@v8' (SHA:4afd733a84b1f43292c63897423277bb7f4313a9)
+Lint	Set up job	2026-09-12T12:48:42.0363417Z Complete job name: Lint
+Lint	Run actions/checkout@v4	﻿2026-09-12T12:48:42.1053866Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1062526Z ##[group]Run actions/checkout@v4
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1063459Z with:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1064105Z   repository: dlvhdr/gh-enhance
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1071485Z   token: ***
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1072187Z   ssh-strict: true
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1072860Z   ssh-user: git
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1073538Z   persist-credentials: true
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1074285Z   clean: true
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1074972Z   sparse-checkout-cone-mode: true
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1075772Z   fetch-depth: 1
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1076519Z   fetch-tags: false
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1077211Z   show-progress: true
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1077911Z   lfs: false
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1078570Z   submodules: false
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1079346Z   set-safe-directory: true
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1080132Z   allow-unsafe-pr-checkout: false
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1081197Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1933770Z Syncing repository: dlvhdr/gh-enhance
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1936936Z ##[group]Getting Git version info
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1938591Z Working directory is '/home/runner/work/gh-enhance/gh-enhance'
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.1941016Z [command]/usr/bin/git version
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2007184Z git version 2.55.0
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2027030Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2044646Z Temporarily overriding HOME='/home/runner/work/_temp/8957b6a1-93b6-4a52-86bc-bb107ca90b2d' before making global git config changes
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2054843Z Adding repository directory to the temporary git global config as a safe directory
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2057711Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/gh-enhance/gh-enhance
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2091051Z Deleting the contents of '/home/runner/work/gh-enhance/gh-enhance'
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2101566Z ##[group]Initializing the repository
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2103549Z [command]/usr/bin/git init /home/runner/work/gh-enhance/gh-enhance
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2216276Z hint: Using 'master' as the name for the initial branch. This default branch name
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2227887Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2230136Z hint: to use in all of your new repositories, which will suppress this warning,
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2232021Z hint: call:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2232911Z hint:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2233989Z hint: 	git config --global init.defaultBranch <name>
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2235398Z hint:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2236847Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2239042Z hint: 'development'. The just-created branch can be renamed via this command:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2240796Z hint:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2241714Z hint: 	git branch -m <name>
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2242783Z hint:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2244271Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2256565Z Initialized empty Git repository in /home/runner/work/gh-enhance/gh-enhance/.git/
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2260473Z [command]/usr/bin/git remote add origin https://github.com/dlvhdr/gh-enhance
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2290211Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2291913Z ##[group]Disabling automatic garbage collection
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2293454Z [command]/usr/bin/git config --local gc.auto 0
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2320370Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2321999Z ##[group]Setting up auth
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2325358Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2352713Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2679324Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2714104Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2905863Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.2938165Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.3130811Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.3162589Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.3164367Z ##[group]Fetching the repository
+Lint	Run actions/checkout@v4	2026-09-12T12:48:42.3172406Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +be1a36721960c91ab2b0a316a68aeb6434fa604d:refs/remotes/pull/47/merge
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0840540Z From https://github.com/dlvhdr/gh-enhance
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0841271Z  * [new ref]         be1a36721960c91ab2b0a316a68aeb6434fa604d -> pull/47/merge
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0843572Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0844169Z ##[group]Determining the checkout info
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0845901Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0850925Z [command]/usr/bin/git sparse-checkout disable
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0893118Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0920244Z ##[group]Checking out the ref
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.0922891Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/47/merge
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1313245Z Note: switching to 'refs/remotes/pull/47/merge'.
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1313699Z 
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1313989Z You are in 'detached HEAD' state. You can look around, make experimental
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1314626Z changes and commit them, and you can discard any commits you make in this
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1315608Z state without impacting any branches by switching back to a branch.
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1316179Z 
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1316454Z If you want to create a new branch to retain commits you create, you may
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1317096Z do so (now or later) by using -c with the switch command. Example:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1317469Z 
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1317644Z   git switch -c <new-branch-name>
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1317905Z 
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1318072Z Or undo this operation with:
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1318309Z 
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1318472Z   git switch -
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1318742Z 
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1319086Z Turn off this advice by setting config variable advice.detachedHead to false
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1319515Z 
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1320010Z HEAD is now at be1a367 Merge b3208cef16e2c900dd3dd0065e438b22998b9a9d into ea48db99c42e8915721e3166c6b9a6614794e9bb
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1323627Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1365494Z [command]/usr/bin/git log -1 --format=%H
+Lint	Run actions/checkout@v4	2026-09-12T12:48:43.1389538Z be1a36721960c91ab2b0a316a68aeb6434fa604d
+Lint	Run actions/setup-go@v5	﻿2026-09-12T12:48:43.1669259Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.1670709Z ##[group]Run actions/setup-go@v5
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.1670961Z with:
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.1671163Z   go-version: stable
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.1671385Z   check-latest: false
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.1673544Z   token: ***
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.1673746Z   cache: true
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.1673950Z ##[endgroup]
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.2684908Z Setup go version spec stable
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.2770954Z (node:2022) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.2771942Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.9072079Z stable version resolved as 1.27.1
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.9094659Z Attempting to download 1.27.1...
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.9094922Z matching 1.27.1...
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:43.9097176Z Acquiring 1.27.1 from https://github.com/actions/go-versions/releases/download/1.27.1-33583469715/go-1.27.1-linux-x64.tar.gz
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:44.5403509Z Extracting Go...
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:44.5489272Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/c1027322-b86b-42a1-b119-af1472286824 -f /home/runner/work/_temp/8ff927d0-db4c-45f7-88ef-cc35afb4cb81
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:45.9889624Z Successfully extracted go to /home/runner/work/_temp/c1027322-b86b-42a1-b119-af1472286824
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:45.9890097Z Adding to the cache ...
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:51.8756517Z Successfully cached go to /opt/hostedtoolcache/go/1.27.1/x64
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:51.8760425Z Added go to the path
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:51.8766522Z Successfully set up Go version stable
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:51.8959289Z [command]/opt/hostedtoolcache/go/1.27.1/x64/bin/go env GOMODCACHE
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:51.9000095Z [command]/opt/hostedtoolcache/go/1.27.1/x64/bin/go env GOCACHE
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:51.9037117Z /home/runner/go/pkg/mod
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:51.9052626Z /home/runner/.cache/go-build
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:52.1880232Z Cache hit for: setup-go-Linux-x64-ubuntu24-go-1.27.1-78ec58ba16027f2bf1176221a10d4e8e284d1d680db70deebe2963a80c4642ba
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:52.1966260Z (node:2022) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:53.4644127Z Received 4194304 of 86345324 (4.9%), 4.0 MBs/sec
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.0648965Z Received 86345324 of 86345324 (100.0%), 51.5 MBs/sec
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.0649664Z Cache Size: ~82 MB (86345324 B)
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.0751631Z [command]/usr/bin/tar -xf /home/runner/work/_temp/97a1518d-73c6-49bc-82cf-d9a9d1831df2/cache.tzst -P -C /home/runner/work/gh-enhance/gh-enhance --use-compress-program unzstd
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.6726288Z Cache restored successfully
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8014155Z Cache restored from key: setup-go-Linux-x64-ubuntu24-go-1.27.1-78ec58ba16027f2bf1176221a10d4e8e284d1d680db70deebe2963a80c4642ba
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8038836Z go version go1.27.1 linux/amd64
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8039082Z 
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8039399Z ##[group]go env
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8390250Z AR='ar'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8390558Z CC='gcc'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8390846Z CGO_CFLAGS='-O2 -g'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8391158Z CGO_CPPFLAGS=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8391470Z CGO_CXXFLAGS='-O2 -g'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8391804Z CGO_ENABLED='1'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8392071Z CGO_FFLAGS='-O2 -g'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8392329Z CGO_LDFLAGS='-O2 -g'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8392582Z CXX='g++'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8392822Z GCCGO='gccgo'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8393079Z GO111MODULE=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8393338Z GOAMD64='v1'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8393573Z GOARCH='amd64'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8393801Z GOAUTH='netrc'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8394084Z GOBIN='/home/runner/go/bin'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8394723Z GOCACHE='/home/runner/.cache/go-build'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8395059Z GOCACHEPROG=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8395301Z GODEBUG=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8395554Z GOENV='/home/runner/.config/go/env'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8395850Z GOEXE=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8396242Z GOEXPERIMENT=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8396483Z GOFIPS140='off'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8396714Z GOFLAGS=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8397465Z GOGCCFLAGS='-fPIC -m64 -pthread -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=/tmp/go-build469538347=/tmp/go-build -gno-record-gcc-switches'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8398228Z GOHOSTARCH='amd64'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8398473Z GOHOSTOS='linux'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8398718Z GOINSECURE=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8399037Z GOMOD='/home/runner/work/gh-enhance/gh-enhance/go.mod'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8399433Z GOMODCACHE='/home/runner/go/pkg/mod'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8399746Z GONOPROXY=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8399978Z GONOSUMDB=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8400219Z GOOS='linux'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8400456Z GOPACKAGESDRIVER=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8400737Z GOPATH='/home/runner/go'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8401012Z GOPRIVATE=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8401313Z GOPROXY='https://proxy.golang.org,direct'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8401686Z GOROOT='/opt/hostedtoolcache/go/1.27.1/x64'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8402056Z GOSUMDB='sum.golang.org'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8402327Z GOTELEMETRY='local'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8402634Z GOTELEMETRYDIR='/home/runner/.config/go/telemetry'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8402999Z GOTMPDIR=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8403245Z GOTOOLCHAIN='auto'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8403640Z GOTOOLDIR='/opt/hostedtoolcache/go/1.27.1/x64/pkg/tool/linux_amd64'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8404058Z GOVCS=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8404299Z GOVERSION='go1.27.1'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8404552Z GOWORK=''
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8404821Z PKG_CONFIG='pkg-config'
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8404991Z 
+Lint	Run actions/setup-go@v5	2026-09-12T12:48:54.8405364Z ##[endgroup]
+Lint	golangci-lint	﻿2026-09-12T12:48:54.8596250Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	golangci-lint	2026-09-12T12:48:54.8597283Z ##[group]Run golangci/golangci-lint-action@v8
+Lint	golangci-lint	2026-09-12T12:48:54.8597527Z with:
+Lint	golangci-lint	2026-09-12T12:48:54.8597699Z   install-mode: binary
+Lint	golangci-lint	2026-09-12T12:48:54.8599777Z   github-token: ***
+Lint	golangci-lint	2026-09-12T12:48:54.8599957Z   verify: true
+Lint	golangci-lint	2026-09-12T12:48:54.8600135Z   only-new-issues: false
+Lint	golangci-lint	2026-09-12T12:48:54.8600331Z   skip-cache: false
+Lint	golangci-lint	2026-09-12T12:48:54.8600507Z   skip-save-cache: false
+Lint	golangci-lint	2026-09-12T12:48:54.8600697Z   problem-matchers: false
+Lint	golangci-lint	2026-09-12T12:48:54.8600902Z   cache-invalidation-interval: 7
+Lint	golangci-lint	2026-09-12T12:48:54.8601120Z ##[endgroup]
+Lint	golangci-lint	2026-09-12T12:48:54.9705559Z ##[group]prepare environment
+Lint	golangci-lint	2026-09-12T12:48:54.9708691Z Checking for go.mod: go.mod
+Lint	golangci-lint	2026-09-12T12:48:54.9712969Z (node:2085) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint	golangci-lint	2026-09-12T12:48:54.9756815Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint	golangci-lint	2026-09-12T12:48:55.2439951Z Cache hit for: golangci-lint.cache-Linux-2958-1341a090a212c70fea2b33e9f744a04942519307
+Lint	golangci-lint	2026-09-12T12:48:55.2520175Z (node:2085) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Lint	golangci-lint	2026-09-12T12:48:55.9584017Z Received 380108 of 380108 (100.0%), 0.9 MBs/sec
+Lint	golangci-lint	2026-09-12T12:48:55.9584524Z Cache Size: ~0 MB (380108 B)
+Lint	golangci-lint	2026-09-12T12:48:55.9605739Z [command]/usr/bin/tar -xf /home/runner/work/_temp/6c850dc2-916d-4404-a94a-96cdb2daf83c/cache.tzst -P -C /home/runner/work/gh-enhance/gh-enhance --use-compress-program unzstd
+Lint	golangci-lint	2026-09-12T12:48:56.0379563Z Cache restored successfully
+Lint	golangci-lint	2026-09-12T12:48:56.0383393Z Restored cache for golangci-lint from key 'golangci-lint.cache-Linux-2958-1341a090a212c70fea2b33e9f744a04942519307' in 1068ms
+Lint	golangci-lint	2026-09-12T12:48:56.0384735Z Finding needed golangci-lint version...
+Lint	golangci-lint	2026-09-12T12:48:56.0837868Z Requested golangci-lint 'latest', using 'v2.13.2', calculation took 45ms
+Lint	golangci-lint	2026-09-12T12:48:56.0838485Z Installation mode: binary
+Lint	golangci-lint	2026-09-12T12:48:56.0838842Z Installing golangci-lint binary v2.13.2...
+Lint	golangci-lint	2026-09-12T12:48:56.0839662Z Downloading binary https://github.com/golangci/golangci-lint/releases/download/v2.13.2/golangci-lint-2.13.2-linux-amd64.tar.gz ...
+Lint	golangci-lint	2026-09-12T12:48:56.3460311Z [command]/usr/bin/tar xz --overwrite --warning=no-unknown-keyword --overwrite -C /home/runner -f /home/runner/work/_temp/3d280683-e9b5-44a2-9625-9eaddf3a1bea
+Lint	golangci-lint	2026-09-12T12:48:56.5806794Z Installed golangci-lint into /home/runner/golangci-lint-2.13.2-linux-amd64/golangci-lint in 497ms
+Lint	golangci-lint	2026-09-12T12:48:56.5808075Z Prepared env in 1610ms
+Lint	golangci-lint	2026-09-12T12:48:56.5809060Z ##[endgroup]
+Lint	golangci-lint	2026-09-12T12:48:56.5810998Z ##[group]run golangci-lint
+Lint	golangci-lint	2026-09-12T12:48:56.5816724Z Running [/home/runner/golangci-lint-2.13.2-linux-amd64/golangci-lint config path] in [/home/runner/work/gh-enhance/gh-enhance] ...
+Lint	golangci-lint	2026-09-12T12:48:56.6409940Z Running [/home/runner/golangci-lint-2.13.2-linux-amd64/golangci-lint config verify] in [/home/runner/work/gh-enhance/gh-enhance] ...
+Lint	golangci-lint	2026-09-12T12:48:56.7071962Z Running [/home/runner/golangci-lint-2.13.2-linux-amd64/golangci-lint run] in [/home/runner/work/gh-enhance/gh-enhance] ...
+Lint	golangci-lint	2026-09-12T12:48:58.2366476Z 0 issues.
+Lint	golangci-lint	2026-09-12T12:48:58.2366712Z 
+Lint	golangci-lint	2026-09-12T12:48:58.2366871Z golangci-lint found no issues
+Lint	golangci-lint	2026-09-12T12:48:58.2367169Z Ran golangci-lint in 1529ms
+Lint	golangci-lint	2026-09-12T12:48:58.2367647Z ##[endgroup]
+Lint	Post golangci-lint	﻿2026-09-12T12:48:58.2549984Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Post golangci-lint	2026-09-12T12:48:58.2550941Z Post job cleanup.
+Lint	Post golangci-lint	2026-09-12T12:48:58.3704605Z Cache hit occurred on the primary key golangci-lint.cache-Linux-2958-1341a090a212c70fea2b33e9f744a04942519307, not saving cache.
+Lint	Post golangci-lint	2026-09-12T12:48:58.3705642Z (node:2341) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint	Post golangci-lint	2026-09-12T12:48:58.3706290Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint	Post Run actions/setup-go@v5	﻿2026-09-12T12:48:58.3856134Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Post Run actions/setup-go@v5	2026-09-12T12:48:58.3857731Z Post job cleanup.
+Lint	Post Run actions/setup-go@v5	2026-09-12T12:48:58.4844639Z (node:2349) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint	Post Run actions/setup-go@v5	2026-09-12T12:48:58.4845402Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint	Post Run actions/setup-go@v5	2026-09-12T12:48:58.4929653Z [command]/opt/hostedtoolcache/go/1.27.1/x64/bin/go env GOMODCACHE
+Lint	Post Run actions/setup-go@v5	2026-09-12T12:48:58.4968156Z [command]/opt/hostedtoolcache/go/1.27.1/x64/bin/go env GOCACHE
+Lint	Post Run actions/setup-go@v5	2026-09-12T12:48:58.4991906Z /home/runner/go/pkg/mod
+Lint	Post Run actions/setup-go@v5	2026-09-12T12:48:58.5010771Z /home/runner/.cache/go-build
+Lint	Post Run actions/setup-go@v5	2026-09-12T12:48:58.5033756Z Cache hit occurred on the primary key setup-go-Linux-x64-ubuntu24-go-1.27.1-78ec58ba16027f2bf1176221a10d4e8e284d1d680db70deebe2963a80c4642ba, not saving cache.
+Lint	Post Run actions/checkout@v4	﻿2026-09-12T12:48:58.5153612Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.5154988Z Post job cleanup.
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.5842412Z [command]/usr/bin/git version
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.5878982Z git version 2.55.0
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.5911690Z Temporarily overriding HOME='/home/runner/work/_temp/4bca3025-6521-4d33-ada5-372e957d33a2' before making global git config changes
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.5912854Z Adding repository directory to the temporary git global config as a safe directory
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.5916445Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/gh-enhance/gh-enhance
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.5950146Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.5983972Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.6193249Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.6497541Z http.https://github.com/.extraheader
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.6527331Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.6570477Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.6804519Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Lint	Post Run actions/checkout@v4	2026-09-12T12:48:58.6841838Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Lint	Complete job	﻿2026-09-12T12:48:58.7208229Z Cleaning up orphan processes
+Lint	Complete job	2026-09-12T12:48:58.7469052Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, golangci/golangci-lint-action@v8. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

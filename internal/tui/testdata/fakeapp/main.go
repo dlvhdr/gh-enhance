@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -57,28 +58,55 @@ func main() {
 	}
 }
 
-func makeFakeClient() api.API {
+func makeFakeClient() *api.API {
 	mux := http.NewServeMux()
+
+	runsPage := 1
+	stepsStage := 1
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		time.Sleep(50 * time.Millisecond)
 		log.Debug("got http request", "url", req.URL.String(), "method", req.Method)
 		switch {
 		// https://api.github.com/repos/dlvhdr/gh-enhance/actions/jobs/44932094595
 		case req.Method == http.MethodGet && strings.Contains(req.URL.String(), "/actions/jobs/"):
-			d, err := os.ReadFile("./testdata/fetchCheckRunStepsRest.json")
+			d, err := os.ReadFile(fmt.Sprintf("./testdata/fetchJobSteps%d.json", stepsStage))
+			if err != nil {
+				panic(err)
+			}
+			stepsStage = min(2, stepsStage+1)
+			mustWrite(w, string(d))
+			w.WriteHeader(http.StatusOK)
+			return
+		// get check run logs
+		case req.Method == http.MethodGet && strings.Contains(req.URL.String(), "/check-runs/"):
+			d, err := os.ReadFile("./testdata/jobLogs.json")
 			if err != nil {
 				panic(err)
 			}
 			mustWrite(w, string(d))
 			w.WriteHeader(http.StatusOK)
 			return
+		// rerun a job
+		case req.Method == http.MethodPost && strings.Contains(req.URL.String(), "/rerun"):
+			runsPage = 1
+			stepsStage = 1
+			w.WriteHeader(http.StatusOK)
+			return
+		case req.Method == http.MethodGet && strings.Contains(req.URL.String(), "/attempts/"):
+			d, err := os.ReadFile("./testdata/fetchWorkflowRun.json")
+			if err != nil {
+				panic(err)
+			}
+			mustWrite(w, string(d))
+			w.WriteHeader(http.StatusOK)
 		}
 		w.WriteHeader(http.StatusNotFound)
 	})
-	page := 1
+
 	mux.HandleFunc("/api/graphql", func(w http.ResponseWriter, req *http.Request) {
 		log.Debug("got graphql request", "url", req.URL.String(), "method", req.Method)
 		body := ""
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		if req.Method == http.MethodPost {
 			body = mustRead(req.Body)
 		}
@@ -90,13 +118,8 @@ func makeFakeClient() api.API {
 			}
 			mustWrite(w, string(d))
 		case strings.Contains(body, "query FetchCheckRuns"):
-			d, err := os.ReadFile(fmt.Sprintf("./testdata/fetchCheckRunsPage%d.json", page))
-			if page == 1 {
-				page = 2
-			}
-			if err != nil {
-				panic(err)
-			}
+			d, err := os.ReadFile(fmt.Sprintf("./testdata/fetchCheckRunsPage%d.json", runsPage))
+			runsPage = min(3, runsPage+1)
 			if err != nil {
 				panic(err)
 			}
@@ -135,7 +158,17 @@ func makeFakeClient() api.API {
 	tAPI := api.New()
 	tAPI.SetGQLClient(gqlClient)
 	tAPI.SetHTTPClient(httpClient)
-	return tAPI
+	tAPI.SetGHCLIExecutor(
+		func(args ...string) (stdOut bytes.Buffer, stdErr bytes.Buffer, err error) {
+			time.Sleep(2000 * time.Millisecond)
+			d, err := os.ReadFile("./testdata/jobLogs.json")
+			if err != nil {
+				panic(err)
+			}
+			return *bytes.NewBuffer(d), bytes.Buffer{}, nil
+		},
+	)
+	return &tAPI
 }
 
 func mustRead(r io.Reader) string {
