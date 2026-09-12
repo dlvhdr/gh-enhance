@@ -1680,7 +1680,7 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.C
 		ji.steps = steps
 		if sji := m.getSelectedJobItem(); areJobItemsEqual(sji, ji) && sji != nil &&
 			len(sji.steps) == 0 {
-			m.setStepsListItemsFromJob(ji)
+			cmds = append(cmds, m.setStepsListItemsFromJob(ji))
 		}
 	}
 
