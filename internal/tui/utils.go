@@ -96,3 +96,59 @@ func TimeElapsed(then time.Time) string {
 
 	return parts[0] + text
 }
+
+func areRunItemsEqual(a, b *runItem) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b != nil {
+		return false
+	}
+
+	return a.run.Id == b.run.Id
+}
+
+func areCheckItemsEqual(a, b *checkItem) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b != nil {
+		return false
+	}
+
+	return a.job.Id == b.job.Id
+}
+
+func areJobItemsEqual(a, b *jobItem) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b != nil {
+		return false
+	}
+
+	return a.job.Id == b.job.Id
+}
+
+func areStepItemsEqual(a, b *stepItem) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b != nil {
+		return false
+	}
+
+	return a.step.Name == b.step.Name && a.step.StartedAt.Equal(b.step.StartedAt)
+}

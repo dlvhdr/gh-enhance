@@ -45,6 +45,7 @@ type WorkflowJob struct {
 
 	// A number that uniquely identifies this workflow run in its parent workflow.
 	RunNumber int
+	RunId     string
 }
 
 type LogKind int

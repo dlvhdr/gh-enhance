@@ -103,6 +103,7 @@ func IsFailureConclusion(c Conclusion) bool {
 // CheckSuite is a grouping of CheckRuns
 type CheckSuite struct {
 	Conclusion Conclusion
+	Status     Status
 	DatabaseId int
 	Branch     struct {
 		Name string
@@ -114,6 +115,7 @@ type CheckSuite struct {
 
 	// A WorkflowRun has one CheckSuite and is defined by a GitHub Action's file
 	WorkflowRun struct {
+		Id                        string
 		Url                       string
 		DatabaseId                int
 		Event                     string
@@ -441,6 +443,7 @@ type httpStep struct {
 
 type jobStepsResponse struct {
 	Id           int
+	RunId        int `json:"run_id"`
 	Url          string
 	WorkflowName string
 	Steps        []httpStep
@@ -448,6 +451,7 @@ type jobStepsResponse struct {
 
 type NormalizedJobStepsResponse struct {
 	Id           int
+	RunId        int
 	Url          string
 	WorkflowName string
 	Steps        []Step
@@ -499,6 +503,7 @@ func (a *API) FetchJobSteps(repo string, jobID string) (NormalizedJobStepsRespon
 		})
 	}
 	res.Id = raw.Id
+	res.RunId = raw.RunId
 	res.Url = raw.Url
 	res.WorkflowName = raw.WorkflowName
 	res.Steps = normalized
@@ -548,7 +553,7 @@ func (pr *PRWithChecks) IsStatusCheckInProgress() bool {
 		contexts.StatusContextCountsByState,
 	)
 	return (pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "" ||
-		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING" || stats.InProgress > 0)
+		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == CommitStatePending || stats.InProgress > 0)
 }
 
 func ReRunJob(repo string, jobId string) error {
@@ -594,7 +599,8 @@ type WorkflowRunResponse struct {
 // REST API response for GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs
 // https://docs.github.com/en/rest/actions/workflow-jobs#list-jobs-for-a-workflow-run
 type WorkflowRunJobsResponse struct {
-	TotalCount int              `json:"total_count"`
+	TotalCount int `json:"total_count"`
+	NextPage   string
 	Jobs       []WorkflowRunJob `json:"jobs"`
 }
 
@@ -658,16 +664,18 @@ func (a *API) FetchWorkflowRunByID(repo string, runID string) (WorkflowRunRespon
 	return res, nil
 }
 
-func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsResponse, error) {
+func (a *API) fetchWorkflowRunJobsPage(
+	repo string,
+	runID string,
+	pageLink string,
+) (WorkflowRunJobsResponse, error) {
 	res := WorkflowRunJobsResponse{}
 	c, err := a.getHTTPClient()
 	if err != nil {
 		return res, err
 	}
 
-	jobsUrl, err := url.Parse(
-		fmt.Sprintf("https://api.github.com/repos/%s/actions/runs/%s/jobs", repo, runID),
-	)
+	jobsUrl, err := url.Parse(pageLink)
 	if err != nil {
 		return res, err
 	}
@@ -702,7 +710,30 @@ func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsRe
 		return res, err
 	}
 
+	if linkHeader := resp.Header.Get("link"); linkHeader != "" {
+		res.NextPage = parseNextLink(linkHeader)
+	}
+
 	return res, nil
+}
+
+func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsResponse, error) {
+	accumulated := WorkflowRunJobsResponse{Jobs: make([]WorkflowRunJob, 0)}
+	pageLink := fmt.Sprintf(
+		"https://api.github.com/repos/%s/actions/runs/%s/jobs?per_page=100",
+		repo,
+		runID,
+	)
+	for pageLink != "" {
+		resp, err := a.fetchWorkflowRunJobsPage(repo, runID, pageLink)
+		if err == nil {
+			accumulated.Jobs = append(accumulated.Jobs, resp.Jobs...)
+			accumulated.TotalCount = resp.TotalCount
+		}
+		pageLink = resp.NextPage
+	}
+
+	return accumulated, nil
 }
 
 func ReRunRun(repo string, runId string) error {
@@ -771,4 +802,29 @@ func (a *API) FetchPR(repo string, prNumber string) (PRQuery, error) {
 
 	log.Debug("FetchPR request completed", "duration", time.Since(startTime))
 	return res, nil
+}
+
+func parseNextLink(linkHeader string) string {
+	if linkHeader == "" {
+		return ""
+	}
+	// Pagination and link headers are documented here:
+	//   https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api?apiVersion=2022-11-28#using-link-headers
+	// An example link header to handle:
+	//   link: <https://api.github.com/repositories/1300192/issues?page=2>; rel="prev", <https://api.github.com/repositories/1300192/issues?page=4>; rel="next", <https://api.github.com/repositories/1300192/issues?page=515>; rel="last", <https://api.github.com/repositories/1300192/issues?page=1>; rel="first"
+	links := strings.SplitSeq(linkHeader, ",")
+	for link := range links {
+		parts := strings.Split(strings.TrimSpace(link), ";")
+		if len(parts) != 2 {
+			continue
+		}
+		if strings.Contains(parts[1], `rel="next"`) {
+			urlField := strings.TrimSpace(parts[0])
+			if strings.HasPrefix(urlField, "<") && strings.HasSuffix(urlField, ">") {
+				url := urlField[1 : len(urlField)-1]
+				return url
+			}
+		}
+	}
+	return ""
 }

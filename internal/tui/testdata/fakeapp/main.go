@@ -64,7 +64,7 @@ func makeFakeClient() api.API {
 		switch {
 		// https://api.github.com/repos/dlvhdr/gh-enhance/actions/jobs/44932094595
 		case req.Method == http.MethodGet && strings.Contains(req.URL.String(), "/actions/jobs/"):
-			d, err := os.ReadFile("./testdata/fetchCheckRunStepsRest.json")
+			d, err := os.ReadFile("./testdata/fetchJobSteps.json")
 			if err != nil {
 				panic(err)
 			}
@@ -78,7 +78,7 @@ func makeFakeClient() api.API {
 	mux.HandleFunc("/api/graphql", func(w http.ResponseWriter, req *http.Request) {
 		log.Debug("got graphql request", "url", req.URL.String(), "method", req.Method)
 		body := ""
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		if req.Method == http.MethodPost {
 			body = mustRead(req.Body)
 		}
@@ -93,9 +93,6 @@ func makeFakeClient() api.API {
 			d, err := os.ReadFile(fmt.Sprintf("./testdata/fetchCheckRunsPage%d.json", page))
 			if page == 1 {
 				page = 2
-			}
-			if err != nil {
-				panic(err)
 			}
 			if err != nil {
 				panic(err)
