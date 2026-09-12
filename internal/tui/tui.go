@@ -1735,7 +1735,7 @@ func (m *model) enrichRunWithJobs(msg runJobsFetchedMsg) []tea.Cmd {
 
 	ri.loadingJobs = false
 	if msg.err != nil {
-		log.Error("ya runJobsFetchedMsg", "err", msg.err)
+		log.Error("runJobsFetchedMsg", "err", msg.err)
 		return nil
 	}
 
