@@ -196,7 +196,14 @@ func (m model) makeFetchWorkflowRunJobsCmd(run data.WorkflowRun) tea.Cmd {
 			return runJobsFetchedMsg{runId: run.Id, err: err}
 		}
 
-		jobs := make([]data.WorkflowJob, jobsResp.TotalCount)
+		log.Info(
+			"fetched workflow run jobs",
+			"len(jobs)",
+			len(jobsResp.Jobs),
+			"total count",
+			jobsResp.TotalCount,
+		)
+		jobs := make([]data.WorkflowJob, len(jobsResp.Jobs))
 		for i, job := range jobsResp.Jobs {
 			jobs[i] = convertJobResponseToWorkflowJob(job, jobRelatedRun{
 				name:      run.Name,
@@ -204,13 +211,6 @@ func (m model) makeFetchWorkflowRunJobsCmd(run data.WorkflowRun) tea.Cmd {
 				runNumber: run.RunNumber,
 			})
 		}
-		log.Info(
-			"fetched workflow run jobs",
-			"len(jobs)",
-			len(jobs),
-			"total count",
-			jobsResp.TotalCount,
-		)
 		data.SortJobs(jobs)
 		return runJobsFetchedMsg{runId: run.Id, jobs: jobs}
 	}
@@ -241,25 +241,21 @@ func (m *model) makeFetchJobLogsCmd() tea.Cmd {
 
 	var ji *jobItem
 	if m.flat {
-		ci := m.checksList.SelectedItem().(*checkItem)
+		ci := m.getSelectedCheckItem()
 		if ci == nil {
 			return nil
 		}
 		ji = &ci.jobItem
 	} else {
-		ri := m.runsList.SelectedItem().(*runItem)
-		if len(ri.jobsItems) == 0 {
+		ri := m.getSelectedRunItem()
+		if ri == nil || len(ri.jobsItems) == 0 {
 			return nil
 		}
-		job := m.jobsList.SelectedItem()
+		job := m.getSelectedJobItem()
 		if job == nil {
 			return nil
 		}
-		j, ok := job.(*jobItem)
-		if !ok {
-			return nil
-		}
-		ji = j
+		ji = job
 	}
 
 	if ji.isStatusInProgress() {
@@ -385,7 +381,7 @@ func (m *model) makeFetchCheckStepsCmd(jobId string) tea.Cmd {
 		log.Info("job steps fetched", "jobId", jobId, "len(steps)", len(stepsRes.Steps))
 
 		return checkStepsFetchedMsg{
-			checkId: jobId,
+			checkId: fmt.Sprintf("%d", stepsRes.Id),
 			steps:   stepsRes.Steps,
 		}
 	}
@@ -552,13 +548,13 @@ func convertRunResponseToWorkflowRun(
 	run api.WorkflowRunResponse,
 	jobsResp api.WorkflowRunJobsResponse,
 ) data.WorkflowRun {
-	jobs := make([]data.WorkflowJob, 0, len(jobsResp.Jobs))
-	for _, j := range jobsResp.Jobs {
-		jobs = append(jobs, convertJobResponseToWorkflowJob(j, jobRelatedRun{
+	jobs := make([]data.WorkflowJob, len(jobsResp.Jobs))
+	for i, j := range jobsResp.Jobs {
+		jobs[i] = convertJobResponseToWorkflowJob(j, jobRelatedRun{
 			name:      run.Name,
 			event:     run.Event,
 			runNumber: run.RunNumber,
-		}))
+		})
 	}
 	data.SortJobs(jobs)
 
@@ -722,7 +718,7 @@ func makeWorkflowRun(checkRun api.CheckRun) data.WorkflowRun {
 		Bucket:       data.GetConclusionBucket(checkRun.CheckSuite.Conclusion),
 		StartedAt:    checkRun.StartedAt,
 		RunNumber:    checkRun.CheckSuite.WorkflowRun.RunNumber,
-		Status:       strings.ToLower(string(checkRun.Status)),
+		Status:       strings.ToLower(string(checkRun.CheckSuite.Status)),
 		Conclusion:   strings.ToLower(string(checkRun.Conclusion)),
 	}
 	return run
@@ -821,7 +817,7 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 	log.Info("re-running job", "runId", runId, "jobId", jobId)
 	cmds := make([]tea.Cmd, 0)
 	ri := m.getRunItemById(runId)
-	ji, _ := m.getJobItemById(jobId)
+	ji := m.getJobItemById(jobId)
 	if ri == nil && ji == nil {
 		return cmds
 	}

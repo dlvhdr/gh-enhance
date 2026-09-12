@@ -78,7 +78,7 @@ func makeFakeClient() api.API {
 	mux.HandleFunc("/api/graphql", func(w http.ResponseWriter, req *http.Request) {
 		log.Debug("got graphql request", "url", req.URL.String(), "method", req.Method)
 		body := ""
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		if req.Method == http.MethodPost {
 			body = mustRead(req.Body)
 		}
