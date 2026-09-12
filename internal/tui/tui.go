@@ -464,7 +464,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.lastFetched = time.Now()
-		cmds = append(cmds, m.fetchPRChecksWithInterval())
+		switch m.mode() {
+		case ModePR:
+			cmds = append(cmds, m.fetchPRChecksWithInterval())
+		case ModeRepo:
+			// not supported yet
+		case ModeRun:
+			cmds = append(cmds, m.startFetchingRunWithInterval())
+		}
 
 	case tea.WindowSizeMsg:
 		log.Info("window size changed", "width", msg.Width, "height", msg.Height)
@@ -480,6 +487,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
+		log.Info("key pressed", "key", msg.String())
 		if m.checksList.FilterState() == list.Filtering ||
 			m.runsList.FilterState() == list.Filtering ||
 			m.jobsList.FilterState() == list.Filtering ||
@@ -1071,9 +1079,7 @@ func (m *model) viewFooter() string {
 		texts, bg, stats.Failed, stats.InProgress, stats.Succeeded, stats.Skipped,
 	)
 	checksText := bg.Render(strings.Join(texts, bg.Render(", ")))
-
-	isInProgress := m.prWithChecks.Number != 0 && m.prWithChecks.IsStatusCheckInProgress()
-	return m.renderFooterLayout(bg, sFooter, isInProgress, totalText, checksText)
+	return m.renderFooterLayout(bg, sFooter, m.isInProgress(), totalText, checksText)
 }
 
 func (m *model) viewRunModeFooter(bg lipgloss.Style, sFooter lipgloss.Style) string {
@@ -1154,7 +1160,6 @@ func (m *model) renderFooterLayout(
 			Foreground(m.styles.colors.faintColor).
 			Render(fmt.Sprintf("refreshing %s", untilStr))
 	}
-
 	help := m.styles.helpButtonStyle.Render("? help")
 
 	partsWidth := 0
@@ -1179,6 +1184,15 @@ func (m *model) isRunModeInProgress() bool {
 	if len(m.workflowRuns) == 0 {
 		return true
 	}
+
+	if m.flat {
+		if ci := m.getSelectedCheckItem(); ci.isStatusInProgress() {
+			return true
+		}
+	} else if ri := m.getSelectedRunItem(); ri != nil && ri.HasNotConcluded() {
+		return true
+	}
+
 	for _, job := range m.workflowRuns[0].Jobs {
 		if job.IsStatusInProgress() {
 			return true
@@ -1387,7 +1401,6 @@ func (m *model) updateListsSpinners() []tea.Cmd {
 	} else {
 		rCmds := m.updateRunsModeSpinners()
 		cmds = append(cmds, rCmds...)
-
 	}
 
 	return cmds
@@ -1635,11 +1648,12 @@ func (m *model) isScrollbarVisible() bool {
 }
 
 func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.Cmd {
+	log.Debug("enriching run with all jobs steps", "runId", msg.runId)
 	cmds := make([]tea.Cmd, 0)
 	jobsMap := make(map[string]api.CheckRunWithSteps)
 	checks := msg.data.Resource.WorkflowRun.CheckSuite.CheckRuns.Nodes
 	for _, check := range checks {
-		jobsMap[fmt.Sprintf("%d", check.DatabaseId)] = check
+		jobsMap[fmt.Sprint(check.DatabaseId)] = check
 	}
 
 	ri := m.getRunItemById(msg.runId)
@@ -1649,8 +1663,8 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.C
 	}
 
 	ri.loadingSteps = false
-	for jIdx, ji := range ri.jobsItems {
-		ri.jobsItems[jIdx].loadingSteps = false
+	for _, ji := range ri.jobsItems {
+		ji.loadingSteps = false
 		jobWithSteps, ok := jobsMap[ji.job.Id]
 		if !ok {
 			continue
@@ -1663,15 +1677,16 @@ func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.C
 			steps = append(steps, &si)
 		}
 
-		ri.jobsItems[jIdx].steps = steps
-
-		if areJobItemsEqual(m.getSelectedJobItem(), ji) {
-			cmds = append(cmds, m.updateCurrentJobStepsListItems()...)
+		ji.steps = steps
+		if sji := m.getSelectedJobItem(); areJobItemsEqual(sji, ji) && sji != nil &&
+			len(sji.steps) == 0 {
+			m.setStepsListItemsFromJob(ji)
 		}
 	}
 
 	if areRunItemsEqual(m.getSelectedRunItem(), ri) {
 		cmds = append(cmds, m.updateCurrentRunJobsListItems()...)
+		cmds = append(cmds, m.updateCurrentJobStepsListItems()...)
 	}
 
 	return cmds
@@ -1968,16 +1983,6 @@ func (m *model) getRunItemById(runId string) *runItem {
 	for _, run := range m.runsList.Items() {
 		ri := run.(*runItem)
 		if ri.run.Id == runId {
-			return ri
-		}
-	}
-	return nil
-}
-
-func (m *model) getRunItemByName(runName string) *runItem {
-	for _, run := range m.runsList.Items() {
-		ri := run.(*runItem)
-		if ri.run.Name == runName {
 			return ri
 		}
 	}
@@ -2589,9 +2594,10 @@ func (m *model) updateCurrentJobStepsListItems() []tea.Cmd {
 	if ji == nil {
 		return nil
 	}
-	log.Debug("updating current job steps", "job", ji.job.Id)
+	log.Debug("updating current job steps", "job", ji.job.Id, "len", len(ji.steps))
 
 	sm := m.makeCurrentStepsMap()
+
 	for i, si := range ji.steps {
 		if existing, ok := sm[si.step.Name]; ok {
 			existing.step = si.step
@@ -2600,4 +2606,30 @@ func (m *model) updateCurrentJobStepsListItems() []tea.Cmd {
 		}
 	}
 	return cmds
+}
+
+func (m *model) isInProgress() bool {
+	isInProgress := false
+	if m.mode() == ModePR {
+		isInProgress = m.prWithChecks.Number != 0 && m.prWithChecks.IsStatusCheckInProgress()
+	}
+	if isInProgress {
+		return true
+	}
+
+	if m.flat {
+		for _, ci := range m.checksList.Items() {
+			if ci, ok := ci.(*checkItem); ok && ci.isStatusInProgress() {
+				return true
+			}
+		}
+	}
+
+	for _, ri := range m.runsList.Items() {
+		if ri, ok := ri.(*runItem); ok && ri.HasNotConcluded() {
+			return true
+		}
+	}
+
+	return false
 }

@@ -209,6 +209,7 @@ func (m model) makeFetchWorkflowRunJobsCmd(run data.WorkflowRun) tea.Cmd {
 				name:      run.Name,
 				event:     run.Event,
 				runNumber: run.RunNumber,
+				runId:     run.Id,
 			})
 		}
 		data.SortJobs(jobs)
@@ -505,6 +506,7 @@ type jobRelatedRun struct {
 	name      string
 	event     string
 	runNumber int
+	runId     string
 }
 
 func convertJobResponseToWorkflowJob(
@@ -541,6 +543,7 @@ func convertJobResponseToWorkflowJob(
 		Bucket:      data.GetConclusionBucket(conclusion),
 		Kind:        data.JobKindGithubActions,
 		RunNumber:   relatedRun.runNumber,
+		RunId:       relatedRun.runId,
 	}
 }
 
@@ -617,26 +620,26 @@ func (m *model) mergeWorkflowRuns(
 	msg prChecksFetchedMsg,
 	runsSoFar []data.WorkflowRun,
 ) []data.WorkflowRun {
-	runsMap := make(map[int]data.WorkflowRun)
+	runsMap := make(map[string]data.WorkflowRun)
 
 	// start with existing workflow runs to keep order and
 	// prevent the UI from jumping
 	for _, run := range runsSoFar {
-		runsMap[run.RunNumber] = run
+		runsMap[run.Id] = run
 	}
 
 	for _, run := range msg.runs {
-		existing, ok := runsMap[run.RunNumber]
+		existing, ok := runsMap[run.Id]
 
 		// run is new, no need to merge its jobs with the existing one
 		if !ok {
-			runsMap[run.RunNumber] = run
+			runsMap[run.Id] = run
 			continue
 		}
 
 		// run already exists, merge its jobs with the existing one
 		existing.Jobs = append(existing.Jobs, run.Jobs...)
-		runsMap[run.RunNumber] = existing
+		runsMap[run.Id] = existing
 	}
 
 	merged := make([]data.WorkflowRun, 0)
@@ -656,14 +659,13 @@ func (m *model) mergeWorkflowRuns(
 // sort jobs by their status and creation time etc.
 func makeWorkflowRuns(nodes []api.ContextNode) []data.WorkflowRun {
 	checkRuns := filterForCheckRuns(nodes)
-	runsMap := make(map[int]data.WorkflowRun)
+	runsMap := make(map[string]data.WorkflowRun)
 
 	for _, checkRun := range checkRuns {
 		job := makeWorkflowJob(checkRun)
 
-		wfRunNumber := checkRun.CheckSuite.WorkflowRun.RunNumber
-		// wfName := workflowName(checkRun)
-		run, ok := runsMap[wfRunNumber]
+		wfrId := checkRun.CheckSuite.WorkflowRun.Id
+		run, ok := runsMap[wfrId]
 		if ok {
 			run.Jobs = append(run.Jobs, job)
 		} else {
@@ -671,7 +673,7 @@ func makeWorkflowRuns(nodes []api.ContextNode) []data.WorkflowRun {
 			run.Jobs = []data.WorkflowJob{job}
 		}
 
-		runsMap[wfRunNumber] = run
+		runsMap[wfrId] = run
 	}
 
 	runs := make([]data.WorkflowRun, 0)
@@ -749,6 +751,7 @@ func makeWorkflowJob(checkRun api.CheckRun) data.WorkflowJob {
 		Bucket:      data.GetConclusionBucket(checkRun.Conclusion),
 		Kind:        kind,
 		RunNumber:   wfr.RunNumber,
+		RunId:       wfr.Id,
 	}
 	return job
 }
@@ -758,6 +761,7 @@ func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
 	type latestMap struct {
 		jobs      []data.WorkflowJob
 		runNumber int
+		runId     string
 	}
 
 	jobIds := map[string]bool{}
@@ -773,6 +777,7 @@ func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
 			wfNameToJobs[wfName] = latestMap{
 				jobs:      onlyJob,
 				runNumber: job.RunNumber,
+				runId:     job.RunId,
 			}
 
 			// job is part of a wf that we already met
@@ -787,7 +792,11 @@ func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
 				}
 			}
 			existing.jobs[found] = job
-			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, runNumber: job.RunNumber}
+			wfNameToJobs[wfName] = latestMap{
+				jobs:      existing.jobs,
+				runNumber: job.RunNumber,
+				runId:     job.RunId,
+			}
 
 			// the job isn't a later attempt - it's a job we haven't met before, append it
 		} else {
@@ -795,7 +804,11 @@ func takeOnlyLatestRunAttempts(jobs []data.WorkflowJob) []data.WorkflowJob {
 			if !ok {
 				existing.jobs = append(existing.jobs, job)
 			}
-			wfNameToJobs[wfName] = latestMap{jobs: existing.jobs, runNumber: existing.runNumber}
+			wfNameToJobs[wfName] = latestMap{
+				jobs:      existing.jobs,
+				runNumber: existing.runNumber,
+				runId:     job.RunId,
+			}
 		}
 
 		jobIds[job.Id] = true
@@ -822,10 +835,7 @@ func (m *model) rerunJob(runId string, jobId string) []tea.Cmd {
 		return cmds
 	}
 
-	commits := m.prWithChecks.Commits.Nodes
-	if len(commits) > 0 {
-		commits[0].Commit.StatusCheckRollup.State = api.CommitStatePending
-	}
+	m.setPRInProgress()
 	ji.job.Bucket = data.CheckBucketPending
 	ji.job.State = api.StatusPending
 	ji.job.StartedAt = time.Now()
@@ -855,13 +865,12 @@ func (m *model) rerunRun(runId string) []tea.Cmd {
 		return cmds
 	}
 
-	commits := m.prWithChecks.Commits.Nodes
-	if len(commits) > 0 {
-		commits[0].Commit.StatusCheckRollup.State = api.CommitStatePending
-	}
+	m.setPRInProgress()
 	ri.run.Event = "manual rerun"
 	ri.run.Bucket = data.CheckBucketPending
 	ri.run.Jobs = make([]data.WorkflowJob, 0)
+	ri.run.Conclusion = ""
+	ri.run.Status = "pending"
 	ri.jobsItems = make([]*jobItem, 0)
 	m.jobsList.SetItems(make([]list.Item, 0))
 	m.stepsList.SetItems(make([]list.Item, 0))
@@ -960,4 +969,14 @@ func (m *model) previousPane() pane {
 		return PaneChecks
 	}
 	return PaneRuns
+}
+
+func (m *model) setPRInProgress() {
+	if m.mode() != ModePR {
+		return
+	}
+
+	if len(m.prWithChecks.Commits.Nodes) > 0 {
+		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.State = api.CommitStatePending
+	}
 }

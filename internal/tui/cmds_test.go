@@ -53,6 +53,7 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 			RunNumber: wfr.RunNumber,
 			Jobs: []data.WorkflowJob{
 				{
+					RunId:      wfr.Id,
 					RunNumber:  wfr.RunNumber,
 					Id:         "job2",
 					State:      api.StatusCompleted,

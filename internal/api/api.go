@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -74,8 +73,6 @@ const (
 	defaultServerURL = "https://github.com"
 )
 
-var nextPagePattern = regexp.MustCompile(`(?i)rel="next"`)
-
 func New() API {
 	apiURL := os.Getenv("GITHUB_API_URL")
 	if apiURL == "" {
@@ -118,6 +115,7 @@ type CheckSuite struct {
 
 	// A WorkflowRun has one CheckSuite and is defined by a GitHub Action's file
 	WorkflowRun struct {
+		Id                        string
 		Url                       string
 		DatabaseId                int
 		Event                     string
@@ -555,7 +553,7 @@ func (pr *PRWithChecks) IsStatusCheckInProgress() bool {
 		contexts.StatusContextCountsByState,
 	)
 	return (pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "" ||
-		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING" || stats.InProgress > 0)
+		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == CommitStatePending || stats.InProgress > 0)
 }
 
 func ReRunJob(repo string, jobId string) error {

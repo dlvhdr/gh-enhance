@@ -22,12 +22,12 @@ func main() {
 	client := makeFakeClient()
 	newConfigFile, fileErr := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o666)
 	if fileErr != nil {
-		// panic(fileErr)
+		panic(fileErr)
 	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		// panic(err)
+		panic(err)
 	}
 	fmt.Println(wd) // for example /home/user
 	fmt.Print("logging to", path.Join(wd, newConfigFile.Name()))
