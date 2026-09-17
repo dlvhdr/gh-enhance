@@ -615,12 +615,16 @@ func (a *API) ReRunJob(repo string, jobId string) error {
 	}
 
 	body := strings.NewReader("")
-	_, err = client.Post(
+	resp, err := client.Post(
 		fmt.Sprintf("%s/repos/%s/actions/jobs/%s/rerun", a.url, repo, jobId),
 		"",
 		body,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // REST API response for GET /repos/{owner}/{repo}/actions/runs/{run_id}
@@ -798,12 +802,16 @@ func (a *API) ReRunRun(repo string, runId string) error {
 
 	body := strings.NewReader("")
 
-	_, err = client.Post(
+	resp, err := client.Post(
 		fmt.Sprintf("%s/repos/%s/actions/runs/%s/rerun", a.url, repo, runId),
 		"",
 		body,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 type PR struct {
