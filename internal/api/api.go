@@ -472,7 +472,6 @@ type jobStepsResponse struct {
 
 type NormalizedJobStepsResponse struct {
 	Id           int
-	RunId        int
 	Url          string
 	WorkflowName string
 	Steps        []Step
@@ -524,7 +523,6 @@ func (a *API) FetchJobSteps(repo string, jobID string) (NormalizedJobStepsRespon
 		})
 	}
 	res.Id = raw.Id
-	res.RunId = raw.RunId
 	res.Url = raw.Url
 	res.WorkflowName = raw.WorkflowName
 	res.Steps = normalized
@@ -642,7 +640,7 @@ type WorkflowRunResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	RunStartedAt time.Time `json:"run_started_at"`
-	CheckSuiteId string    `json:"check_suite_id"`
+	CheckSuiteId int       `json:"check_suite_id"`
 	DisplayTitle string    `json:"display_title"`
 	PullRequests []struct {
 		Number int    `json:"number"`
@@ -723,8 +721,7 @@ func (a *API) FetchWorkflowRunByID(repo string, runID string) (WorkflowRunRespon
 
 func (a *API) fetchWorkflowRunJobsPage(
 	repo string,
-	runID string,
-	pageLink string,
+	runJobsPageURL string,
 ) (WorkflowRunJobsResponse, error) {
 	res := WorkflowRunJobsResponse{}
 	c, err := a.getHTTPClient()
@@ -732,7 +729,7 @@ func (a *API) fetchWorkflowRunJobsPage(
 		return res, err
 	}
 
-	jobsUrl, err := url.Parse(pageLink)
+	jobsUrl, err := url.Parse(runJobsPageURL)
 	if err != nil {
 		return res, err
 	}
@@ -750,7 +747,7 @@ func (a *API) fetchWorkflowRunJobsPage(
 		body, _ := io.ReadAll(resp.Body)
 		return res, fmt.Errorf(
 			"failed to fetch workflow run jobs for run %s: %s %s",
-			runID,
+			runJobsPageURL,
 			resp.Status,
 			string(body),
 		)
@@ -776,18 +773,18 @@ func (a *API) fetchWorkflowRunJobsPage(
 
 func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsResponse, error) {
 	accumulated := WorkflowRunJobsResponse{Jobs: make([]WorkflowRunJob, 0)}
-	pageLink := fmt.Sprintf(
+	runJobsPageURL := fmt.Sprintf(
 		"https://api.github.com/repos/%s/actions/runs/%s/jobs?per_page=100",
 		repo,
 		runID,
 	)
-	for pageLink != "" {
-		resp, err := a.fetchWorkflowRunJobsPage(repo, runID, pageLink)
+	for runJobsPageURL != "" {
+		resp, err := a.fetchWorkflowRunJobsPage(repo, runJobsPageURL)
 		if err == nil {
 			accumulated.Jobs = append(accumulated.Jobs, resp.Jobs...)
 			accumulated.TotalCount = resp.TotalCount
 		}
-		pageLink = resp.NextPage
+		runJobsPageURL = resp.NextPage
 	}
 
 	return accumulated, nil

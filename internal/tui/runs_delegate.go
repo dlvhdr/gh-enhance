@@ -30,17 +30,14 @@ func (ri *runItem) Title() string {
 	status := ri.viewStatus()
 	s := ri.meta.TitleStyle()
 	w := ri.meta.width - lipgloss.Width(status) - 2
-	name := ri.run.Name + fmt.Sprintf(
-		" csid=%s, rid=%s, commit=%s",
-		ri.run.CheckSuiteId,
-		ri.run.Id,
-		ri.run.HeadSha,
-	)
+	name := ri.run.Name
 	if ri.run.RunAttempt > 1 {
-		name = name + fmt.Sprintf(
-			" (attempt #%d)",
-			ri.run.RunAttempt,
-		)
+		name = name + lipgloss.NewStyle().
+			Foreground(ri.meta.styles.colors.faintColor).
+			Render(fmt.Sprintf(
+				" (attempt #%d)",
+				ri.run.RunAttempt,
+			))
 	}
 	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -80,6 +77,11 @@ func (ri *runItem) Description() string {
 
 // FilterValue implements /charm.land/bubbles.list.Item.FilterValue
 func (ri *runItem) FilterValue() string { return ri.run.Name }
+
+func (ri *runItem) ShouldFetchJobs() bool {
+	return !ri.loadingJobs &&
+		(ri.lastFetchJobs.IsZero() || (time.Since(ri.lastFetchJobs) > refreshInterval && ri.HasNotConcluded()))
+}
 
 func (ri *runItem) IsInProgress() bool {
 	return ri.run.Status == "in_progress"
@@ -193,11 +195,10 @@ func NewRunItem(run data.WorkflowRun, styles styles) runItem {
 	}
 
 	return runItem{
-		meta:          itemMeta{styles: styles},
-		run:           &run,
-		jobsItems:     jobs,
-		loadingSteps:  false,
-		loadingJobs:   false,
-		lastFetchJobs: time.Now(),
+		meta:         itemMeta{styles: styles},
+		run:          &run,
+		jobsItems:    jobs,
+		loadingSteps: false,
+		loadingJobs:  false,
 	}
 }

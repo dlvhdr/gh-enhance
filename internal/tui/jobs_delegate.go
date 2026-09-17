@@ -45,7 +45,7 @@ func (ji *jobItem) Title() string {
 		s.Render(status),
 		s.Render(" "),
 		s.Width(w).
-			Render(ansi.Truncate(s.Render(ji.job.Name+fmt.Sprintf(" jid=%s wfrid=%s", ji.job.Id, ji.job.WorkflowRunId)), w, Ellipsis)),
+			Render(ansi.Truncate(s.Render(ji.job.Name), w, Ellipsis)),
 	)
 }
 

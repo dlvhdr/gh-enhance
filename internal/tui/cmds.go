@@ -147,6 +147,9 @@ func (m model) fetchRepoChecksWithCursor(cursor string) tea.Msg {
 	wfRuns := make([]data.WorkflowRun, 0)
 	for i, run := range resp.WorkflowRuns {
 		jobsResp := api.WorkflowRunJobsResponse{}
+
+		// Fetch only the last WorkflowRun's jobs as it's the most recent one and
+		// the first in that is shown
 		if i == len(resp.WorkflowRuns)-1 {
 			jobsResp, err = m.client.FetchWorkflowRunJobs(m.repo, strconv.Itoa(run.Id))
 			if err != nil {
@@ -371,11 +374,11 @@ type runModeFetchedMsg struct {
 
 func (m *model) makeFetchRunCmd() tea.Cmd {
 	return func() tea.Msg {
-		return m.fetchRun()
+		return m.fetchRunModeRun()
 	}
 }
 
-func (m *model) fetchRun() tea.Msg {
+func (m *model) fetchRunModeRun() tea.Msg {
 	runResp, err := m.client.FetchWorkflowRunByID(m.repo, m.runID)
 	if err != nil {
 		log.Error("error fetching workflow run", "err", err)
@@ -390,6 +393,42 @@ func (m *model) fetchRun() tea.Msg {
 
 	run := convertRunResponseToWorkflowRun(runResp, jobsResp)
 	return runModeFetchedMsg{runs: []data.WorkflowRun{run}}
+}
+
+func (m model) makeFetchWorkflowRunJobsCmd(run data.WorkflowRun) tea.Cmd {
+	return func() tea.Msg {
+		jobsResp, err := m.client.FetchWorkflowRunJobs(m.repo, run.Id)
+		if err != nil {
+			log.Error(
+				"error fetching workflow run jobs",
+				"runId",
+				run,
+				"link",
+				run.Link,
+				"err",
+				err,
+			)
+			return runJobsFetchedMsg{runId: run.Id, err: err}
+		}
+
+		jobs := make([]data.WorkflowJob, jobsResp.TotalCount)
+		for i, job := range jobsResp.Jobs {
+			jobs[i] = convertJobResponseToWorkflowJob(job, jobRelatedRun{
+				name:  run.Name,
+				event: run.Event,
+				runId: run.Id,
+			})
+		}
+		log.Info(
+			"fetched workflow run jobs",
+			"len(jobs)",
+			len(jobs),
+			"total count",
+			jobsResp.TotalCount,
+		)
+		data.SortJobs(jobs)
+		return runJobsFetchedMsg{runId: run.Id, jobs: jobs}
+	}
 }
 
 func (m *model) startFetchingRunWithInterval() tea.Cmd {
@@ -412,7 +451,7 @@ func (m *model) makeFetchRunIntervalTickCmd() tea.Cmd {
 			return nil
 		}
 
-		return runModeIntervalTickMsg{msg: m.fetchRun()}
+		return runModeIntervalTickMsg{msg: m.fetchRunModeRun()}
 	}
 }
 
@@ -499,7 +538,7 @@ func convertRunResponseToWorkflowRun(
 
 	wfRun := data.WorkflowRun{
 		Id:           fmt.Sprintf("%d", run.Id),
-		CheckSuiteId: run.CheckSuiteId,
+		CheckSuiteId: fmt.Sprintf("%d", run.CheckSuiteId),
 		HeadSha:      run.HeadSha,
 		Name:         run.Name,
 		DisplayTitle: run.DisplayTitle,
@@ -565,7 +604,6 @@ func (m *model) mergeFetchedWorkflowRuns(
 
 		// run is new, no need to merge its jobs with the existing one
 		if !ok {
-			log.Debug("new run")
 			runsMap[run.Id] = run
 			continue
 		}

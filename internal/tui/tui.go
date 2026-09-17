@@ -1827,6 +1827,13 @@ func (m *model) onRunChanged() []tea.Cmd {
 		cmds = append(cmds, m.makeFetchWorkflowRunStepsCmd(ri.run.Id))
 	}
 
+	if m.mode() == ModeRepo && ri.ShouldFetchJobs() {
+		log.Info("run changed - fetching jobs", "runId", ri.run.Id)
+		ri.loadingJobs = true
+		ri.lastFetchJobs = time.Now()
+		cmds = append(cmds, m.makeFetchWorkflowRunJobsCmd(*ri.run))
+	}
+
 	m.setJobsListItemsFromRun(m.getSelectedRunItem())
 
 	cmds = append(cmds, m.updateListsSpinners()...)
@@ -2274,6 +2281,18 @@ func (m *model) onWorkflowRunsFetched() []tea.Cmd {
 
 		if len(m.runsList.Items()) > 0 {
 			ri := m.getSelectedRunItem()
+
+			if m.mode() == ModeRepo && ri.ShouldFetchJobs() {
+				ri.loadingJobs = true
+				ri.lastFetchJobs = time.Now()
+				log.Info(
+					"[repo mode] workflow runs fetched - fetching the current run's jobs",
+					"runId",
+					ri.run.Id,
+				)
+				cmds = append(cmds, m.makeFetchWorkflowRunJobsCmd(*ri.run))
+			}
+
 			if ri != nil && ri.run != nil && !ri.loadingSteps &&
 				(ri.lastFetchSteps.IsZero() || time.Since(ri.lastFetchSteps) > refreshInterval) {
 				ri.loadingSteps = true
