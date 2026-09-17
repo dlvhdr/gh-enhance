@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,8 @@ import (
 	"time"
 
 	"charm.land/log/v2"
-	gh "github.com/cli/go-gh/v2/pkg/api"
+	ghCLI "github.com/cli/go-gh"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	checks "github.com/dlvhdr/x/gh-checks"
 	"github.com/shurcooL/githubv4"
 )
@@ -63,9 +65,10 @@ type Conclusion string
 type CheckRunState string
 
 type API struct {
-	url        string
-	gqlClient  *gh.GraphQLClient
-	httpClient *http.Client
+	url           string
+	gqlClient     *ghAPI.GraphQLClient
+	httpClient    *http.Client
+	ghCLIExecutor func(args ...string) (stdOut, stdErr bytes.Buffer, err error)
 }
 
 const (
@@ -84,6 +87,7 @@ func New() API {
 	// initialize singletons
 	a.getHTTPClient()
 	a.getGraphQLClient()
+	a.ghCLIExecutor = ghCLI.Exec
 
 	a.url = apiURL
 
@@ -100,11 +104,16 @@ func IsFailureConclusion(c Conclusion) bool {
 	}
 }
 
-// CheckSuite is a grouping of CheckRuns
+// Check Suite are a grouping of Check Runs.
+// You can only have one Check Suite per commit (i.e. head_sha) per GitHub App.
 type CheckSuite struct {
 	Conclusion Conclusion
+	Status     Status
 	DatabaseId int
-	Branch     struct {
+	Commit     struct {
+		Oid string
+	}
+	Branch struct {
 		Name string
 	}
 	App struct {
@@ -112,12 +121,14 @@ type CheckSuite struct {
 		Name string
 	}
 
-	// A WorkflowRun has one CheckSuite and is defined by a GitHub Action's file
+	// A check suite may be associated with a workflow run
 	WorkflowRun struct {
+		Id                        string
 		Url                       string
 		DatabaseId                int
 		Event                     string
 		RunNumber                 int
+		RunAttempt                int
 		PendingDeploymentRequests struct {
 			Nodes []struct {
 				Environment struct {
@@ -126,7 +137,9 @@ type CheckSuite struct {
 			}
 		} `graphql:"pendingDeploymentRequests(first: 1)"`
 		Workflow struct {
-			Name string
+			Id         string
+			Name       string
+			DatabaseId int
 		}
 	}
 }
@@ -139,7 +152,9 @@ type StatusContext struct {
 	State       Conclusion
 }
 
-// CheckRun is a job running in CI on a specific commit. It is part of a CheckSuite.
+// CheckRun is a job running in CI on a specific commit.
+// Check Runs belong to one Check Suite, one Check Suite can have many Check Runs.
+// You can only have one Check Suite per commit (i.e. head_sha) per GitHub App.
 type CheckRun struct {
 	Id          string
 	Name        string
@@ -253,7 +268,7 @@ type NormalizedRepoCheckRunsResponse struct {
 	CheckRuns  []CheckRun
 }
 
-func (a *API) SetGQLClient(c *gh.GraphQLClient) {
+func (a *API) SetGQLClient(c *ghAPI.GraphQLClient) {
 	a.gqlClient = c
 }
 
@@ -261,21 +276,27 @@ func (a *API) SetHTTPClient(c *http.Client) {
 	a.httpClient = c
 }
 
-func (a *API) getGraphQLClient() (*gh.GraphQLClient, error) {
+func (a *API) SetGHCLIExecutor(
+	executor func(args ...string) (stdOut, stdErr bytes.Buffer, err error),
+) {
+	a.ghCLIExecutor = executor
+}
+
+func (a *API) getGraphQLClient() (*ghAPI.GraphQLClient, error) {
 	var err error
 	if a.gqlClient != nil {
 		return a.gqlClient, nil
 	}
 
 	level := os.Getenv("LOG_LEVEL")
-	opts := gh.ClientOptions{}
+	opts := ghAPI.ClientOptions{}
 	if level == "debug" {
 		logger := NewHTTPLogger(0)
 		opts.Log = &logger
 		opts.LogVerboseHTTP = true
 		opts.LogColorize = true
 	}
-	a.gqlClient, err = gh.NewGraphQLClient(opts)
+	a.gqlClient, err = ghAPI.NewGraphQLClient(opts)
 	return a.gqlClient, err
 }
 
@@ -285,7 +306,7 @@ func (a *API) getHTTPClient() (*http.Client, error) {
 		return a.httpClient, nil
 	}
 	level := os.Getenv("LOG_LEVEL")
-	opts := gh.ClientOptions{}
+	opts := ghAPI.ClientOptions{}
 	if level == "debug" {
 		logger := NewHTTPLogger(0)
 		opts.Log = &logger
@@ -293,7 +314,7 @@ func (a *API) getHTTPClient() (*http.Client, error) {
 		opts.LogColorize = true
 	}
 
-	a.httpClient, err = gh.NewHTTPClient(opts)
+	a.httpClient, err = ghAPI.NewHTTPClient(opts)
 	return a.httpClient, err
 }
 
@@ -327,6 +348,8 @@ func (a *API) FetchPRCheckRuns(
 	log.Debug("FetchPRCheckRuns request completed", "duration", time.Since(startTime))
 	return res, nil
 }
+
+var wow = 0
 
 func (a *API) FetchRepoWorkflowRuns(
 	repo string,
@@ -441,6 +464,7 @@ type httpStep struct {
 
 type jobStepsResponse struct {
 	Id           int
+	RunId        int `json:"run_id"`
 	Url          string
 	WorkflowName string
 	Steps        []httpStep
@@ -521,7 +545,7 @@ type CheckRunOutput struct {
 }
 
 func FetchCheckRunOutput(repo string, runID string) (CheckRunOutputResponse, error) {
-	client, err := gh.DefaultRESTClient()
+	client, err := ghAPI.DefaultRESTClient()
 	res := CheckRunOutputResponse{}
 	if err != nil {
 		return res, err
@@ -537,6 +561,39 @@ func FetchCheckRunOutput(repo string, runID string) (CheckRunOutputResponse, err
 	return res, nil
 }
 
+func (a *API) FetchJobLogs(repo string, jobId string) (string, error) {
+	jobLogsRes, stderr, err := a.ghCLIExecutor(
+		"run",
+		"view",
+		"-R",
+		repo,
+		"--log",
+		"--job",
+		jobId,
+	)
+	if err != nil {
+		// TODO: fetch with gh api
+		// if run is still in progress, gh CLI will not fetch the logs (why???)
+		// e.g.
+		// gh api \
+		//   -H "Accept: application/vnd.github+json" \
+		//   -H "X-GitHub-Api-Version: 2022-11-28" \
+		//   /repos/rapidsai/cuml/actions/jobs/46882393014/logs
+		log.Error("error fetching job logs", "jobId", jobId, "err", err, "stderr", stderr.String())
+		return stderr.String(), err
+	}
+	jobLogs := jobLogsRes.String()
+	log.Debug(
+		"success fetching job logs",
+		"id",
+		jobId,
+		"bytes",
+		len(jobLogsRes.Bytes()),
+	)
+
+	return jobLogs, nil
+}
+
 func (pr *PRWithChecks) IsStatusCheckInProgress() bool {
 	if pr == nil || len(pr.Commits.Nodes) == 0 {
 		return true
@@ -548,20 +605,26 @@ func (pr *PRWithChecks) IsStatusCheckInProgress() bool {
 		contexts.StatusContextCountsByState,
 	)
 	return (pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "" ||
-		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == "PENDING" || stats.InProgress > 0)
+		pr.Commits.Nodes[0].Commit.StatusCheckRollup.State == CommitStatePending || stats.InProgress > 0)
 }
 
-func ReRunJob(repo string, jobId string) error {
-	client, err := gh.DefaultRESTClient()
+func (a *API) ReRunJob(repo string, jobId string) error {
+	client, err := a.getHTTPClient()
 	if err != nil {
 		return err
 	}
 
 	body := strings.NewReader("")
-	res := struct{}{}
-
-	err = client.Post(fmt.Sprintf("repos/%s/actions/jobs/%s/rerun", repo, jobId), body, res)
-	return err
+	resp, err := client.Post(
+		fmt.Sprintf("%s/repos/%s/actions/jobs/%s/rerun", a.url, repo, jobId),
+		"",
+		body,
+	)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 // REST API response for GET /repos/{owner}/{repo}/actions/runs/{run_id}
@@ -581,6 +644,7 @@ type WorkflowRunResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	RunStartedAt time.Time `json:"run_started_at"`
+	CheckSuiteId int       `json:"check_suite_id"`
 	DisplayTitle string    `json:"display_title"`
 	PullRequests []struct {
 		Number int    `json:"number"`
@@ -594,7 +658,8 @@ type WorkflowRunResponse struct {
 // REST API response for GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs
 // https://docs.github.com/en/rest/actions/workflow-jobs#list-jobs-for-a-workflow-run
 type WorkflowRunJobsResponse struct {
-	TotalCount int              `json:"total_count"`
+	TotalCount int `json:"total_count"`
+	NextPage   string
 	Jobs       []WorkflowRunJob `json:"jobs"`
 }
 
@@ -658,16 +723,17 @@ func (a *API) FetchWorkflowRunByID(repo string, runID string) (WorkflowRunRespon
 	return res, nil
 }
 
-func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsResponse, error) {
+func (a *API) fetchWorkflowRunJobsPage(
+	repo string,
+	runJobsPageURL string,
+) (WorkflowRunJobsResponse, error) {
 	res := WorkflowRunJobsResponse{}
 	c, err := a.getHTTPClient()
 	if err != nil {
 		return res, err
 	}
 
-	jobsUrl, err := url.Parse(
-		fmt.Sprintf("https://api.github.com/repos/%s/actions/runs/%s/jobs", repo, runID),
-	)
+	jobsUrl, err := url.Parse(runJobsPageURL)
 	if err != nil {
 		return res, err
 	}
@@ -685,7 +751,7 @@ func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsRe
 		body, _ := io.ReadAll(resp.Body)
 		return res, fmt.Errorf(
 			"failed to fetch workflow run jobs for run %s: %s %s",
-			runID,
+			runJobsPageURL,
 			resp.Status,
 			string(body),
 		)
@@ -702,20 +768,50 @@ func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsRe
 		return res, err
 	}
 
+	if linkHeader := resp.Header.Get("link"); linkHeader != "" {
+		res.NextPage = parseNextLink(linkHeader)
+	}
+
 	return res, nil
 }
 
-func ReRunRun(repo string, runId string) error {
-	client, err := gh.DefaultRESTClient()
+func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsResponse, error) {
+	accumulated := WorkflowRunJobsResponse{Jobs: make([]WorkflowRunJob, 0)}
+	runJobsPageURL := fmt.Sprintf(
+		"https://api.github.com/repos/%s/actions/runs/%s/jobs?per_page=100",
+		repo,
+		runID,
+	)
+	for runJobsPageURL != "" {
+		resp, err := a.fetchWorkflowRunJobsPage(repo, runJobsPageURL)
+		if err == nil {
+			accumulated.Jobs = append(accumulated.Jobs, resp.Jobs...)
+			accumulated.TotalCount = resp.TotalCount
+		}
+		runJobsPageURL = resp.NextPage
+	}
+
+	return accumulated, nil
+}
+
+func (a *API) ReRunRun(repo string, runId string) error {
+	client, err := a.getHTTPClient()
 	if err != nil {
 		return err
 	}
 
 	body := strings.NewReader("")
-	res := struct{}{}
 
-	err = client.Post(fmt.Sprintf("repos/%s/actions/runs/%s/rerun", repo, runId), body, res)
-	return err
+	resp, err := client.Post(
+		fmt.Sprintf("%s/repos/%s/actions/runs/%s/rerun", a.url, repo, runId),
+		"",
+		body,
+	)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 type PR struct {
@@ -771,4 +867,29 @@ func (a *API) FetchPR(repo string, prNumber string) (PRQuery, error) {
 
 	log.Debug("FetchPR request completed", "duration", time.Since(startTime))
 	return res, nil
+}
+
+func parseNextLink(linkHeader string) string {
+	if linkHeader == "" {
+		return ""
+	}
+	// Pagination and link headers are documented here:
+	//   https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api?apiVersion=2022-11-28#using-link-headers
+	// An example link header to handle:
+	//   link: <https://api.github.com/repositories/1300192/issues?page=2>; rel="prev", <https://api.github.com/repositories/1300192/issues?page=4>; rel="next", <https://api.github.com/repositories/1300192/issues?page=515>; rel="last", <https://api.github.com/repositories/1300192/issues?page=1>; rel="first"
+	links := strings.SplitSeq(linkHeader, ",")
+	for link := range links {
+		parts := strings.Split(strings.TrimSpace(link), ";")
+		if len(parts) != 2 {
+			continue
+		}
+		if strings.Contains(parts[1], `rel="next"`) {
+			urlField := strings.TrimSpace(parts[0])
+			if strings.HasPrefix(urlField, "<") && strings.HasSuffix(urlField, ">") {
+				url := urlField[1 : len(urlField)-1]
+				return url
+			}
+		}
+	}
+	return ""
 }

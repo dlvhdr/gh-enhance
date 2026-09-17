@@ -29,6 +29,9 @@ func ParseJobLogs(jobLogs string) []data.LogsWithTime {
 
 	for line := range lines {
 		fields := strings.SplitN(line, string('\t'), 3)
+		if len(fields) < 3 {
+			continue
+		}
 
 		if count == 0 {
 			name = fields[0]

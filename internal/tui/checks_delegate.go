@@ -12,7 +12,7 @@ import (
 )
 
 type checkItem struct {
-	jobItem
+	*jobItem
 }
 
 // Title implements github.com/charmbracelet/bubbles.list.DefaultItem.Title
@@ -85,6 +85,6 @@ func newCheckItemDelegate(styles styles) list.ItemDelegate {
 
 func NewCheckItem(job data.WorkflowJob, styles styles) checkItem {
 	return checkItem{
-		jobItem: NewJobItem(job, styles),
+		jobItem: new(NewJobItem(job, styles)),
 	}
 }

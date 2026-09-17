@@ -96,3 +96,77 @@ func TimeElapsed(then time.Time) string {
 
 	return parts[0] + text
 }
+
+func areRunItemsEqual(a, b *runItem) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b != nil {
+		return false
+	}
+
+	return a.run.Id == b.run.Id
+}
+
+func areCheckItemsEqual(a, b *checkItem) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b != nil {
+		return false
+	}
+
+	return a.job.Id == b.job.Id
+}
+
+func areJobItemsEqual(a, b *jobItem) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b != nil {
+		return false
+	}
+
+	return a.job.Id == b.job.Id
+}
+
+func areStepItemsEqual(a, b *stepItem) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a != nil && b == nil {
+		return false
+	}
+	if a == nil && b != nil {
+		return false
+	}
+
+	return a.step.Name == b.step.Name && a.step.StartedAt.Equal(b.step.StartedAt)
+}
+
+func copyJob(dst *jobItem, src *jobItem) {
+	dst.job = src.job
+	dst.meta = src.meta
+	dst.logs = src.logs
+	dst.logsErr = src.logsErr
+	dst.logsStderr = src.logsStderr
+	dst.renderedLogs = src.renderedLogs
+	dst.unstyledLogs = src.unstyledLogs
+	dst.errorLine = src.errorLine
+	dst.renderedText = src.renderedText
+	dst.title = src.title
+	dst.initiatedLogsFetch = src.initiatedLogsFetch
+	dst.loadingLogs = src.loadingLogs
+	dst.loadingSteps = src.loadingSteps
+	dst.stepsItems = src.stepsItems
+	dst.styles = src.styles
+}

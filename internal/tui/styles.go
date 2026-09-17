@@ -206,7 +206,7 @@ func makeStyles() styles {
 			Foreground(colors.faintColor).
 			Align(lipgloss.Right),
 		canceledGlyph: lipgloss.NewStyle().
-			Foreground(colors.warnColor).
+			Foreground(colors.faintColor).
 			SetString(CanceledIcon),
 		skippedGlyph: lipgloss.NewStyle().
 			Foreground(colors.faintColor).

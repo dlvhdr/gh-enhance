@@ -31,55 +31,60 @@ type jobItem struct {
 	initiatedLogsFetch bool
 	loadingLogs        bool
 	loadingSteps       bool
-	steps              []*stepItem
+	stepsItems         []*stepItem
 	styles             styles
 }
 
 // Title implements charm.land/bubbles.list.DefaultItem.Title
-func (i *jobItem) Title() string {
-	status := i.viewStatus()
-	s := i.meta.TitleStyle()
-	w := i.meta.width - lipgloss.Width(status) - 2
-	return lipgloss.JoinHorizontal(lipgloss.Top, s.Render(status), s.Render(" "),
-		s.Width(w).Render(ansi.Truncate(s.Render(i.job.Name), w, Ellipsis)))
+func (ji *jobItem) Title() string {
+	status := ji.viewStatus()
+	s := ji.meta.TitleStyle()
+	w := ji.meta.width - lipgloss.Width(status) - 2
+	return lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		s.Render(status),
+		s.Render(" "),
+		s.Width(w).
+			Render(ansi.Truncate(s.Render(ji.job.Name), w, Ellipsis)),
+	)
 }
 
 // Description implements charm.land/bubbles.list.DefaultItem.Description
-func (i *jobItem) Description() string {
-	if i.job.Bucket == data.CheckBucketActionRequired {
+func (ji *jobItem) Description() string {
+	if ji.job.Bucket == data.CheckBucketActionRequired {
 		return "Action required"
 	}
-	if i.job.Bucket == data.CheckBucketSkipping {
+	if ji.job.Bucket == data.CheckBucketSkipping {
 		return "Skipped"
 	}
-	if i.job.Bucket == data.CheckBucketCancel {
+	if ji.job.Bucket == data.CheckBucketCancel {
 		return "Cancelled"
 	}
-	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
-		return fmt.Sprintf("Running for %v%s", utils.FormatTimeSince(i.job.StartedAt), Ellipsis)
+	if ji.job.CompletedAt.IsZero() && !ji.job.StartedAt.IsZero() {
+		return fmt.Sprintf("Running for %v%s", utils.FormatTimeSince(ji.job.StartedAt), Ellipsis)
 	}
-	if i.job.Bucket == data.CheckBucketPending {
-		if i.job.State == api.StatusWaiting {
+	if ji.job.Bucket == data.CheckBucketPending {
+		if ji.job.State == api.StatusWaiting {
 			return "Waiting"
 		}
 
 		return "Pending"
 	}
 
-	return i.job.CompletedAt.Sub(i.job.StartedAt).String()
+	return ji.job.CompletedAt.Sub(ji.job.StartedAt).String()
 }
 
 // FilterValue implements charm.land/bubbles.list.Item.FilterValue
-func (i *jobItem) FilterValue() string {
-	return i.job.Name
+func (ji *jobItem) FilterValue() string {
+	return ji.job.Name
 }
 
-func (i *jobItem) viewStatus() string {
-	s := i.meta.TitleStyle()
-	if i.job.CompletedAt.IsZero() && !i.job.StartedAt.IsZero() {
+func (ji *jobItem) viewStatus() string {
+	s := ji.meta.TitleStyle()
+	if ji.job.CompletedAt.IsZero() && !ji.job.StartedAt.IsZero() {
 		return cachedSpinner.View()
 	}
-	return bucketToIcon(i.job.Bucket, strings.ToLower(string(i.job.State)), s, i.meta.styles)
+	return bucketToIcon(ji.job.Bucket, strings.ToLower(string(ji.job.State)), s, ji.meta.styles)
 }
 
 // jobsDelegate implements charm.land/bubbles.list.ItemDelegate
@@ -134,7 +139,7 @@ func (ji *jobItem) hasInProgressSteps() bool {
 
 	// if the job isn't in progress but we have stale steps that are still showing
 	// as in progress
-	for _, si := range ji.steps {
+	for _, si := range ji.stepsItems {
 		if si.step.CompletedAt.IsZero() {
 			return true
 		}
@@ -158,6 +163,6 @@ func NewJobItem(job data.WorkflowJob, styles styles) jobItem {
 		logs:         make([]data.LogsWithTime, 0),
 		loadingLogs:  false,
 		loadingSteps: loadingSteps,
-		steps:        make([]*stepItem, 0),
+		stepsItems:   make([]*stepItem, 0),
 	}
 }

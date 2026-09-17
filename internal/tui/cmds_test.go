@@ -21,7 +21,7 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 		t.Error(err)
 	}
 
-	wfr := makeWorkflowRun(
+	wfr := extractWorkflowRun(
 		res.Data.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes[0].CheckRun,
 	)
 
@@ -32,7 +32,7 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes,
 	)
 	msg1 := prChecksFetchedMsg{runs: runs, pr: m.prWithChecks}
-	m.workflowRuns = m.mergeWorkflowRuns(msg1, m.workflowRuns)
+	m.workflowRuns = m.mergeFetchedWorkflowRuns(msg1, m.workflowRuns)
 
 	if len(m.workflowRuns) != 1 {
 		t.Fatalf(`expected workflow runs to have length of 1, got: %d`, len(m.workflowRuns))
@@ -53,25 +53,26 @@ func TestMergingOfSameWorkflowJobs(t *testing.T) {
 			RunNumber: wfr.RunNumber,
 			Jobs: []data.WorkflowJob{
 				{
-					RunNumber:  wfr.RunNumber,
-					Id:         "job2",
-					State:      api.StatusCompleted,
-					Conclusion: api.ConclusionSuccess,
-					Name:       "job2",
-					Title:      "job2",
-					Workflow:   wfr.Name,
-					Event:      "pull_request",
-					Logs:       []data.LogsWithTime{},
-					Link:       "https://github.com/dlvhdr/gh-dash/actions/runs/19991547923/job/57332991075",
-					Bucket:     data.CheckBucketPass,
-					Kind:       data.JobKindCheckRun,
+					CheckSuiteId: wfr.CheckSuiteId,
+					RunAttempt:   wfr.RunNumber,
+					Id:           "job2",
+					State:        api.StatusCompleted,
+					Conclusion:   api.ConclusionSuccess,
+					Name:         "job2",
+					Title:        "job2",
+					WorkflowName: wfr.Name,
+					Event:        "pull_request",
+					Logs:         []data.LogsWithTime{},
+					Link:         "https://github.com/dlvhdr/gh-dash/actions/runs/19991547923/job/57332991075",
+					Bucket:       data.CheckBucketPass,
+					Kind:         data.JobKindCheckRun,
 				},
 			},
 			Bucket: wfr.Bucket,
 		},
 	}
 	msg2 := prChecksFetchedMsg{runs: next}
-	m.workflowRuns = m.mergeWorkflowRuns(msg2, m.workflowRuns)
+	m.workflowRuns = m.mergeFetchedWorkflowRuns(msg2, m.workflowRuns)
 
 	if len(m.workflowRuns) != 1 {
 		t.Fatalf(
@@ -98,7 +99,7 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 		t.Error(err)
 	}
 
-	wfr := makeWorkflowRun(
+	wfr := extractWorkflowRun(
 		res.Data.Resource.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes[0].CheckRun,
 	)
 
@@ -109,7 +110,7 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 		m.prWithChecks.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes,
 	)
 	msg1 := prChecksFetchedMsg{runs: runs, pr: m.prWithChecks}
-	m.workflowRuns = m.mergeWorkflowRuns(msg1, m.workflowRuns)
+	m.workflowRuns = m.mergeFetchedWorkflowRuns(msg1, m.workflowRuns)
 
 	if len(m.workflowRuns) != 1 {
 		t.Fatalf(`expected workflow runs to have length of 1, got: %d`, len(m.workflowRuns))
@@ -129,24 +130,24 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 			Event:    m.workflowRuns[0].Event,
 			Jobs: []data.WorkflowJob{
 				{
-					Id:         "job1",
-					State:      api.StatusCompleted,
-					Conclusion: api.ConclusionSuccess,
-					Name:       m.workflowRuns[0].Jobs[0].Name,
-					Title:      m.workflowRuns[0].Jobs[0].Name,
-					Workflow:   "some-other-workflow",
-					Event:      "pull_request",
-					Logs:       []data.LogsWithTime{},
-					Link:       "https://github.com/neovim/neovim/actions/runs/15928656163/job/44932094595",
-					Bucket:     data.CheckBucketPass,
-					Kind:       data.JobKindCheckRun,
+					Id:           "job1",
+					State:        api.StatusCompleted,
+					Conclusion:   api.ConclusionSuccess,
+					Name:         m.workflowRuns[0].Jobs[0].Name,
+					Title:        m.workflowRuns[0].Jobs[0].Name,
+					WorkflowName: "some-other-workflow",
+					Event:        "pull_request",
+					Logs:         []data.LogsWithTime{},
+					Link:         "https://github.com/neovim/neovim/actions/runs/15928656163/job/44932094595",
+					Bucket:       data.CheckBucketPass,
+					Kind:         data.JobKindCheckRun,
 				},
 			},
 			Bucket: wfr.Bucket,
 		},
 	}
 	msg2 := prChecksFetchedMsg{runs: next}
-	m.workflowRuns = m.mergeWorkflowRuns(msg2, m.workflowRuns)
+	m.workflowRuns = m.mergeFetchedWorkflowRuns(msg2, m.workflowRuns)
 
 	if len(m.workflowRuns) != 2 {
 		t.Errorf(`expected workflow runs to have length of 2, got: %d`, len(m.workflowRuns))
