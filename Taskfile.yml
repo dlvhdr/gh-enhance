@@ -42,15 +42,24 @@ tasks:
     interactive: true
     desc: Run in debug mode with ERROR level logs. Run `task logs` to watch the logs.
 
-  install:
-    desc: Install the application
-    vars:
-      LDFLAGS: '{{if .VERSION}}-ldflags="-X github.com/dlvhdr/gh-enhance/internal/version.Version={{.VERSION}}"{{end}}'
+  build:
+    desc: Build
     cmds:
-      - go install {{.LDFLAGS}} -v .
-    sources:
-      - ./**/*.go
-      - go.mod
+      - go build .
+
+  uninstall:
+    desc: Uninstall from the gh extensions
+    cmd: |
+      if gh ext list | grep --quiet 'gh enhance'; then echo "🕐 Uninstalling..."; gh ext remove enhance; fi
+      exit 0
+
+  install:
+    desc: Install the local app as a gh extension
+    cmds:
+      - task: build
+      - task: uninstall
+      - echo "🕐 Installing local build..." && gh ext install .
+      - gh enhance --version
 
   install:prod:
     desc: Install the latest available version as a gh extension
@@ -58,12 +67,6 @@ tasks:
       - task: uninstall
       - echo "🕐 Installing latest version..." && gh ext install dlvhdr/gh-enhance
       - gh enhance --version
-
-  uninstall:
-    desc: Uninstall from the gh extensions
-    cmd: |
-      if gh ext list | grep --quiet 'gh enhance'; then echo "🕐 Uninstalling..."; gh ext remove enhance; fi
-      exit 0
 
   dlv:
     cmds:
