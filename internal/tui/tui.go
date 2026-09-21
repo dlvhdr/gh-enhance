@@ -1615,33 +1615,7 @@ func (m *model) logsWidth() int {
 }
 
 func (m *model) loadingLogsView() string {
-	parts := make([]string, 0)
-	sji := m.getSelectedJobItem()
-	byId := m.getJobItemById(sji.job.Id)
-	if sji != nil {
-		parts = append(parts, fmt.Sprintf("Job ID: %v", sji.job.Id))
-		parts = append(
-			parts,
-			fmt.Sprintf("Initiated logs fetch: %v", sji.initiatedLogsFetch),
-		)
-		parts = append(parts, fmt.Sprintf("Loading logs: %v", sji.loadingLogs))
-		parts = append(parts, fmt.Sprintf("Loading steps: %v", sji.loadingSteps))
-	}
-	if byId != nil {
-		parts = append(parts, fmt.Sprintf("(by id) Job ID: %v", byId.job.Id))
-		parts = append(
-			parts,
-			fmt.Sprintf("(by id) Initiated logs fetch: %v", byId.initiatedLogsFetch),
-		)
-		parts = append(parts, fmt.Sprintf("(by id) Loading logs: %v", byId.loadingLogs))
-		parts = append(parts, fmt.Sprintf("(by id) Loading steps: %v", byId.loadingSteps))
-	}
-	return m.fullScreenMessageView(
-		lipgloss.JoinVertical(
-			lipgloss.Left,
-			parts...,
-		),
-	)
+	return m.fullScreenMessageView(m.logsSpinner.View())
 }
 
 func (m *model) fullScreenMessageView(message string) string {
