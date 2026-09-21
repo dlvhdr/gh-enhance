@@ -15,7 +15,14 @@ var (
 
 	quitKey = key.NewBinding(
 		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", "quit"),
+		key.WithHelp("q/ctrl+c", "quit"),
+	)
+
+	// Matched after the filter/search input guards so typing "q" into an
+	// input still works; ctrl+c (quitKey) quits from anywhere.
+	softQuitKey = key.NewBinding(
+		key.WithKeys("q"),
+		key.WithHelp("q", "quit"),
 	)
 
 	nextRowKey = key.NewBinding(
