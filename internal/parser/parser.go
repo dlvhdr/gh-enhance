@@ -13,6 +13,7 @@ const (
 	GroupStartMarker     = "##[group]"
 	GroupEndMarker       = "##[endgroup]"
 	CommandMarker        = "[command]"
+	WarningMarker        = "##[warning]"
 	ErrorMarker          = "##[error]"
 	PostJobCleanupMarker = "Post job cleanup."
 	CompleteJobMarker    = "Cleaning up orphan processes"
@@ -28,6 +29,8 @@ func ParseJobLogs(jobLogs string) []data.LogsWithTime {
 	count, depth := 0, 0
 
 	for line := range lines {
+		// GitHub doesn't escape the escape sequence so we need to write an actual escape sequence.
+		line = strings.ReplaceAll(line, "^[", "\x1b")
 		fields := strings.SplitN(line, string('\t'), 3)
 		if len(fields) < 3 {
 			continue
@@ -74,6 +77,8 @@ func ParseJobLogs(jobLogs string) []data.LogsWithTime {
 			log.Kind = data.LogKindCommand
 		} else if strings.Contains(text, ErrorMarker) {
 			log.Kind = data.LogKindError
+		} else if strings.Contains(text, WarningMarker) {
+			log.Kind = data.LogKindWarning
 		}
 
 		log.Depth = depth
