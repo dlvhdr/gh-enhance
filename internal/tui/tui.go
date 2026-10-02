@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"image/color"
-	"math"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -70,7 +69,6 @@ type model struct {
 	checksDelegate          list.ItemDelegate
 	styles                  styles
 	logsSpinner             spinner.Model
-	logsInput               textinput.Model
 	inProgressSpinner       spinner.Model
 	flat                    bool
 	lastTick                time.Time
@@ -224,7 +222,6 @@ func NewModel(opts ModelOpts) model {
 		scrollbar:               sb,
 		styles:                  s,
 		logsSpinner:             ls,
-		logsInput:               li,
 		help:                    h,
 		version:                 version,
 		inProgressSpinner:       ips,
@@ -261,10 +258,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Info("got msg", "type", fmt.Sprintf("%T", msg))
 	}
 	switch msg := msg.(type) {
-	// case cursor.BlinkMsg:
-	// 	m.logsInput, cmd = m.logsInput.Update(msg)
-	// 	cmds = append(cmds, cmd)
-
 	// `startIntervalFetching` is sent after the `refreshInterval` duration has elapsed.
 	// At this point, `m.fetchPRChecksWithInterval()` checks if all checks have concluded.
 	// If they did - it's a noop, otherwise we check at the interval.
@@ -565,10 +558,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setHeights()
 		}
 
-		// if m.focusedPane == PaneLogs && key.Matches(msg, searchKey) {
-		// 	cmds = append(cmds, m.logsInput.Focus())
-		// }
-
 		if key.Matches(msg, openPRKey) && m.prWithChecks.Url != "" {
 			cmds = append(cmds, makeOpenUrlCmd(m.prWithChecks.Url))
 		}
@@ -655,11 +644,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case PaneLogs:
 		m.logsViewport, cmd = m.logsViewport.Update(msg)
-		cmds = append(cmds, cmd)
-	}
-
-	if _, ok := msg.(tea.KeyPressMsg); !ok && m.logsInput.Focused() {
-		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -1234,8 +1218,6 @@ func (m *model) setFocusedPaneStyles() {
 
 	w := m.logsWidth()
 	m.logsViewport.SetWidth(w)
-	m.logsInput.SetWidth(int(math.Max(float64(0), float64(
-		w-lipgloss.Width(m.logsInput.Prompt)-2))))
 }
 
 func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate, p pane) {
@@ -2144,7 +2126,6 @@ func (m *model) setWidths() {
 	m.help.SetWidth(m.width)
 	w := m.logsWidth()
 	m.logsViewport.SetWidth(w)
-	m.logsInput.SetWidth(w - 10)
 }
 
 func (m *model) renderFullScreenLogsSpinner(message string, cta string) string {
@@ -2342,9 +2323,7 @@ func (m *model) stopSpinners() {
 }
 
 func (m *model) resetStepsState() {
-	// m.logsViewport.ClearHighlights()
 	m.numHighlights = 0
-	m.logsInput.Reset()
 	m.stepsList.ResetSelected()
 	m.stepsList.ResetFilter()
 }
