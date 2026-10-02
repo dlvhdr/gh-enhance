@@ -2,6 +2,7 @@ package tui
 
 import (
 	"math"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -169,4 +170,23 @@ func copyJob(dst *jobItem, src *jobItem) {
 	dst.loadingSteps = src.loadingSteps
 	dst.stepsItems = src.stepsItems
 	dst.styles = src.styles
+}
+
+var ansiRegex = regexp.MustCompile(`(\x1b\[[0-9;]*m.*?\x1b\[0?m)`)
+
+// StyleStyledString is for styling a string that contains ANSI escape codes.
+func StyleStyledString(s string, st lipgloss.Style) string {
+	split := ansiRegex.Split(s, -1)
+	matches := ansiRegex.FindAllString(s, -1)
+
+	finalResult := ""
+	for i, section := range split {
+		if section != "" {
+			finalResult += st.Render(section)
+		}
+		if i < len(split)-1 && i < len(matches) {
+			finalResult += matches[i]
+		}
+	}
+	return finalResult
 }

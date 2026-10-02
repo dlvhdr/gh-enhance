@@ -3,20 +3,16 @@ package tui
 import (
 	"fmt"
 	"image/color"
-	"math"
 	"os"
-	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/cursor"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/paginator"
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"charm.land/log/v2"
@@ -32,6 +28,7 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/tui/scrollbar"
 	"github.com/dlvhdr/gh-enhance/internal/tui/util"
 	"github.com/dlvhdr/gh-enhance/internal/utils"
+	"github.com/robinovitch61/viewport/filterableviewport"
 )
 
 type pane int
@@ -60,7 +57,7 @@ type model struct {
 	jobsList                list.Model
 	stepsList               list.Model
 	checksList              list.Model
-	logsViewport            viewport.Model
+	logsViewport            *filterableviewport.Model[logLine]
 	numHighlights           int
 	scrollbar               util.Model
 	focusedPane             pane
@@ -72,7 +69,6 @@ type model struct {
 	checksDelegate          list.ItemDelegate
 	styles                  styles
 	logsSpinner             spinner.Model
-	logsInput               textinput.Model
 	inProgressSpinner       spinner.Model
 	flat                    bool
 	lastTick                time.Time
@@ -138,19 +134,7 @@ func NewModel(opts ModelOpts) model {
 	checksList.SetStatusBarItemName("step", "checks")
 	checksList.SetWidth(defaultUnfocusedLargePaneWidth)
 
-	vp := viewport.New()
-	vp.LeftGutterFunc = func(info viewport.GutterContext) string {
-		return lipgloss.NewStyle().Foreground(s.colors.faintColor).Render(
-			fmt.Sprintf(" %*d %s ", 5, info.Index+1,
-				lipgloss.NewStyle().Foreground(s.colors.fainterColor).Render("│")))
-	}
-	vp.KeyMap.Right = rightKey
-	vp.KeyMap.Left = leftKey
-
-	vp.HighlightStyle = lipgloss.NewStyle().Foreground(s.tint.Black).Background(s.tint.Blue)
-	vp.SelectedHighlightStyle = lipgloss.NewStyle().
-		Foreground(s.tint.Black).
-		Background(s.tint.BrightGreen)
+	vp := newLogsViewport(s)
 
 	sb := scrollbar.NewVertical()
 	sb.Style = sb.Style.Inherit(s.scrollbarStyle)
@@ -238,7 +222,6 @@ func NewModel(opts ModelOpts) model {
 		scrollbar:               sb,
 		styles:                  s,
 		logsSpinner:             ls,
-		logsInput:               li,
 		help:                    h,
 		version:                 version,
 		inProgressSpinner:       ips,
@@ -275,10 +258,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Info("got msg", "type", fmt.Sprintf("%T", msg))
 	}
 	switch msg := msg.(type) {
-	case cursor.BlinkMsg:
-		m.logsInput, cmd = m.logsInput.Update(msg)
-		cmds = append(cmds, cmd)
-
 	// `startIntervalFetching` is sent after the `refreshInterval` duration has elapsed.
 	// At this point, `m.fetchPRChecksWithInterval()` checks if all checks have concluded.
 	// If they did - it's a noop, otherwise we check at the interval.
@@ -487,6 +466,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.setFocusedPaneStyles()
 	case tea.KeyPressMsg:
+		if m.focusedPane == PaneLogs && m.logsViewport.FilterFocused() {
+			m.logsViewport, cmd = m.logsViewport.Update(msg)
+			cmds = append(cmds, cmd)
+			return m, tea.Batch(cmds...)
+		}
+
 		if key.Matches(msg, quitKey) {
 			log.Info("quitting", "msg", msg)
 			return m, tea.Quit
@@ -499,26 +484,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stepsList.FilterState() == list.Filtering {
 			// handled at the list Update func
 			break
-		}
-
-		if m.logsInput.Focused() {
-			if key.Matches(msg, applySearchKey) {
-				ji := m.getSelectedJobItem()
-				if ji != nil {
-					m.logsViewport.SetContentLines(ji.unstyledLogs)
-					highlights := regexp.MustCompile(
-						m.logsInput.Value()).FindAllStringIndex(
-						strings.Join(ji.unstyledLogs, "\n"), -1)
-					m.numHighlights = len(highlights)
-					m.logsViewport.SetHighlights(highlights)
-					m.logsViewport.HighlightNext()
-					m.logsInput.Blur()
-				}
-			} else {
-				m.logsInput, cmd = m.logsInput.Update(msg)
-				cmds = append(cmds, cmd)
-				break
-			}
 		}
 
 		if key.Matches(msg, modeKey) {
@@ -591,10 +556,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key.Matches(msg, helpKey) {
 			m.helpOpen = !m.helpOpen
 			m.setHeights()
-		}
-
-		if m.focusedPane == PaneLogs && key.Matches(msg, searchKey) {
-			cmds = append(cmds, m.logsInput.Focus())
 		}
 
 		if key.Matches(msg, openPRKey) && m.prWithChecks.Url != "" {
@@ -682,41 +643,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case PaneLogs:
-		if msg, ok := msg.(tea.KeyPressMsg); ok {
-			if key.Matches(msg, gotoBottomKey) {
-				m.logsViewport.GotoBottom()
-			}
-
-			if key.Matches(msg, gotoTopKey) {
-				m.logsViewport.GotoTop()
-			}
-
-			if key.Matches(msg, nextSearchMatchKey) {
-				m.logsViewport.HighlightNext()
-			}
-
-			if key.Matches(msg, prevSearchMatchKey) {
-				m.logsViewport.HighlightPrevious()
-			}
-
-			if key.Matches(msg, cancelSearchKey) {
-				m.logsInput.Blur()
-				m.logsInput.Reset()
-				m.numHighlights = 0
-				m.logsViewport.ClearHighlights()
-				ji := m.getSelectedJobItem()
-				if ji != nil {
-					m.logsViewport.SetContentLines(ji.renderedLogs)
-				}
-			}
-		}
 		m.logsViewport, cmd = m.logsViewport.Update(msg)
-
-		cmds = append(cmds, cmd)
-	}
-
-	if _, ok := msg.(tea.KeyPressMsg); !ok && m.logsInput.Focused() {
-		m.logsInput, cmd = m.logsInput.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -1231,7 +1158,6 @@ func (m *model) shouldShowSteps() bool {
 
 func (m *model) viewLogs() string {
 	title := "Job Logs"
-	w := m.logsWidth()
 	h := m.getMainContentHeight()
 	if m.focusedPane == PaneLogs {
 		title = makePill(title, m.styles.focusedPaneTitleStyle, m.styles.colors.focusedColor)
@@ -1243,30 +1169,10 @@ func (m *model) viewLogs() string {
 		title = s.Render(title)
 	}
 
-	if m.logsInput.Value() != "" && !m.logsInput.Focused() {
-		matches := fmt.Sprintf("%d matches", m.numHighlights)
-		if m.numHighlights == 0 {
-			matches = "no matches"
-		}
-		title = lipgloss.JoinHorizontal(lipgloss.Top, title, " ",
-			m.styles.faintFgStyle.Render(matches))
-	}
-
-	inputView := ""
-	ji := m.getSelectedJobItem()
-	if ji != nil && m.logsViewport.GetContent() != "" && ji.logsStderr == "" {
-		inputView = lipgloss.NewStyle().
-			Width(w).
-			Border(lipgloss.RoundedBorder(), true).
-			BorderForeground(
-				m.styles.colors.fainterColor).
-			Render(m.logsInput.View())
-	}
-
 	return lipgloss.NewStyle().
 		Height(h).
 		MaxHeight(h).
-		Render(lipgloss.JoinVertical(lipgloss.Left, title, inputView, m.logsContentView()))
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, m.logsContentView()))
 }
 
 func (m *model) setFocusedPaneStyles() {
@@ -1312,8 +1218,6 @@ func (m *model) setFocusedPaneStyles() {
 
 	w := m.logsWidth()
 	m.logsViewport.SetWidth(w)
-	m.logsInput.SetWidth(int(math.Max(float64(0), float64(
-		w-lipgloss.Width(m.logsInput.Prompt)-2))))
 }
 
 func (m *model) setListFocusedStyles(l *list.Model, delegate *list.ItemDelegate, p pane) {
@@ -1649,7 +1553,8 @@ func (m *model) noLogsView(message string) string {
 }
 
 func (m *model) isScrollbarVisible() bool {
-	return m.logsViewport.TotalLineCount() > m.logsViewport.VisibleLineCount()
+	metrics := m.logsViewport.GetItemMetrics()
+	return metrics.TotalItems > m.logsViewport.GetHeight()
 }
 
 func (m *model) enrichRunWithJobsStepsV2(msg workflowRunStepsFetchedMsg) []tea.Cmd {
@@ -1813,7 +1718,7 @@ func (m *model) onRunChanged() []tea.Cmd {
 	cmds = append(cmds, m.updateListsSpinners()...)
 	cmds = append(cmds, m.onJobChanged()...)
 
-	m.logsViewport.GotoTop()
+	m.logsViewport.GoToTop()
 
 	return cmds
 }
@@ -1849,13 +1754,13 @@ func (m *model) onStepChanged() {
 	}
 
 	if cursor == len(m.stepsList.Items())-1 {
-		m.logsViewport.GotoBottom()
+		m.logsViewport.GoToBottom()
 		return
 	}
 
 	for i, log := range ji.logs {
 		if log.Time.After(step.(*stepItem).step.StartedAt) {
-			m.logsViewport.SetYOffset(i - 1)
+			m.logsViewport.SetSelectedItemIdx(i - 1)
 			return
 		}
 	}
@@ -1864,7 +1769,7 @@ func (m *model) onStepChanged() {
 func (m *model) renderJobLogs() tea.Cmd {
 	ji := m.getSelectedJobItem()
 	if ji == nil || ji.loadingLogs {
-		m.logsViewport.SetContent("")
+		m.logsViewport.SetObjects([]logLine{})
 	}
 
 	if ji == nil {
@@ -1876,14 +1781,19 @@ func (m *model) renderJobLogs() tea.Cmd {
 	}
 
 	if ji.logsErr != nil {
-		m.logsViewport.SetContent(ji.logsStderr)
+		objs := make([]logLine, 0)
+		lines := strings.Split(ji.logsStderr, "\n")
+		for i, l := range lines {
+			objs = append(objs, newLogLine(l, i, len(lines), m.styles))
+		}
+		m.logsViewport.SetObjects(objs)
 		m.setHeights()
 
 		return nil
 	}
 
 	if len(ji.renderedLogs) != 0 {
-		m.logsViewport.SetContentLines(ji.renderedLogs)
+		m.logsViewport.SetObjects(ji.renderedLogs)
 		m.setHeights()
 
 		return nil
@@ -1891,7 +1801,12 @@ func (m *model) renderJobLogs() tea.Cmd {
 
 	if ji.job.Title != "" || ji.job.Kind == data.JobKindCheckRun ||
 		ji.job.Kind == data.JobKindExternal {
-		m.logsViewport.SetContent(ji.renderedText)
+		objs := make([]logLine, 0)
+		lines := strings.Split(ji.renderedText, "\n")
+		for i, l := range lines {
+			objs = append(objs, newLogLine(l, i, len(lines), m.styles))
+		}
+		m.logsViewport.SetObjects(objs)
 		m.logsViewport.SetWidth(5)
 		m.setHeights()
 
@@ -1899,7 +1814,7 @@ func (m *model) renderJobLogs() tea.Cmd {
 	}
 
 	ji.renderedLogs, ji.unstyledLogs = m.renderLogs(ji)
-	m.logsViewport.SetContentLines(ji.renderedLogs)
+	m.logsViewport.SetObjects(ji.renderedLogs)
 	m.setHeights()
 
 	return nil
@@ -2035,11 +1950,11 @@ func (m *model) getJobItemById(jobId string) *jobItem {
 	return nil
 }
 
-func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
+func (m *model) renderLogs(ji *jobItem) ([]logLine, []string) {
 	defer utils.TimeTrack(time.Now(), "rendering logs")
-	w := m.logsViewport.Width() - m.styles.scrollbarStyle.GetWidth()
+	w := m.logsViewport.GetWidth() - m.styles.scrollbarStyle.GetWidth()
 	expand := ExpandSymbol + " "
-	lines := make([]string, 0)
+	lines := make([]logLine, 0)
 	unstyledLines := make([]string, 0)
 	for i, log := range ji.logs {
 		rendered := log.Log
@@ -2051,6 +1966,16 @@ func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
 			unstyled = rendered
 			rendered = m.styles.errorBgStyle.Width(w).Render(lipgloss.JoinHorizontal(lipgloss.Top,
 				m.styles.errorTitleStyle.Render("Error: "), m.styles.errorStyle.Render(rendered)))
+		case data.LogKindWarning:
+			rendered = strings.Replace(rendered, parser.WarningMarker, "", 1)
+			unstyled = rendered
+			rendered = m.styles.warningBgStyle.Width(w).Render(lipgloss.JoinHorizontal(
+				lipgloss.Top,
+				m.styles.warningTitleStyle.Render(
+					"Warning: ",
+				),
+				m.styles.warningStyle.Render(rendered),
+			))
 		case data.LogKindCommand:
 			rendered = strings.Replace(rendered, parser.CommandMarker, "", 1)
 			unstyled = rendered
@@ -2062,7 +1987,7 @@ func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
 		case data.LogKindJobCleanup:
 			rendered = m.styles.stepStartMarkerStyle.Render(rendered)
 		case data.LogKindStepStart:
-			rendered = strings.Replace(rendered, parser.GroupStartMarker, expand, 1)
+			rendered = strings.Replace(rendered, parser.StepStartMarker, expand+"Run ", 1)
 			unstyled = rendered
 			rendered = m.styles.stepStartMarkerStyle.Render(rendered)
 		case data.LogKindStepNone:
@@ -2077,7 +2002,7 @@ func (m *model) renderLogs(ji *jobItem) ([]string, []string) {
 			unstyled = unstyledSep + unstyled
 			rendered = sep + rendered
 		}
-		lines = append(lines, rendered)
+		lines = append(lines, newLogLine(rendered, i, len(ji.logs), m.styles))
 		unstyledLines = append(unstyledLines, unstyled)
 	}
 	return lines, unstyledLines
@@ -2164,20 +2089,16 @@ func (m *model) goToErrorInLogs() {
 				break
 			}
 		}
-		m.logsViewport.SetYOffset(currJob.errorLine)
+		m.logsViewport.SetSelectedItemIdx(currJob.errorLine)
 	} else {
-		m.logsViewport.GotoTop()
+		m.logsViewport.GoToTop()
 	}
 }
 
 func (m *model) getLogsViewportHeight() int {
 	h := m.getMainContentHeight()
 
-	// TODO: take borders from logsInput view
 	vph := h - paneTitleHeight
-	if m.logsViewport.GetContent() != "" {
-		vph -= lipgloss.Height(m.logsInput.View()) + 2 // borders
-	}
 	m.logsViewport.SetHeight(vph)
 	m.scrollbar, _ = m.scrollbar.Update(scrollbar.HeightMsg(vph))
 
@@ -2205,7 +2126,6 @@ func (m *model) setWidths() {
 	m.help.SetWidth(m.width)
 	w := m.logsWidth()
 	m.logsViewport.SetWidth(w)
-	m.logsInput.SetWidth(w - 10)
 }
 
 func (m *model) renderFullScreenLogsSpinner(message string, cta string) string {
@@ -2403,9 +2323,7 @@ func (m *model) stopSpinners() {
 }
 
 func (m *model) resetStepsState() {
-	m.logsViewport.ClearHighlights()
 	m.numHighlights = 0
-	m.logsInput.Reset()
 	m.stepsList.ResetSelected()
 	m.stepsList.ResetFilter()
 }

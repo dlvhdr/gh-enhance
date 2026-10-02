@@ -18,6 +18,7 @@ require (
 	github.com/dlvhdr/x/help v0.1.0
 	github.com/hasura/go-graphql-client v0.15.0
 	github.com/lrstanley/bubbletint/v2 v2.0.1
+	github.com/robinovitch61/viewport v0.14.1-0.20260718213438-0e7e3ee636f2
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
 	github.com/spf13/cobra v1.10.2
 )

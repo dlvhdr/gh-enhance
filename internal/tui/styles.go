@@ -74,8 +74,11 @@ type styles struct {
 	watermarkIllustrationStyle lipgloss.Style
 	debugStyle                 lipgloss.Style
 	errorBgStyle               lipgloss.Style
+	warningBgStyle             lipgloss.Style
 	errorStyle                 lipgloss.Style
+	warningStyle               lipgloss.Style
 	errorTitleStyle            lipgloss.Style
+	warningTitleStyle          lipgloss.Style
 	separatorStyle             lipgloss.Style
 	commandStyle               lipgloss.Style
 	stepStartMarkerStyle       lipgloss.Style
@@ -118,6 +121,7 @@ func makeStyles() styles {
 	}
 
 	errorBgStyle := lipgloss.NewStyle().Background(lipgloss.Darken(t.Red, 0.8))
+	warningBgStyle := lipgloss.NewStyle().Background(lipgloss.Darken(t.Yellow, 0.8))
 	bg := lipgloss.Darken(t.Bg, 0.4)
 	brighterBg := lipgloss.Darken(t.Bg, 0.1)
 	unfocusedBg := lipgloss.Darken(focusedColor, 0.5)
@@ -242,12 +246,18 @@ func makeStyles() styles {
 		watermarkIllustrationStyle: lipgloss.NewStyle().Foreground(t.White),
 		debugStyle:                 lipgloss.NewStyle().Background(lipgloss.Color("1")),
 		errorBgStyle:               errorBgStyle,
+		warningBgStyle:             warningBgStyle,
 		errorStyle:                 errorBgStyle.Foreground(colors.errorColor).Bold(false),
+		warningStyle:               errorBgStyle.Foreground(colors.warnColor).Bold(false),
 		errorTitleStyle:            errorBgStyle.Foreground(colors.errorColor).Bold(true),
+		warningTitleStyle:          errorBgStyle.Foreground(colors.warnColor).Bold(true),
 		separatorStyle:             lipgloss.NewStyle().Foreground(colors.fainterColor),
 		commandStyle:               lipgloss.NewStyle().Foreground(t.Blue).Inline(true),
-		stepStartMarkerStyle:       lipgloss.NewStyle().Bold(true).Inline(true),
-		groupStartMarkerStyle:      lipgloss.NewStyle().Inline(true),
+		stepStartMarkerStyle: lipgloss.NewStyle().
+			Bold(true).
+			Inline(true).
+			Foreground(t.BrightCyan),
+		groupStartMarkerStyle: lipgloss.NewStyle().Inline(true),
 		scrollbarStyle: lipgloss.NewStyle().Border(lipgloss.Border{
 			Top: "▲", Bottom: "▼",
 		}, true, false, true, false).BorderForeground(colors.darkColor),

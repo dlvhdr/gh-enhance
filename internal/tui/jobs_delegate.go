@@ -23,7 +23,7 @@ type jobItem struct {
 	logs               []data.LogsWithTime
 	logsErr            error
 	logsStderr         string
-	renderedLogs       []string
+	renderedLogs       []logLine
 	unstyledLogs       []string
 	errorLine          int
 	renderedText       string

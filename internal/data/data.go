@@ -60,6 +60,7 @@ const (
 	LogKindGroupEnd
 	LogKindCommand
 	LogKindError
+	LogKindWarning
 	LogKindJobCleanup
 	LogKindCompleteJob
 )
