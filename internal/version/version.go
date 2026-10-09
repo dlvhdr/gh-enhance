@@ -6,7 +6,7 @@ import "runtime/debug"
 
 var Version = "devel"
 
-// A user may install diffnav using `go install github.com/dlvhdr/gh-enhance@latest`.
+// A user may install enhance using `go install github.com/dlvhdr/gh-enhance@latest`.
 // without -ldflags, in which case the version above is unset. As a workaround
 // we use the embedded build version that *is* set when using `go install` (and
 // is only set for `go install` and not for `go build`).
