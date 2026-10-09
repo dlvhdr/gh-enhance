@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image/color"
 	"os"
-	"runtime/debug"
 	"strings"
 	"time"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/dlvhdr/gh-enhance/internal/tui/scrollbar"
 	"github.com/dlvhdr/gh-enhance/internal/tui/util"
 	"github.com/dlvhdr/gh-enhance/internal/utils"
+	"github.com/dlvhdr/gh-enhance/internal/version"
 	"github.com/robinovitch61/viewport/filterableviewport"
 )
 
@@ -103,10 +103,7 @@ func NewModel(opts ModelOpts) model {
 		tint.SetTintID(theme)
 	}
 
-	version := "dev"
-	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Sum != "" {
-		version = info.Main.Version
-	}
+	ver := version.Version
 
 	s := makeStyles()
 
@@ -223,7 +220,7 @@ func NewModel(opts ModelOpts) model {
 		styles:                  s,
 		logsSpinner:             ls,
 		help:                    h,
-		version:                 version,
+		version:                 ver,
 		inProgressSpinner:       ips,
 		flat:                    flat,
 		focusedPane:             focusedPane,
