@@ -98,10 +98,7 @@ type ModelOpts struct {
 func NewModel(opts ModelOpts) model {
 	tint.NewDefaultRegistry()
 	tint.SetTintID(tint.TintTokyoNightStorm.ID)
-	theme := os.Getenv("ENHANCE_THEME")
-	if theme != "" {
-		tint.SetTintID(theme)
-	}
+	setTheme(os.Getenv("ENHANCE_THEME"))
 
 	ver := version.Version
 
