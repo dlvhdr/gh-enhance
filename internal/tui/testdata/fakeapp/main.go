@@ -146,7 +146,7 @@ func makeFakeClient() *api.API {
 	if err != nil {
 		panic(err)
 	}
-	httpClient, err := gh.NewHTTPClient(gh.ClientOptions{
+	restClient, err := gh.NewRESTClient(gh.ClientOptions{
 		Transport: localRoundTripper{handler: mux},
 		Host:      "localhost:3000",
 		AuthToken: "fake-token",
@@ -157,7 +157,7 @@ func makeFakeClient() *api.API {
 
 	tAPI := api.New()
 	tAPI.SetGQLClient(gqlClient)
-	tAPI.SetHTTPClient(httpClient)
+	tAPI.SetRESTClient(restClient)
 	tAPI.SetGHCLIExecutor(
 		func(args ...string) (stdOut bytes.Buffer, stdErr bytes.Buffer, err error) {
 			time.Sleep(2000 * time.Millisecond)

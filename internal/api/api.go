@@ -14,6 +14,7 @@ import (
 	"charm.land/log/v2"
 	ghCLI "github.com/cli/go-gh"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
+	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
 	checks "github.com/dlvhdr/x/gh-checks"
 	"github.com/shurcooL/githubv4"
 )
@@ -65,31 +66,27 @@ type Conclusion string
 type CheckRunState string
 
 type API struct {
+	host          string
 	url           string
 	gqlClient     *ghAPI.GraphQLClient
-	httpClient    *http.Client
+	restClient    *ghAPI.RESTClient
 	ghCLIExecutor func(args ...string) (stdOut, stdErr bytes.Buffer, err error)
 }
 
 const (
-	defaultAPIURL    = "https://api.github.com"
 	defaultServerURL = "https://github.com"
 )
 
 func New() API {
-	apiURL := os.Getenv("GITHUB_API_URL")
-	if apiURL == "" {
-		apiURL = defaultAPIURL
-	}
-
 	a := API{}
 
 	// initialize singletons
-	a.getHTTPClient()
+	a.getRESTClient()
 	a.getGraphQLClient()
+	// NOTE: The host comes from `GH_HOST`/gh config and does not follow the git remote,
+	// so running inside a GHE clone without `GH_HOST` set targets the default host
+	a.host, _ = ghAuth.DefaultHost()
 	a.ghCLIExecutor = ghCLI.Exec
-
-	a.url = apiURL
 
 	return a
 }
@@ -272,8 +269,8 @@ func (a *API) SetGQLClient(c *ghAPI.GraphQLClient) {
 	a.gqlClient = c
 }
 
-func (a *API) SetHTTPClient(c *http.Client) {
-	a.httpClient = c
+func (a *API) SetRESTClient(c *ghAPI.RESTClient) {
+	a.restClient = c
 }
 
 func (a *API) SetGHCLIExecutor(
@@ -300,10 +297,10 @@ func (a *API) getGraphQLClient() (*ghAPI.GraphQLClient, error) {
 	return a.gqlClient, err
 }
 
-func (a *API) getHTTPClient() (*http.Client, error) {
+func (a *API) getRESTClient() (*ghAPI.RESTClient, error) {
 	var err error
-	if a.httpClient != nil {
-		return a.httpClient, nil
+	if a.restClient != nil {
+		return a.restClient, nil
 	}
 	level := os.Getenv("LOG_LEVEL")
 	opts := ghAPI.ClientOptions{}
@@ -314,8 +311,16 @@ func (a *API) getHTTPClient() (*http.Client, error) {
 		opts.LogColorize = true
 	}
 
-	a.httpClient, err = ghAPI.NewHTTPClient(opts)
-	return a.httpClient, err
+	a.restClient, err = ghAPI.NewRESTClient(opts)
+	return a.restClient, err
+}
+
+func (a *API) webURL(path string) string {
+	host := a.host
+	if host == "" {
+		host = "github.com"
+	}
+	return fmt.Sprintf("https://%s/%s", host, path)
 }
 
 func (a *API) FetchPRCheckRuns(
@@ -330,7 +335,7 @@ func (a *API) FetchPRCheckRuns(
 		return res, err
 	}
 
-	parsedUrl, err := url.Parse(fmt.Sprintf("https://github.com/%s/pull/%s", repo, prNumber))
+	parsedUrl, err := url.Parse(a.webURL(fmt.Sprintf("%s/pull/%s", repo, prNumber)))
 	if err != nil {
 		return res, err
 	}
@@ -357,24 +362,21 @@ func (a *API) FetchRepoWorkflowRuns(
 ) (RepoWorkflowRunsResponse, error) {
 	var err error
 	res := RepoWorkflowRunsResponse{}
-	c, err := a.getHTTPClient()
+	c, err := a.getRESTClient()
 	if err != nil {
 		return res, err
 	}
 
-	parsedUrl, err := url.Parse(fmt.Sprintf("%s/repos/%s/actions/runs", a.url, repo))
-	if err != nil {
-		return res, err
-	}
+	path := fmt.Sprintf("repos/%s/actions/runs", repo)
 
-	log.Debug("fetching repo action runs", "url", parsedUrl)
+	log.Debug("fetching repo action runs", "path", path)
 	startTime := time.Now()
-	resp, err := c.Get(parsedUrl.String())
+	resp, err := c.Request(http.MethodGet, path, nil)
 	if err != nil {
 		log.Error("error fetching repo action runs", "err", err)
 		return res, err
 	}
-	log.Debug("FetchRepoActionRuns request completed", "duration", time.Since(startTime))
+	log.Debug("FetchRepoWorkflowRuns request completed", "duration", time.Since(startTime))
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -397,7 +399,7 @@ func (a *API) FetchRepoWorkflowRuns(
 		return res, err
 	}
 	log.Debug(
-		"FetchRepoActionRuns data",
+		"FetchRepoWorkflowRuns data",
 		"TotalCount",
 		res.TotalCount,
 		"fetched",
@@ -433,7 +435,7 @@ func (a *API) FetchWorkflowRunSteps(repo string, runID string) (WorkflowRunSteps
 		return res, err
 	}
 
-	runUrl, err := url.Parse(fmt.Sprintf("https://github.com/%s/actions/runs/%s", repo, runID))
+	runUrl, err := url.Parse(a.webURL(fmt.Sprintf("%s/actions/runs/%s", repo, runID)))
 	if err != nil {
 		return res, err
 	}
@@ -479,21 +481,16 @@ type NormalizedJobStepsResponse struct {
 
 func (a *API) FetchJobSteps(repo string, jobID string) (NormalizedJobStepsResponse, error) {
 	res := NormalizedJobStepsResponse{}
-	c, err := a.getHTTPClient()
+	c, err := a.getRESTClient()
 	if err != nil {
 		return res, err
 	}
 
-	jobUrl, err := url.Parse(
-		fmt.Sprintf("https://api.github.com/repos/%s/actions/jobs/%s", repo, jobID),
-	)
-	if err != nil {
-		return res, err
-	}
+	path := fmt.Sprintf("repos/%s/actions/jobs/%s", repo, jobID)
 
-	log.Debug("fetching job steps", "url", jobUrl)
+	log.Debug("fetching job steps", "path", path)
 	startTime := time.Now()
-	resp, err := c.Get(jobUrl.String())
+	resp, err := c.Request(http.MethodGet, path, nil)
 	if err != nil {
 		return res, err
 	}
@@ -609,15 +606,15 @@ func (pr *PRWithChecks) IsStatusCheckInProgress() bool {
 }
 
 func (a *API) ReRunJob(repo string, jobId string) error {
-	client, err := a.getHTTPClient()
+	client, err := a.getRESTClient()
 	if err != nil {
 		return err
 	}
 
 	body := strings.NewReader("")
-	resp, err := client.Post(
-		fmt.Sprintf("%s/repos/%s/actions/jobs/%s/rerun", a.url, repo, jobId),
-		"",
+	resp, err := client.Request(
+		http.MethodPost,
+		fmt.Sprintf("repos/%s/actions/jobs/%s/rerun", repo, jobId),
 		body,
 	)
 	if err != nil {
@@ -678,27 +675,23 @@ type WorkflowRunJob struct {
 
 func (a *API) FetchWorkflowRunByID(repo string, runID string) (WorkflowRunResponse, error) {
 	res := WorkflowRunResponse{}
-	c, err := a.getHTTPClient()
+	c, err := a.getRESTClient()
 	if err != nil {
 		return res, err
 	}
 
-	runUrl, err := url.Parse(
-		fmt.Sprintf("https://api.github.com/repos/%s/actions/runs/%s", repo, runID),
-	)
-	if err != nil {
-		return res, err
-	}
+	path := fmt.Sprintf("repos/%s/actions/runs/%s", repo, runID)
 
-	log.Debug("fetching workflow run by ID", "url", runUrl)
+	log.Debug("fetching workflow run by ID", "path", path)
 	startTime := time.Now()
-	resp, err := c.Get(runUrl.String())
+	resp, err := c.Request(http.MethodGet, path, nil)
 	if err != nil {
 		return res, err
 	}
 	log.Debug("FetchWorkflowRunByID request completed", "duration", time.Since(startTime))
 	defer resp.Body.Close()
 
+	// NOTE: This is now dead code
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return res, fmt.Errorf(
@@ -728,19 +721,14 @@ func (a *API) fetchWorkflowRunJobsPage(
 	runJobsPageURL string,
 ) (WorkflowRunJobsResponse, error) {
 	res := WorkflowRunJobsResponse{}
-	c, err := a.getHTTPClient()
+	c, err := a.getRESTClient()
 	if err != nil {
 		return res, err
 	}
 
-	jobsUrl, err := url.Parse(runJobsPageURL)
-	if err != nil {
-		return res, err
-	}
-
-	log.Debug("fetching workflow run jobs", "url", jobsUrl)
+	log.Debug("fetching workflow run jobs", "url", runJobsPageURL)
 	startTime := time.Now()
-	resp, err := c.Get(jobsUrl.String())
+	resp, err := c.Request(http.MethodGet, runJobsPageURL, nil)
 	if err != nil {
 		return res, err
 	}
@@ -778,7 +766,7 @@ func (a *API) fetchWorkflowRunJobsPage(
 func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsResponse, error) {
 	accumulated := WorkflowRunJobsResponse{Jobs: make([]WorkflowRunJob, 0)}
 	runJobsPageURL := fmt.Sprintf(
-		"https://api.github.com/repos/%s/actions/runs/%s/jobs?per_page=100",
+		"repos/%s/actions/runs/%s/jobs?per_page=100",
 		repo,
 		runID,
 	)
@@ -795,16 +783,16 @@ func (a *API) FetchWorkflowRunJobs(repo string, runID string) (WorkflowRunJobsRe
 }
 
 func (a *API) ReRunRun(repo string, runId string) error {
-	client, err := a.getHTTPClient()
+	client, err := a.getRESTClient()
 	if err != nil {
 		return err
 	}
 
 	body := strings.NewReader("")
 
-	resp, err := client.Post(
-		fmt.Sprintf("%s/repos/%s/actions/runs/%s/rerun", a.url, repo, runId),
-		"",
+	resp, err := client.Request(
+		http.MethodPost,
+		fmt.Sprintf("repos/%s/actions/runs/%s/rerun", repo, runId),
 		body,
 	)
 	if err != nil {
@@ -850,7 +838,7 @@ func (a *API) FetchPR(repo string, prNumber string) (PRQuery, error) {
 		return res, err
 	}
 
-	parsedUrl, err := url.Parse(fmt.Sprintf("https://github.com/%s/pull/%s", repo, prNumber))
+	parsedUrl, err := url.Parse(a.webURL(fmt.Sprintf("%s/pull/%s", repo, prNumber)))
 	if err != nil {
 		return res, err
 	}
