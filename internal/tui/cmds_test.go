@@ -160,3 +160,64 @@ func TestMergingOfDifferentWorkflowJobs(t *testing.T) {
 		t.Errorf(`expected jobs to have length of 1, got: %d`, len(m.workflowRuns[1].Jobs))
 	}
 }
+
+func checkRunWith(app, url, detailsURL string) api.CheckRun {
+	cr := api.CheckRun{Url: url, DetailsUrl: detailsURL}
+	cr.CheckSuite.App.Name = app
+	return cr
+}
+
+func TestJobKind(t *testing.T) {
+	tests := []struct {
+		name       string
+		app        string
+		url        string
+		detailsURL string
+		want       data.JobKind
+	}{
+		{
+			name:       "github actions app",
+			app:        api.GithubActionsAppName,
+			url:        "https://github.com/o/r/runs/1",
+			detailsURL: "https://github.com/o/r/actions/runs/2/job/1",
+			want:       data.JobKindGithubActions,
+		},
+		{
+			name:       "native check on github.com",
+			app:        "CodeQL",
+			url:        "https://github.com/o/r/runs/1",
+			detailsURL: "https://github.com/o/r/runs/1",
+			want:       data.JobKindCheckRun,
+		},
+		{
+			name:       "native check on a GHE host",
+			app:        "CodeQL",
+			url:        "https://github.example.com/o/r/runs/1",
+			detailsURL: "https://github.example.com/o/r/runs/1",
+			want:       data.JobKindCheckRun,
+		},
+		{
+			name:       "external CI on github.com",
+			app:        "Cirrus CI",
+			url:        "https://github.com/o/r/runs/1",
+			detailsURL: "https://cirrus-ci.com/task/1",
+			want:       data.JobKindExternal,
+		},
+		{
+			name:       "external CI on a GHE host",
+			app:        "Cirrus CI",
+			url:        "https://github.example.com/o/r/runs/1",
+			detailsURL: "https://cirrus-ci.com/task/1",
+			want:       data.JobKindExternal,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := jobKind(checkRunWith(tc.app, tc.url, tc.detailsURL))
+			if got != tc.want {
+				t.Errorf("jobKind() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

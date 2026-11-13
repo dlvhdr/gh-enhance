@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -340,7 +341,8 @@ func (m *model) startSpinners() []tea.Cmd {
 
 func (m *model) makeInitPRCmd() tea.Cmd {
 	cmds := m.startSpinners()
-	cmds = append(cmds,
+	cmds = append(
+		cmds,
 		m.makeFetchPRCmd(),
 		m.makeInitialGetPRChecksCmd(m.prNumber),
 		m.startFetchingPRChecksWithInterval(),
@@ -350,7 +352,8 @@ func (m *model) makeInitPRCmd() tea.Cmd {
 
 func (m *model) makeInitRepoModeCmd() tea.Cmd {
 	cmds := m.startSpinners()
-	cmds = append(cmds,
+	cmds = append(
+		cmds,
 		m.makeInitialGetRepoChecksCmd(),
 		m.makeFetchRepoChecksWithInterval(),
 	)
@@ -360,7 +363,8 @@ func (m *model) makeInitRepoModeCmd() tea.Cmd {
 // Run mode: fetch the workflow run and its jobs directly via REST API.
 func (m *model) makeInitRunModeCmd() tea.Cmd {
 	cmds := m.startSpinners()
-	cmds = append(cmds,
+	cmds = append(
+		cmds,
 		m.makeFetchRunCmd(),
 		m.startFetchingRunWithInterval(),
 	)
@@ -578,13 +582,20 @@ func jobKind(cr api.CheckRun) data.JobKind {
 	var kind data.JobKind
 	if isGHA {
 		kind = data.JobKindGithubActions
-	} else if !strings.HasPrefix(cr.DetailsUrl, "https://github.com/") {
+	} else if !sameHost(cr.Url, cr.DetailsUrl) {
 		kind = data.JobKindExternal
 	} else {
 		kind = data.JobKindCheckRun
 	}
 
 	return kind
+}
+
+func sameHost(a, b string) bool {
+	ua, errA := url.Parse(a)
+	ub, errB := url.Parse(b)
+
+	return errA == nil && errB == nil && ua.Host != "" && strings.EqualFold(ua.Host, ub.Host)
 }
 
 func (m *model) mergeFetchedWorkflowRuns(
