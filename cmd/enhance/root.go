@@ -48,6 +48,12 @@ var rootCmd = &cobra.Command{
 	# watch all recent runs of the specified repo
   gh enhance -R neovim/neovim 
 
+  	# look up via a URL on a GitHub Enterprise instance (the URL's host is used)
+  gh enhance https://github.example.com/<owner>/<repo>/pull/<number>
+
+  	# select the host explicitly for other invocations
+  GH_HOST=github.example.com gh enhance -R <owner/<repo>
+
 	# look up via a full URL to a GitHub PR
   gh enhance https://github.com/dlvhdr/gh-dash/pull/767
 
@@ -182,7 +188,7 @@ func init() {
 
 		if !isRunMode && len(args) > 0 {
 			arg := args[0]
-			if u, err := url.Parse(arg); err == nil && u.Hostname() == "github.com" {
+			if u, err := url.Parse(arg); err == nil && u.Host != "" {
 				if m := runURLPattern.FindStringSubmatch(u.Path); m != nil {
 					repo = m[runURLPattern.SubexpIndex("owner")] + "/" +
 						m[runURLPattern.SubexpIndex("repo")]
@@ -195,6 +201,9 @@ func init() {
 				} else {
 					fmt.Print(usage)
 					return errors.New("bad URL passed")
+				}
+				if err := os.Setenv("GH_HOST", u.Host); err != nil {
+					return err
 				}
 			} else {
 				// Bare number - must be a PR number
