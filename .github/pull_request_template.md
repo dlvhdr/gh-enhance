@@ -1,6 +1,6 @@
 # Summary
 
-Closes #<issue number>
+Closes #
 
 - [ ] I have read the [Contributing](https://github.com/dlvhdr/gh-enhance/blob/main/CONTRIBUTING.md) and [AI Policy](https://github.com/dlvhdr/gh-enhance/blob/main/AI_POLICY.md) guides.
 
